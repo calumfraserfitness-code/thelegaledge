@@ -1,0 +1,2191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Legal Edge – Client Portal</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --navy: #0b1220;
+    --navy2: #121d30;
+    --navy3: #1a2740;
+    --gold: #c9a84c;
+    --gold2: #e0bf6e;
+    --gold3: #f5d98b;
+    --text: #e8ecf0;
+    --muted: #8a9bb0;
+    --card: #162035;
+    --border: rgba(201,168,76,0.2);
+    --success: #2ecc71;
+    --flag: #ff9f43;
+    --radius: 12px;
+  }
+  html { font-size: 16px; scroll-behavior: smooth; }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--navy);
+    color: var(--text);
+    min-height: 100vh;
+    line-height: 1.6;
+  }
+
+  /* ===== HEADER ===== */
+  .header {
+    background: linear-gradient(135deg, #0a1020 0%, #111d35 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+  }
+  .logo-wrap { display: flex; align-items: center; gap: 14px; }
+  .logo-img {
+    height: 58px; width: auto; object-fit: contain; display: block;
+  }
+  .logo-text { display: flex; flex-direction: column; align-items: flex-start; }
+  .logo-text .brand {
+    font-size: 1.4rem; font-weight: 800; letter-spacing: 3px;
+    color: var(--gold2); text-transform: uppercase;
+  }
+  .logo-text .tagline {
+    font-size: 0.6rem; letter-spacing: 4px; color: var(--muted); text-transform: uppercase;
+  }
+  .header-divider { width: 1px; height: 32px; background: var(--border); }
+  .header-subtitle { font-size: 0.7rem; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; }
+
+  /* ===== PROGRESS ===== */
+  .progress-wrap {
+    background: var(--navy2);
+    padding: 18px 20px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .progress-steps {
+    display: flex;
+    max-width: 640px;
+    margin: 0 auto 16px;
+  }
+  .step {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; position: relative; cursor: default;
+  }
+  .step:not(:last-child)::after {
+    content: ''; position: absolute; top: 14px; left: 50%;
+    width: 100%; height: 2px; background: var(--navy3); z-index: 0; transition: background 0.4s;
+  }
+  .step.done:not(:last-child)::after { background: var(--gold); }
+  .step-circle {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: var(--navy3); border: 2px solid rgba(255,255,255,0.1);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.68rem; font-weight: 700; position: relative; z-index: 1;
+    transition: all 0.3s; color: var(--muted);
+  }
+  .step.active .step-circle {
+    background: var(--gold); border-color: var(--gold2);
+    color: var(--navy); box-shadow: 0 0 14px rgba(201,168,76,0.5);
+  }
+  .step.done .step-circle { background: var(--gold); border-color: var(--gold); color: var(--navy); }
+  .step-label { font-size: 0.6rem; letter-spacing: 1px; color: var(--muted); margin-top: 6px; text-transform: uppercase; text-align: center; }
+  .step.active .step-label { color: var(--gold2); }
+  .step.done .step-label { color: var(--gold); }
+
+  /* ===== FORM AREA ===== */
+  .form-area { max-width: 700px; margin: 0 auto; padding: 28px 18px 130px; }
+
+  .section-header {
+    margin-bottom: 28px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid var(--border);
+  }
+  .section-title { font-size: 1.35rem; font-weight: 800; color: var(--gold2); margin-bottom: 6px; }
+  .section-desc { color: var(--muted); font-size: 0.88rem; line-height: 1.7; }
+
+  /* Sub-section headers inside a form */
+  .subsection {
+    display: flex; align-items: center; gap: 10px;
+    margin: 28px 0 14px;
+  }
+  .subsection-line { flex: 1; height: 1px; background: var(--border); }
+  .subsection-title {
+    font-size: 0.7rem; font-weight: 700; letter-spacing: 2.5px;
+    color: var(--gold); text-transform: uppercase; white-space: nowrap;
+  }
+
+  /* ===== FIELD CARDS ===== */
+  .field-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    margin-bottom: 12px;
+    transition: border-color 0.2s;
+  }
+  .field-card:focus-within { border-color: rgba(201,168,76,0.5); }
+  .field-label {
+    font-size: 0.8rem; font-weight: 600; letter-spacing: 0.8px;
+    color: var(--gold); text-transform: uppercase;
+    margin-bottom: 10px;
+    display: flex; align-items: flex-start; gap: 8px;
+  }
+  .field-label .icon { font-size: 1rem; flex-shrink: 0; margin-top: 1px; }
+  .field-hint { font-size: 0.78rem; color: var(--muted); margin-bottom: 10px; font-style: italic; margin-top: -4px; }
+
+  input[type="text"], input[type="email"], input[type="tel"],
+  input[type="number"], input[type="time"], select, textarea {
+    width: 100%;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 0.93rem;
+    padding: 11px 14px;
+    outline: none;
+    transition: border 0.2s, background 0.2s;
+    font-family: inherit;
+  }
+  input:focus, select:focus, textarea:focus {
+    border-color: var(--gold);
+    background: rgba(201,168,76,0.05);
+  }
+  select option { background: var(--navy2); }
+  textarea { resize: vertical; min-height: 78px; }
+  .input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .input-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  @media (max-width: 480px) {
+    .input-row, .input-row-3 { grid-template-columns: 1fr; }
+  }
+  .input-label { font-size: 0.72rem; color: var(--muted); margin-bottom: 4px; letter-spacing: 0.3px; }
+
+  /* ===== CHOICE BUTTONS ===== */
+  .choices { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 4px; }
+  .choice-btn {
+    background: rgba(255,255,255,0.04);
+    border: 1.5px solid rgba(255,255,255,0.12);
+    border-radius: 8px;
+    color: var(--text);
+    cursor: pointer;
+    font-size: 0.84rem;
+    font-family: inherit;
+    padding: 9px 14px;
+    transition: all 0.16s;
+    user-select: none;
+    line-height: 1.3;
+  }
+  .choice-btn:hover { border-color: var(--gold); color: var(--gold2); }
+  .choice-btn.selected {
+    background: rgba(201,168,76,0.15);
+    border-color: var(--gold);
+    color: var(--gold2);
+    font-weight: 600;
+  }
+  .multi-hint { font-size: 0.72rem; color: var(--muted); margin-top: 8px; font-style: italic; }
+
+  /* ===== OTHER INPUT (shown when "Other" selected) ===== */
+  .other-input {
+    display: none;
+    margin-top: 8px;
+    width: 100%;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 0.9rem;
+    padding: 10px 14px;
+    outline: none;
+    font-family: inherit;
+    transition: border 0.2s;
+  }
+  .other-input:focus { border-color: var(--gold); }
+  .other-input.show { display: block; }
+
+  /* ===== RANGE SLIDER ===== */
+  .scale-wrap { margin-top: 8px; }
+  .scale-labels { display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--muted); margin-bottom: 6px; }
+  input[type="range"] {
+    width: 100%; accent-color: var(--gold); cursor: pointer;
+    height: 6px; background: var(--navy3); border-radius: 4px;
+    border: none; padding: 0;
+  }
+  .scale-value { text-align: center; font-size: 1.25rem; font-weight: 800; color: var(--gold2); margin-top: 6px; }
+
+  /* ===== NAV BUTTONS ===== */
+  .nav-bar {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: linear-gradient(0deg, var(--navy) 55%, transparent);
+    padding: 18px 20px 22px;
+    display: flex; gap: 12px; justify-content: center; z-index: 100;
+  }
+  .btn {
+    border: none; border-radius: 10px; cursor: pointer;
+    font-family: inherit; font-size: 0.95rem; font-weight: 700;
+    padding: 13px 34px; transition: all 0.2s; letter-spacing: 0.4px;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--gold) 0%, var(--gold2) 100%);
+    color: var(--navy);
+    box-shadow: 0 4px 18px rgba(201,168,76,0.35);
+  }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(201,168,76,0.5); }
+  .btn-secondary {
+    background: rgba(255,255,255,0.06); color: var(--muted);
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .btn-secondary:hover { background: rgba(255,255,255,0.1); color: var(--text); }
+
+  /* ===== SUCCESS PAGE ===== */
+  .success-screen { display: none; max-width: 780px; margin: 0 auto; padding: 0 0 80px; }
+
+  /* Hero confirmation banner */
+  .success-hero {
+    background: linear-gradient(135deg, #0d1828 0%, #162035 60%, #1a2a18 100%);
+    border: 1px solid rgba(46,204,113,0.25);
+    border-radius: 18px;
+    padding: 44px 32px 38px;
+    text-align: center;
+    margin-bottom: 28px;
+    position: relative;
+    overflow: hidden;
+  }
+  .success-hero::before {
+    content: '';
+    position: absolute;
+    top: -60px; left: 50%; transform: translateX(-50%);
+    width: 320px; height: 160px;
+    background: radial-gradient(ellipse, rgba(46,204,113,0.12) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .success-check {
+    width: 72px; height: 72px; border-radius: 50%;
+    background: linear-gradient(135deg, rgba(46,204,113,0.2), rgba(46,204,113,0.08));
+    border: 2px solid rgba(46,204,113,0.4);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 2rem; margin: 0 auto 20px;
+    box-shadow: 0 0 30px rgba(46,204,113,0.2);
+  }
+  .success-tag {
+    display: inline-block;
+    background: rgba(46,204,113,0.12);
+    border: 1px solid rgba(46,204,113,0.3);
+    border-radius: 50px;
+    color: #2ecc71;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 2.5px;
+    padding: 5px 14px;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+  .success-title {
+    font-size: 2rem; font-weight: 900;
+    color: var(--text);
+    margin-bottom: 12px;
+    line-height: 1.2;
+  }
+  .success-title span { color: var(--gold2); }
+  .success-sub {
+    color: var(--muted); font-size: 0.96rem;
+    line-height: 1.75; max-width: 480px; margin: 0 auto 28px;
+  }
+
+  /* Timeline steps */
+  .timeline {
+    display: flex; gap: 0;
+    max-width: 460px; margin: 0 auto;
+    justify-content: center;
+  }
+  .timeline-step {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; position: relative;
+  }
+  .timeline-step:not(:last-child)::after {
+    content: ''; position: absolute;
+    top: 16px; left: 50%; width: 100%; height: 2px;
+    background: linear-gradient(90deg, var(--gold), rgba(201,168,76,0.2));
+  }
+  .t-circle {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--gold), var(--gold2));
+    color: var(--navy); font-size: 0.75rem; font-weight: 800;
+    display: flex; align-items: center; justify-content: center;
+    position: relative; z-index: 1;
+    box-shadow: 0 0 14px rgba(201,168,76,0.4);
+  }
+  .t-label { font-size: 0.65rem; color: var(--muted); margin-top: 8px; text-align: center; line-height: 1.4; }
+  .t-label strong { display: block; color: var(--gold2); font-size: 0.72rem; }
+
+  /* What happens next card */
+  .next-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 22px 24px;
+    margin-bottom: 28px;
+  }
+  .next-card-title {
+    font-size: 0.72rem; font-weight: 700; letter-spacing: 2px;
+    color: var(--gold); text-transform: uppercase;
+    margin-bottom: 16px; display: flex; align-items: center; gap: 8px;
+  }
+  .next-steps { display: flex; flex-direction: column; gap: 12px; }
+  .next-step {
+    display: flex; gap: 14px; align-items: flex-start;
+  }
+  .next-step-icon {
+    width: 38px; height: 38px; border-radius: 10px;
+    background: rgba(201,168,76,0.1);
+    border: 1px solid rgba(201,168,76,0.2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem; flex-shrink: 0;
+  }
+  .next-step-info {}
+  .next-step-title { font-size: 0.9rem; font-weight: 700; color: var(--text); margin-bottom: 2px; }
+  .next-step-desc { font-size: 0.82rem; color: var(--muted); line-height: 1.5; }
+
+  /* Library section */
+  .library-header {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 16px;
+  }
+  .library-title-wrap {}
+  .library-eyebrow {
+    font-size: 0.65rem; letter-spacing: 2.5px; color: var(--gold);
+    text-transform: uppercase; font-weight: 700; margin-bottom: 3px;
+  }
+  .library-title { font-size: 1.2rem; font-weight: 800; color: var(--text); }
+  .library-desc { color: var(--muted); font-size: 0.85rem; margin-bottom: 20px; line-height: 1.6; }
+
+  .lib-tabs {
+    display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 18px;
+  }
+  .lib-tab {
+    background: rgba(255,255,255,0.04);
+    border: 1.5px solid rgba(255,255,255,0.1);
+    border-radius: 50px; color: var(--muted);
+    cursor: pointer; font-size: 0.78rem;
+    font-family: inherit; font-weight: 600;
+    padding: 7px 14px; transition: all 0.16s;
+  }
+  .lib-tab:hover { border-color: var(--gold); color: var(--gold2); }
+  .lib-tab.active { background: rgba(201,168,76,0.15); border-color: var(--gold); color: var(--gold2); }
+
+  .lib-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 12px;
+  }
+  .lib-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px;
+    cursor: default;
+    transition: border-color 0.2s, transform 0.2s;
+    display: none;
+  }
+  .lib-card.show { display: block; }
+  .lib-card:hover { border-color: rgba(201,168,76,0.5); transform: translateY(-2px); }
+  .lib-card-type {
+    font-size: 0.62rem; letter-spacing: 2px; text-transform: uppercase;
+    font-weight: 700; margin-bottom: 10px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .type-dot { width: 6px; height: 6px; border-radius: 50%; }
+  .lib-card-title { font-size: 0.92rem; font-weight: 700; color: var(--text); margin-bottom: 6px; line-height: 1.35; }
+  .lib-card-desc { font-size: 0.78rem; color: var(--muted); line-height: 1.5; }
+  .lib-card-read {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 0.72rem; font-weight: 700; color: var(--gold);
+    letter-spacing: 0.5px; margin-top: 12px;
+    text-transform: uppercase;
+  }
+
+  /* Mindset quote banner */
+  .quote-banner {
+    background: linear-gradient(135deg, rgba(201,168,76,0.08) 0%, rgba(201,168,76,0.03) 100%);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--gold);
+    border-radius: var(--radius);
+    padding: 22px 24px;
+    margin-bottom: 28px;
+  }
+  .quote-text {
+    font-size: 1.05rem; font-style: italic;
+    color: var(--text); line-height: 1.65;
+    margin-bottom: 10px;
+  }
+  .quote-author { font-size: 0.78rem; color: var(--gold); font-weight: 700; letter-spacing: 1px; }
+
+  /* Checklist / quick wins */
+  .checklist-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 22px;
+    margin-bottom: 28px;
+  }
+  .checklist-title {
+    font-size: 0.72rem; font-weight: 700; letter-spacing: 2px;
+    color: var(--gold); text-transform: uppercase;
+    margin-bottom: 14px; display: flex; align-items: center; gap: 8px;
+  }
+  .checklist-items { display: flex; flex-direction: column; gap: 10px; }
+  .check-item {
+    display: flex; gap: 12px; align-items: flex-start;
+  }
+  .check-box {
+    width: 20px; height: 20px; border-radius: 5px;
+    border: 1.5px solid var(--border);
+    background: rgba(255,255,255,0.03);
+    flex-shrink: 0; margin-top: 1px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.7rem; transition: all 0.2s;
+  }
+  .check-box.checked {
+    background: rgba(46,204,113,0.15);
+    border-color: rgba(46,204,113,0.5);
+    color: #2ecc71;
+  }
+  .check-text { font-size: 0.88rem; color: var(--text); line-height: 1.45; }
+  .check-text.checked-text { text-decoration: line-through; color: var(--muted); }
+
+  /* ===== COACH BUTTON ===== */
+  #coachBtn {
+    position: fixed; bottom: 88px; right: 18px;
+    background: linear-gradient(135deg, #1a2740, #0e1828);
+    border: 1.5px solid var(--gold); border-radius: 50px;
+    color: var(--gold2); cursor: pointer; font-size: 0.75rem;
+    font-family: inherit; font-weight: 700; letter-spacing: 1.5px;
+    padding: 10px 18px; text-transform: uppercase; z-index: 200;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4); transition: all 0.2s;
+  }
+  #coachBtn:hover {
+    background: rgba(201,168,76,0.15);
+    box-shadow: 0 4px 20px rgba(201,168,76,0.3);
+    transform: translateY(-2px);
+  }
+
+  /* ===== PASSWORD MODAL ===== */
+  .pw-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.9); backdrop-filter: blur(8px);
+    z-index: 950; align-items: center; justify-content: center;
+  }
+  .pw-overlay.show { display: flex; }
+  .pw-box {
+    background: var(--navy2); border: 1px solid var(--border);
+    border-radius: 16px; padding: 36px 30px;
+    max-width: 330px; width: 92%; text-align: center;
+  }
+  .pw-icon { font-size: 2.4rem; margin-bottom: 12px; }
+  .pw-title { font-size: 1.1rem; font-weight: 700; color: var(--gold2); margin-bottom: 6px; }
+  .pw-sub { font-size: 0.82rem; color: var(--muted); margin-bottom: 20px; }
+  .pw-input {
+    width: 100%; background: rgba(255,255,255,0.06);
+    border: 1.5px solid var(--border); border-radius: 10px;
+    color: var(--text); font-size: 1rem; padding: 13px 16px;
+    outline: none; text-align: center; letter-spacing: 4px;
+    margin-bottom: 12px; font-family: monospace; transition: border 0.2s;
+  }
+  .pw-input:focus { border-color: var(--gold); }
+  .pw-error { color: #ff6b6b; font-size: 0.8rem; margin-bottom: 10px; min-height: 18px; }
+  .pw-btns { display: flex; gap: 10px; }
+  .pw-cancel {
+    background: transparent; border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px; color: var(--muted); cursor: pointer;
+    flex: 1; font-family: inherit; font-size: 0.9rem; padding: 11px; transition: all 0.2s;
+  }
+  .pw-cancel:hover { background: rgba(255,255,255,0.06); }
+  .pw-submit {
+    background: linear-gradient(135deg, var(--gold), var(--gold2));
+    border: none; border-radius: 8px; color: var(--navy);
+    cursor: pointer; flex: 2; font-family: inherit;
+    font-size: 0.9rem; font-weight: 700; padding: 11px; transition: all 0.2s;
+  }
+  .pw-submit:hover { opacity: 0.9; }
+
+  /* ===== COACH OVERLAY ===== */
+  .coach-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.85); backdrop-filter: blur(6px);
+    z-index: 900; overflow-y: auto; padding: 16px;
+  }
+  .coach-modal {
+    background: var(--navy2); border: 1px solid var(--border);
+    border-radius: 16px; max-width: 820px; margin: 0 auto; overflow: hidden;
+  }
+  .coach-header {
+    background: linear-gradient(135deg, #0a1020, #111d35);
+    border-bottom: 1px solid var(--border);
+    padding: 18px 22px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .coach-title { font-size: 0.78rem; font-weight: 700; letter-spacing: 2px; color: var(--gold); text-transform: uppercase; }
+  .coach-close {
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px; color: var(--muted); cursor: pointer;
+    font-size: 1.1rem; width: 36px; height: 36px;
+    display: flex; align-items: center; justify-content: center; transition: all 0.2s;
+  }
+  .coach-close:hover { background: rgba(255,0,0,0.1); color: #ff6b6b; border-color: rgba(255,0,0,0.3); }
+
+  /* Client switcher */
+  .client-switcher {
+    background: #0d1828; border-bottom: 1px solid var(--border);
+    padding: 12px 20px; display: flex; gap: 7px; flex-wrap: wrap; align-items: center;
+  }
+  .switcher-label { font-size: 0.68rem; color: var(--muted); letter-spacing: 1.5px; text-transform: uppercase; margin-right: 4px; }
+  .client-tab {
+    background: rgba(255,255,255,0.04); border: 1.5px solid rgba(255,255,255,0.1);
+    border-radius: 50px; color: var(--muted); cursor: pointer;
+    font-size: 0.78rem; font-family: inherit; font-weight: 600;
+    padding: 6px 14px; transition: all 0.16s;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .client-tab:hover { border-color: var(--gold); color: var(--gold2); }
+  .client-tab.active { background: rgba(201,168,76,0.15); border-color: var(--gold); color: var(--gold2); }
+  .client-tab .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+  .client-tab.active .dot { background: var(--gold); box-shadow: 0 0 6px rgba(201,168,76,0.7); }
+  .client-tab.live .dot { background: var(--success); box-shadow: 0 0 6px rgba(46,204,113,0.8); }
+
+  /* Profile cards */
+  .coach-body { padding: 20px; }
+  .client-profile { display: none; }
+  .client-profile.active { display: block; }
+
+  .profile-hero {
+    background: linear-gradient(135deg, rgba(201,168,76,0.08), rgba(201,168,76,0.02));
+    border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 18px; margin-bottom: 16px;
+    display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap;
+  }
+  .profile-avatar {
+    width: 54px; height: 54px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--gold), var(--gold2));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.3rem; font-weight: 800; color: var(--navy); flex-shrink: 0;
+  }
+  .profile-info { flex: 1; min-width: 180px; }
+  .profile-name { font-size: 1.25rem; font-weight: 800; color: var(--text); }
+  .profile-meta { font-size: 0.8rem; color: var(--muted); margin-top: 3px; }
+  .profile-badge {
+    background: rgba(46,204,113,0.1); border: 1px solid rgba(46,204,113,0.3);
+    border-radius: 50px; color: #2ecc71; font-size: 0.68rem;
+    font-weight: 700; letter-spacing: 1px; padding: 4px 10px;
+    text-transform: uppercase; align-self: flex-start;
+  }
+  .profile-badge.pending { background: rgba(255,193,7,0.1); border-color: rgba(255,193,7,0.3); color: #ffc107; }
+  .stat-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .stat-pill {
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 8px; padding: 8px 12px; text-align: center; min-width: 70px;
+  }
+  .stat-val { font-size: 1rem; font-weight: 800; color: var(--gold2); }
+  .stat-lbl { font-size: 0.62rem; color: var(--muted); letter-spacing: 0.4px; margin-top: 1px; }
+
+  .data-section {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); margin-bottom: 12px; overflow: hidden;
+  }
+  .data-section-hdr {
+    background: rgba(255,255,255,0.03); border-bottom: 1px solid var(--border);
+    padding: 12px 18px; font-size: 0.75rem; font-weight: 700;
+    letter-spacing: 2px; color: var(--gold); text-transform: uppercase;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .data-grid { padding: 16px 18px; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px 18px; }
+  .data-item { padding: 2px 0; }
+  .data-key { font-size: 0.72rem; color: var(--muted); letter-spacing: 0.4px; margin-bottom: 3px; text-transform: uppercase; }
+  .data-val { font-size: 0.97rem; color: var(--text); font-weight: 500; line-height: 1.4; }
+  .data-val.hi { color: var(--gold2); font-weight: 700; }
+  .data-val.flag { color: var(--flag); }
+  .data-val.good { color: var(--success); }
+
+  /* ===== YOUR FIRST 72 HOURS ===== */
+  .seventy-two-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin-bottom: 28px;
+  }
+  .sth-header {
+    background: linear-gradient(135deg, #08101e 0%, #0d1828 100%);
+    border-bottom: 1px solid rgba(201,168,76,0.3);
+    padding: 20px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .sth-lines {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .sth-lines span {
+    display: block;
+    height: 1.5px;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+    opacity: 0.6;
+  }
+  .sth-title-wrap { text-align: center; flex-shrink: 0; }
+  .sth-eyebrow {
+    font-size: 0.58rem; letter-spacing: 4px; color: var(--gold);
+    text-transform: uppercase; font-weight: 700; margin-bottom: 3px;
+  }
+  .sth-title {
+    font-size: 1.05rem; font-weight: 900; color: var(--text);
+    letter-spacing: 2px; text-transform: uppercase; white-space: nowrap;
+  }
+  .sth-body { padding: 24px; }
+  .sth-welcome {
+    text-align: center;
+    padding-bottom: 20px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .sth-welcome-title {
+    font-size: 1.05rem; font-weight: 800; color: var(--gold2); margin-bottom: 8px;
+  }
+  .sth-welcome-text { font-size: 0.9rem; color: var(--muted); line-height: 1.65; }
+  .sth-section-label {
+    font-size: 0.68rem; letter-spacing: 2.5px; color: var(--gold);
+    text-transform: uppercase; font-weight: 700; margin-bottom: 16px;
+  }
+  .sth-steps { display: flex; flex-direction: column; gap: 12px; }
+  .sth-step {
+    display: flex; gap: 16px; align-items: flex-start;
+    background: rgba(255,255,255,0.025);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px; padding: 14px 16px;
+  }
+  .sth-num {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--gold), var(--gold2));
+    color: var(--navy); font-size: 0.85rem; font-weight: 900;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; box-shadow: 0 0 12px rgba(201,168,76,0.3);
+  }
+  .sth-step-content {}
+  .sth-step-title { font-size: 0.95rem; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+  .sth-step-desc { font-size: 0.83rem; color: var(--muted); line-height: 1.55; }
+
+  /* ===== FORM SECTIONS ===== */
+  .form-section { display: none; }
+  .form-section.active { display: block; }
+
+  /* ===== ARTICLE MODAL ===== */
+  .article-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.88); backdrop-filter: blur(8px);
+    z-index: 800; overflow-y: auto; padding: 20px 16px;
+  }
+  .article-overlay.show { display: block; }
+  .article-modal {
+    background: var(--navy2); border: 1px solid var(--border);
+    border-radius: 16px; max-width: 680px; margin: 0 auto;
+    overflow: hidden; position: relative;
+  }
+  .article-close {
+    position: absolute; top: 14px; right: 14px;
+    background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 8px; color: var(--muted); cursor: pointer;
+    font-size: 1.1rem; width: 36px; height: 36px;
+    display: flex; align-items: center; justify-content: center; z-index: 5;
+    transition: all 0.2s;
+  }
+  .article-close:hover { background: rgba(255,0,0,0.12); color: #ff6b6b; }
+  .article-hero {
+    background: linear-gradient(135deg, #0a1020, #111d35);
+    padding: 32px 28px 24px; border-bottom: 1px solid var(--border);
+  }
+  .article-cat {
+    font-size: 0.65rem; letter-spacing: 2.5px; font-weight: 700;
+    text-transform: uppercase; margin-bottom: 10px;
+    display: flex; align-items: center; gap: 7px;
+  }
+  .article-title {
+    font-size: 1.35rem; font-weight: 900; color: var(--text); line-height: 1.25; max-width: 560px;
+  }
+  .article-body {
+    padding: 28px; line-height: 1.8; color: var(--muted); font-size: 0.93rem;
+  }
+  .article-body p { margin-bottom: 16px; }
+  .article-body p:last-child { margin-bottom: 0; }
+  .article-body strong { color: var(--text); }
+  .article-body .a-subhead {
+    font-size: 0.78rem; font-weight: 700; letter-spacing: 1.5px;
+    color: var(--gold); text-transform: uppercase; margin: 22px 0 8px;
+  }
+  .article-body .a-tip {
+    background: rgba(201,168,76,0.07); border-left: 3px solid var(--gold);
+    border-radius: 0 8px 8px 0; padding: 12px 16px;
+    margin: 16px 0; font-size: 0.88rem; color: var(--text); line-height: 1.6;
+  }
+
+
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="logo-wrap">
+    <img class="logo-img" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0MjAgNDIwIj4KICA8ZGVmcz4KICAgIDxyYWRpYWxHcmFkaWVudCBpZD0iYmdHIiBjeD0iNDIlIiBjeT0iMzYlIiByPSI2NSUiPgogICAgICA8c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjMmE2OGJjIi8+CiAgICAgIDxzdG9wIG9mZnNldD0iNTUlIiBzdG9wLWNvbG9yPSIjMWE0YTkwIi8+CiAgICAgIDxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iIzBhMjA2MCIvPgogICAgPC9yYWRpYWxHcmFkaWVudD4KICAgIDxyYWRpYWxHcmFkaWVudCBpZD0ic2hpbmVHIiBjeD0iNTAlIiBjeT0iMTglIiByPSI2OCUiPgogICAgICA8c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMDkpIi8+CiAgICAgIDxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0icmdiYSgyNTUsMjU1LDI1NSwwKSIvPgogICAgPC9yYWRpYWxHcmFkaWVudD4KICAgIDxjbGlwUGF0aCBpZD0iY2MiPgogICAgICA8Y2lyY2xlIGN4PSIyMTAiIGN5PSIyMTAiIHI9IjE4MyIvPgogICAgPC9jbGlwUGF0aD4KICAgIDxmaWx0ZXIgaWQ9ImRzIiB4PSItMTAlIiB5PSItMTAlIiB3aWR0aD0iMTIwJSIgaGVpZ2h0PSIxMjAlIj4KICAgICAgPGZlRHJvcFNoYWRvdyBkeD0iMCIgZHk9IjUiIHN0ZERldmlhdGlvbj0iMTAiIGZsb29kLWNvbG9yPSIjMDAwIiBmbG9vZC1vcGFjaXR5PSIwLjM1Ii8+CiAgICA8L2ZpbHRlcj4KICA8L2RlZnM+CgogIDwhLS0gT3V0ZXIgcGFsZSByaW5nIC0tPgogIDxjaXJjbGUgY3g9IjIxMCIgY3k9IjIxMCIgcj0iMjA3IiBmaWxsPSJub25lIiBzdHJva2U9IiNiMGM4ZjQiIHN0cm9rZS13aWR0aD0iMS41IiBvcGFjaXR5PSIwLjM1Ii8+CgogIDwhLS0gV2hpdGUgYm9yZGVyIC0tPgogIDxjaXJjbGUgY3g9IjIxMCIgY3k9IjIxMCIgcj0iMTk3IiBmaWxsPSJ3aGl0ZSIgZmlsdGVyPSJ1cmwoI2RzKSIvPgoKICA8IS0tIE1haW4gYmx1ZSBjaXJjbGUgLS0+CiAgPGNpcmNsZSBjeD0iMjEwIiBjeT0iMjEwIiByPSIxODYiIGZpbGw9InVybCgjYmdHKSIvPgoKICA8IS0tIElubmVyIGJvcmRlciByaW5nIC0tPgogIDxjaXJjbGUgY3g9IjIxMCIgY3k9IjIxMCIgcj0iMTc5IiBmaWxsPSJub25lIiBzdHJva2U9InJnYmEoMjU1LDI1NSwyNTUsMC4yMikiIHN0cm9rZS13aWR0aD0iMiIvPgoKICA8IS0tID09PT09PSBCQUNLR1JPVU5EOiBmYWludCBjb3VydGhvdXNlICsgbGVnYWwgaWNvbm9ncmFwaHkgPT09PT09IC0tPgogIDxnIG9wYWNpdHk9IjAuMTEiIGNsaXAtcGF0aD0idXJsKCNjYykiPgogICAgPCEtLSBQZWRpbWVudCAtLT4KICAgIDxwb2x5Z29uIHBvaW50cz0iMTI4LDE5MCAyMTAsMTMyIDI5MiwxOTAiIGZpbGw9IndoaXRlIi8+CiAgICA8IS0tIENvbHVtbnMgLS0+CiAgICA8cmVjdCB4PSIxNDMiIHk9IjE5MCIgd2lkdGg9IjEzIiBoZWlnaHQ9IjYwIiBmaWxsPSJ3aGl0ZSIgcng9IjIiLz4KICAgIDxyZWN0IHg9IjE2MyIgeT0iMTkwIiB3aWR0aD0iMTMiIGhlaWdodD0iNjAiIGZpbGw9IndoaXRlIiByeD0iMiIvPgogICAgPHJlY3QgeD0iMTgzIiB5PSIxOTAiIHdpZHRoPSIxMyIgaGVpZ2h0PSI2MCIgZmlsbD0id2hpdGUiIHJ4PSIyIi8+CiAgICA8cmVjdCB4PSIyMDMiIHk9IjE5MCIgd2lkdGg9IjEzIiBoZWlnaHQ9IjYwIiBmaWxsPSJ3aGl0ZSIgcng9IjIiLz4KICAgIDxyZWN0IHg9IjIyMyIgeT0iMTkwIiB3aWR0aD0iMTMiIGhlaWdodD0iNjAiIGZpbGw9IndoaXRlIiByeD0iMiIvPgogICAgPHJlY3QgeD0iMjQzIiB5PSIxOTAiIHdpZHRoPSIxMyIgaGVpZ2h0PSI2MCIgZmlsbD0id2hpdGUiIHJ4PSIyIi8+CiAgICA8cmVjdCB4PSIyNjMiIHk9IjE5MCIgd2lkdGg9IjEzIiBoZWlnaHQ9IjYwIiBmaWxsPSJ3aGl0ZSIgcng9IjIiLz4KICAgIDwhLS0gQmFzZSAtLT4KICAgIDxyZWN0IHg9IjEyNiIgeT0iMjQ4IiB3aWR0aD0iMTY4IiBoZWlnaHQ9IjgiIGZpbGw9IndoaXRlIiByeD0iMSIvPgogICAgPCEtLSBTZWN0aW9uIHN5bWJvbCAtLT4KICAgIDx0ZXh0IHg9IjgyIiB5PSIyNjAiIGZpbGw9IndoaXRlIiBmb250LXNpemU9IjQyIiBmb250LWZhbWlseT0ic2VyaWYiIG9wYWNpdHk9IjAuNTUiPsKnPC90ZXh0PgogICAgPCEtLSBGYWludCBzZWNvbmQgc2NhbGVzIC0tPgogICAgPHRleHQgeD0iMjk0IiB5PSIyNzUiIGZpbGw9IndoaXRlIiBmb250LXNpemU9IjM2IiBmb250LWZhbWlseT0ic2VyaWYiIG9wYWNpdHk9IjAuNSI+4pqWPC90ZXh0PgogIDwvZz4KCiAgPCEtLSA9PT09PT0gU0NBTEVTIE9GIEpVU1RJQ0UgPT09PT09IC0tPgogIDxnPgogICAgPCEtLSBUb3Agb3JiL2ZpbmlhbCAtLT4KICAgIDxjaXJjbGUgY3g9IjIxMCIgY3k9IjY3IiByPSIxMyIgZmlsbD0iIzIwNjBiMCIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLXdpZHRoPSIzIi8+CiAgICA8Y2lyY2xlIGN4PSIyMTAiIGN5PSI2NyIgcj0iNiIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjQ4KSIvPgoKICAgIDwhLS0gVmVydGljYWwgcG9zdCAtLT4KICAgIDxyZWN0IHg9IjIwNS41IiB5PSI3OSIgd2lkdGg9IjkiIGhlaWdodD0iMTczIiBmaWxsPSIjMWQ1NWE4IiByeD0iMy41Ii8+CiAgICA8IS0tIFBvc3QgYmFzZSAtLT4KICAgIDxyZWN0IHg9IjE5NCIgeT0iMjQ4IiB3aWR0aD0iMzIiIGhlaWdodD0iMTAiIGZpbGw9IiMxNjNlODgiIHJ4PSIyLjUiLz4KCiAgICA8IS0tIEhvcml6b250YWwgYmVhbSAtLT4KICAgIDxyZWN0IHg9IjEwNiIgeT0iMTEwIiB3aWR0aD0iMjA4IiBoZWlnaHQ9IjkiIGZpbGw9IiMyYTY1YmEiIHJ4PSIzLjUiLz4KCiAgICA8IS0tIExlZnQgY2hhaW4gKGRhc2hlZCkgLS0+CiAgICA8bGluZSB4MT0iMTIwIiB5MT0iMTE5IiB4Mj0iMTEzIiB5Mj0iMTYzIiBzdHJva2U9InJnYmEoMjU1LDI1NSwyNTUsMC43KSIgc3Ryb2tlLXdpZHRoPSIxLjgiIHN0cm9rZS1kYXNoYXJyYXk9IjQuNSwzIi8+CgogICAgPCEtLSBMZWZ0IHBhbiAtLT4KICAgIDxsaW5lIHgxPSI5MyIgeTE9IjE2MyIgeDI9IjEzMyIgeTI9IjE2MyIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLXdpZHRoPSIzIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICAgIDxwYXRoIGQ9Ik05MywxNjMgUTExMywxOTYgMTMzLDE2MyIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjEzKSIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLXdpZHRoPSIyLjgiLz4KCiAgICA8IS0tIFJpZ2h0IGNoYWluIChkYXNoZWQpIC0tPgogICAgPGxpbmUgeDE9IjMwMCIgeTE9IjExOSIgeDI9IjMwNyIgeTI9IjE2MyIgc3Ryb2tlPSJyZ2JhKDI1NSwyNTUsMjU1LDAuNykiIHN0cm9rZS13aWR0aD0iMS44IiBzdHJva2UtZGFzaGFycmF5PSI0LjUsMyIvPgoKICAgIDwhLS0gUmlnaHQgcGFuIC0tPgogICAgPGxpbmUgeDE9IjI4NyIgeTE9IjE2MyIgeDI9IjMyNyIgeTI9IjE2MyIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLXdpZHRoPSIzIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICAgIDxwYXRoIGQ9Ik0yODcsMTYzIFEzMDcsMTk2IDMyNywxNjMiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4xMykiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMi44Ii8+CiAgPC9nPgoKICA8IS0tID09PT09PSBFS0cgLyBIRUFSVEJFQVQgTElORSA9PT09PT0gLS0+CiAgPHBvbHlsaW5lCiAgICBwb2ludHM9IjUyLDIyMCA5NiwyMjAgMTEzLDE5NSAxMzAsMjQ4IDE0NiwyMDIgMTYxLDIyMCAxODIsMjIwIDIwMCwxODggMjIwLDI1MiAyMzgsMjIwIDI1OCwyMjAgMjcyLDE5NyAyODcsMjM3IDMwMCwyMjAgMzU4LDIyMCIKICAgIGZpbGw9Im5vbmUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMy4yIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIG9wYWNpdHk9IjAuOTYiLz4KCiAgPCEtLSA9PT09PT0gRFVNQkJFTEwgKGxvd2VyIGxlZnQsIDNEIHN0eWxlKSA9PT09PT0gLS0+CiAgPGc+CiAgICA8IS0tIExlZnQgb3V0ZXIgcGxhdGUgLS0+CiAgICA8cmVjdCB4PSI0MiIgeT0iMjU2IiB3aWR0aD0iMTIiIGhlaWdodD0iNDYiIGZpbGw9IiMxNjNlODgiIHJ4PSIyLjUiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjYpIiBzdHJva2Utd2lkdGg9IjEuMiIvPgogICAgPCEtLSBMZWZ0IGlubmVyIGNvbGxhciAtLT4KICAgIDxyZWN0IHg9IjU0IiB5PSIyNjIiIHdpZHRoPSI5IiBoZWlnaHQ9IjM0IiBmaWxsPSIjMmE2MGI1IiByeD0iMS41IiBzdHJva2U9InJnYmEoMjU1LDI1NSwyNTUsMC40KSIgc3Ryb2tlLXdpZHRoPSIxIi8+CiAgICA8IS0tIEJhciAtLT4KICAgIDxyZWN0IHg9IjYzIiB5PSIyNzEiIHdpZHRoPSI1NiIgaGVpZ2h0PSIxNiIgZmlsbD0iIzJmNjhjMiIgcng9IjIuNSIvPgogICAgPCEtLSBHcmlwIGxpbmVzIC0tPgogICAgPGxpbmUgeDE9Ijc2IiB5MT0iMjcxIiB4Mj0iNzYiIHkyPSIyODciIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjI4KSIgc3Ryb2tlLXdpZHRoPSIxLjgiLz4KICAgIDxsaW5lIHgxPSI4NSIgeTE9IjI3MSIgeDI9Ijg1IiB5Mj0iMjg3IiBzdHJva2U9InJnYmEoMjU1LDI1NSwyNTUsMC4yOCkiIHN0cm9rZS13aWR0aD0iMS44Ii8+CiAgICA8bGluZSB4MT0iOTQiIHkxPSIyNzEiIHgyPSI5NCIgeTI9IjI4NyIgc3Ryb2tlPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMjgpIiBzdHJva2Utd2lkdGg9IjEuOCIvPgogICAgPGxpbmUgeDE9IjEwMyIgeTE9IjI3MSIgeDI9IjEwMyIgeTI9IjI4NyIgc3Ryb2tlPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMjgpIiBzdHJva2Utd2lkdGg9IjEuOCIvPgogICAgPCEtLSBSaWdodCBpbm5lciBjb2xsYXIgLS0+CiAgICA8cmVjdCB4PSIxMTkiIHk9IjI2MiIgd2lkdGg9IjkiIGhlaWdodD0iMzQiIGZpbGw9IiMyYTYwYjUiIHJ4PSIxLjUiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjQpIiBzdHJva2Utd2lkdGg9IjEiLz4KICAgIDwhLS0gUmlnaHQgb3V0ZXIgcGxhdGUgLS0+CiAgICA8cmVjdCB4PSIxMjgiIHk9IjI1NiIgd2lkdGg9IjEyIiBoZWlnaHQ9IjQ2IiBmaWxsPSIjMTYzZTg4IiByeD0iMi41IiBzdHJva2U9InJnYmEoMjU1LDI1NSwyNTUsMC42KSIgc3Ryb2tlLXdpZHRoPSIxLjIiLz4KICAgIDwhLS0gSGlnaGxpZ2h0IG9uIGJhciB0b3AgLS0+CiAgICA8cmVjdCB4PSI2MyIgeT0iMjcxIiB3aWR0aD0iNTYiIGhlaWdodD0iNCIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjEyKSIgcng9IjIiLz4KICA8L2c+CgogIDwhLS0gPT09PT09IFNURVRIT1NDT1BFIChyaWdodCBzaWRlKSA9PT09PT0gLS0+CiAgPGc+CiAgICA8IS0tIExlZnQgZWFyIHR1YmUgLS0+CiAgICA8cGF0aCBkPSJNMjY3LDIzMyBDMjYzLDIxNiAyNTIsMjExIDI0OCwyMjQiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzQ4ODhkOCIgc3Ryb2tlLXdpZHRoPSI1LjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogICAgPCEtLSBSaWdodCBlYXIgdHViZSAtLT4KICAgIDxwYXRoIGQ9Ik0yOTksMjMzIEMzMDMsMjE2IDMxNCwyMTEgMzE4LDIyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNDg4OGQ4IiBzdHJva2Utd2lkdGg9IjUuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+CiAgICA8IS0tIFlva2UgYnJpZGdlIC0tPgogICAgPHBhdGggZD0iTTI0OCwyMjQgUTI1NCwyMDggMjY2LDIwNCBRMjgzLDE5OCAzMDAsMjA0IFEzMTIsMjA4IDMxOCwyMjQiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzQ4ODhkOCIgc3Ryb2tlLXdpZHRoPSI1LjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogICAgPCEtLSBUdWJlIGRvd24gLS0+CiAgICA8cGF0aCBkPSJNMjgzLDIwNCBDMjgzLDIyOCAyOTYsMjUzIDMwNiwyNzgiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzM4NzhjOCIgc3Ryb2tlLXdpZHRoPSI1LjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogICAgPCEtLSBDaGVzdCBwaWVjZSByaW5nIC0tPgogICAgPGNpcmNsZSBjeD0iMzA3IiBjeT0iMjkzIiByPSIxOCIgZmlsbD0iIzFlNTBhMCIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLXdpZHRoPSIyLjgiLz4KICAgIDwhLS0gSW5uZXIgcmluZyAtLT4KICAgIDxjaXJjbGUgY3g9IjMwNyIgY3k9IjI5MyIgcj0iMTEiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjUpIiBzdHJva2Utd2lkdGg9IjEuNSIvPgogICAgPCEtLSBDZW50ZXIgZG90IC0tPgogICAgPGNpcmNsZSBjeD0iMzA3IiBjeT0iMjkzIiByPSI0LjUiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC42MikiLz4KICA8L2c+CgogIDwhLS0gPT09PT09IEJBTk5FUiA9PT09PT0gLS0+CiAgPCEtLSBEcm9wIHNoYWRvdyBsYXllciAtLT4KICA8cGF0aCBkPSJNMjgsMzE4IFEyMTAsMzAyIDM5MiwzMTggTDM5MCwzNzAgUTIxMCwzODMgMzAsMzcwIFoiIGZpbGw9IiMwNTExMmEiIG9wYWNpdHk9IjAuNTUiLz4KICA8IS0tIE1haW4gYmFubmVyIGJvZHkgLS0+CiAgPHBhdGggZD0iTTI2LDMxNCBRMjEwLDI5OCAzOTQsMzE0IEwzOTIsMzY4IFEyMTAsMzgxIDI4LDM2OCBaIiBmaWxsPSIjMGMxZTRjIi8+CiAgPCEtLSBUb3AgZWRnZSBoaWdobGlnaHQgLS0+CiAgPHBhdGggZD0iTTI2LDMxNCBRMjEwLDI5OCAzOTQsMzE0IEwzOTQsMzIyIFEyMTAsMzA2IDI2LDMyMiBaIiBmaWxsPSIjMWMzODc4Ii8+CiAgPCEtLSBCb3R0b20gZm9sZCBzaGFkb3cgLS0+CiAgPHBhdGggZD0iTTI4LDM2NSBRMjEwLDM3OCAzOTIsMzY1IEwzOTAsMzczIFEyMTAsMzg2IDMwLDM3MyBaIiBmaWxsPSIjMDQwZDFlIi8+CiAgPCEtLSBMZWZ0IHJpYmJvbiB0YWlsIChzd2FsbG93dGFpbCkgLS0+CiAgPHBhdGggZD0iTTI2LDMxNCBMNCwzNDIgTDI4LDM2OCIgZmlsbD0iIzBjMWU0YyIvPgogIDxwYXRoIGQ9Ik0yNiwzMTQgTDcsMzQwIEwyOCwzNjUiIGZpbGw9IiMxYzM4NzgiLz4KICA8IS0tIFJpZ2h0IHJpYmJvbiB0YWlsIChzd2FsbG93dGFpbCkgLS0+CiAgPHBhdGggZD0iTTM5NCwzMTQgTDQxNiwzNDIgTDM5MiwzNjgiIGZpbGw9IiMwYzFlNGMiLz4KICA8cGF0aCBkPSJNMzk0LDMxNCBMNDEzLDM0MCBMMzkyLDM2NSIgZmlsbD0iIzFjMzg3OCIvPgogIDwhLS0gQmFubmVyIHRleHQgLS0+CiAgPHRleHQgeD0iMjEwIiB5PSIzNDgiCiAgICB0ZXh0LWFuY2hvcj0ibWlkZGxlIgogICAgZmlsbD0id2hpdGUiCiAgICBmb250LWZhbWlseT0iQXJpYWwgQmxhY2ssIEFyaWFsLCBzYW5zLXNlcmlmIgogICAgZm9udC1zaXplPSIyNyIgZm9udC13ZWlnaHQ9IjkwMCIgbGV0dGVyLXNwYWNpbmc9IjIuNSI+VEhFIExFR0FMIEVER0U8L3RleHQ+CgogIDwhLS0gR2xhc3Mgc2hlZW4gb3ZlcmxheSB0b3AgLS0+CiAgPHBhdGggZD0iTTY4LDU3IFEyMTAsMzAgMzUyLDU3IFEzNzcsOTIgMzgyLDEzMiBRMjgyLDcyIDIxMCw2NyBRMTM4LDcyIDM4LDEzMiBRNDMsOTIgNjgsNTcgWiIKICAgIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4wNykiIGNsaXAtcGF0aD0idXJsKCNjYykiLz4KPC9zdmc+Cg==" alt="Legal Edge" style="display:block; height:58px;">
+    <div class="logo-text">
+      <span class="brand">Legal Edge</span>
+      <span class="tagline">Performance Coaching</span>
+    </div>
+    <div class="header-divider" style="display:block;"></div>
+    <span class="header-subtitle">Client Portal</span>
+  </div>
+</div>
+
+<!-- PROGRESS -->
+<div class="progress-wrap">
+  <div class="progress-steps" id="progressSteps">
+    <div class="step active" data-step="0">
+      <div class="step-circle">1</div>
+      <div class="step-label">Integration</div>
+    </div>
+    <div class="step" data-step="1">
+      <div class="step-circle">2</div>
+      <div class="step-label">Training</div>
+    </div>
+    <div class="step" data-step="2">
+      <div class="step-circle">3</div>
+      <div class="step-label">Nutrition</div>
+    </div>
+  </div>
+</div>
+
+<!-- FORM AREA -->
+<div class="form-area" id="formArea">
+
+  <!-- ===================================================
+       SECTION 1 — CLIENT INTEGRATION FORM
+       =================================================== -->
+  <div class="form-section active" id="section0">
+    <div class="section-header">
+      <div class="section-title">Client Integration Form</div>
+      <div class="section-desc">This form helps me understand how your life actually runs. Your work schedule, energy patterns, stress levels, sleep habits, and lifestyle constraints all influence how your plan should be structured.<br><br>Take your time and answer honestly — there are no right or wrong answers. This simply allows us to build a plan that fits your reality, not someone else's.</div>
+    </div>
+
+    <div class="field-card">
+      <div class="field-label"><span class="icon">👤</span> Full Name</div>
+      <input type="text" id="q_name" placeholder="Your full name" />
+    </div>
+
+    <!-- SECTION 1 – Work & Schedule -->
+    <div class="subsection">
+      <div class="subsection-line"></div>
+      <div class="subsection-title">🔵 Section 1 – Work &amp; Schedule</div>
+      <div class="subsection-line"></div>
+    </div>
+
+    <div class="field-card">
+      <div class="field-label"><span class="icon">💼</span> What does a typical work week look like?</div>
+      <div class="choices" id="q_worktype">
+        <button class="choice-btn" onclick="choose(this,'q_worktype')">🏠 Fully remote</button>
+        <button class="choice-btn" onclick="choose(this,'q_worktype')">🔀 Hybrid (part office / part home)</button>
+        <button class="choice-btn" onclick="choose(this,'q_worktype')">🏢 Fully in office</button>
+        <button class="choice-btn" onclick="choose(this,'q_worktype','q_worktype_other')">✏️ Other</button>
+      </div>
+      <input class="other-input" id="q_worktype_other" placeholder="Describe your work setup…" />
+    </div>
+
+    <div class="field-card">
+      <div class="field-label"><span class="icon">🕐</span> Daily Schedule</div>
+      <div class="input-row">
+        <div>
+          <div class="input-label">Wake up time</div>
+          <input type="time" id="q_waketime" />
+        </div>
+        <div>
+          <div class="input-label">Start work</div>
+          <input type="time" id="q_workstart" />
+        </div>
+        <div>
+          <div class="input-label">Finish work</div>
+          <input type="time" id="q_workend" />
+        </div>
+        <div>
+          <div class="input-label">Bedtime</div>
+          <input type="time" id="q_bedtime" />
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION 2 – Energy & Stress -->
+    <div class="subsection">
+      <div class="subsection-line"></div>
+      <div class="subsection-title">🔵 Section 2 – Energy &amp; Stress</div>
+      <div class="subsection-line"></div>
+    </div>
+
+    <div class="field-card">
+      <div class="field-label"><span class="icon">⚡</span> When do you feel most energised?</div>
+      <div class="choices" id="q_energy">
+        <button class="choice-btn" onclick="choose(this,'q_energy')">🌅 Morning</button>
+        <button class="choice-btn" onclick="choose(this,'q_energy')">🌤️ Midday</button>
+        <button class="choice-btn" onclick="choose(this,'q_energy')">🌆 Evening</button>
+        <button class="choice-btn" onclick="choose(this,'q_energy')">🔀 It varies</button>
+      </div>
+    </div>
+
+    <div class="field-card">
+      <div class="field-label"><span class="icon">🪫</span> When do you usually feel your energy crash?</div>
+      <input type="time" id="q_crashtime" />
+    </div>
+
+    <div class="field-card">
+      <div class="field-label"><span class="icon">😤</span> Biggest stress triggers right now?</div>
+      <textarea id="q_stresstriggers" placeholder="Work deadlines, family, finances, health…"></textarea>
+    </div>
+
+    <div class="field-card">
+      <div class="field-label"><span class="icon">🔄</span> How do you currently respond to stress?</div>
+      <div class="field-hint">Select all that apply</div>
+      <div class="choices" id="q_stressresponse">
+        <button class="choice-btn" onclick="chooseMulti(this,'q_stressresponse')">🚫 Skip workouts</button>
+        <button class="choice-btn" onclick="chooseMulti(this,'q_stressresponse')">🍕 Eat more</button>
+        <button class="choice-btn" onclick="chooseMulti(this,'q_stressresponse')">🍺 Drink alcohol</button>
+        <button class="choice-btn" onclick="chooseMulti(this,'q_stressresponse')">🔇 Withdraw socially</button>
+        <button class="choice-btn" onclick="chooseMulti(this,'q_stressresponse')">🤷 Nothing structured</button>
+      </div>
+    </div>
+
+    <div class="field-card">
+      <div class="field-label"><span class="icon">⌚</span> Do you track HRV or use a wearable?</div>
+      <div class="choices" id="q_wearable">
+        <button class="choice-btn" onclick="choose(this,'q_wearable')">🍎 Apple Watch</button>
+        <button class="choice-btn" onclick="choose(this,'q_wearable')">💪 Whoop</button>
+        <button class="choice-btn" onclick="choose(this,'q_wearable')">🏃 Garmin</button>
+        <button class="choice-btn" onclick="choose(this,'q_wearable')">💍 Oura</button>
+        <button class="choice-btn" onclick="choose(this,'q_wearable')">❌ No, don't have one</button>
+      </div>
+    </div>
+
+    <!-- SECTION 3 – Sleep -->
+    <div class="subsection">
+      <div class="subsection-line"></div>
+      <div class="subsection-title">🔵 Section 3 – Sleep</div>
+      <div class="subsection-line"></div>
+    </div>
+
+    <div class="field-card">
+      <div class="field-label"><span class="icon">😴</span> Average hours of sleep per night?</div>
+      <div class="scale-wrap">
+        <div class="scale-labels"><span>4 hrs</span><span>6 hrs</span><span>8 hrs</span><span>10+ hrs</span></div>
+        <input type="range" id="q_sleep" min="4" max="10" step="0.5" value="7"
+          oninput="document.getElementById('sleep_val').textContent=this.value+'h'" />
+        <div class="scale-value" id="sleep_val">7h</div>
+      </div>
+    </div>
+
+    <div class="field-card">
+      <div class="field-label"><span class="icon">📱</span> Do you use your phone in bed?</div>
+      <div class="choices" id="q_phoneinbed">
+        <button class="choice-btn" onclick="choose(this,'q_phoneinbed')">😬 Always</button>
+        <button class="choice-btn" onclick="choose(this,'q_phoneinbed')">🤏 Sometimes</button>
+        <button class="choice-btn" onclick="choose(this,'q_phoneinbed')">✅ Rarely</button>
+      </div>
+    </div>
+
+    <!-- SECTION 4 – Lifestyle Constraints -->
+    <div class="subsection">
+      <div class="subsection-line"></div>
+      <div class="subsection-title">🔵 Section 4 – Lifestyle Constraints</div>
+      <div class="subsection-line"></div>
+    </div>
+
+    <div class="field-card">
+      <div class="field-label"><span class="icon">📅</span> Do weekends derail your routine?</div>
+      <div class="choices" id="q_weekends">
+        <button class="choice-btn" onclick="choose(this,'q_weekends')">😬 Yes</button>
+        <button class="choice-btn" onclick="choose(this,'q_weekends')">🤏 Sometimes</button>
+        <button class="choice-btn" onclick="choose(this,'q_weekends')">✅ No</button>
+      </div>
+    </div>
+
+    <div class="field-card">
+      <div class="field-label"><span class="icon">🍺</span> Alcohol frequency per week?</div>
+      <div class="choices" id="q_alcoholfreq">
+        <button class="choice-btn" onclick="choose(this,'q_alcoholfreq')">🚫 None</button>
+        <button class="choice-btn" onclick="choose(this,'q_alcoholfreq')">🥂 Rarely / special occasions</button>
+        <button class="choice-btn" onclick="choose(this,'q_alcoholfreq')">🍷 Weekends only</button>
+        <button class="choice-btn" onclick="choose(this,'q_alcoholfreq')">🍺 3–4× a week</button>
+        <button class="choice-btn" onclick="choose(this,'q_alcoholfreq')">⚠️ Daily</button>
+      </div>
+    </div>
+
+    <div class="field-card">
+      <div class="field-label"><span class="icon">✈️</span> Do you travel regularly for work?</div>
+      <div class="choices" id="q_travel">
+        <button class="choice-btn" onclick="choose(this,'q_travel')">✅ Yes, regularly</button>
+        <button class="choice-btn" onclick="choose(this,'q_travel')">🤏 Occasionally</button>
+        <button class="choice-btn" onclick="choose(this,'q_travel')">❌ No</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================
+       SECTION 2 — FUNCTIONAL STRENGTH FRAMEWORK
+       =================================================== -->
+  <div class="form-section" id="section1">
+    <div class="section-header">
+      <div class="section-title">Functional Strength Framework</div>
+      <div class="section-desc">This form helps me understand your goals, preferences, and current fitness level so I can tailor a programme that's right for you. Whether you're training in the gym or at home, this plan will be designed specifically to help you achieve your goals.<br><br>Please fill this out as accurately and in as much detail as possible.</div>
+    </div>
+
+    <div class="field-card">
+      <div class="field-label"><span class="icon">📊</span> Current Activity Level — how many days per week did/do you train?</div>
+      <div class="choices" id="q_activitylevel">
+        <button class="choice-btn" onclick="choose(this,'q_activitylevel')">0 days — sedentary</button>
+        <button class="choice-btn" onclick="choose(this,'q_activitylevel')">1–2 days</button>
+        <button class="choice-btn" onclick="choose(this,'q_activitylevel')">3–4 days</button>
+        <button class="choice-btn" onclick="choose(this,'q_activitylevel')">5–6 days</button>
+        <button class="choice-btn" onclick="choose(this,'q_activitylevel')">Every day</button>
+        <button class="choice-btn" onclick="choose(this,'q_activitylevel','q_activitylevel_other')">✏️ Other</button>
+      </div>
+      <input class="other-input" id="q_activitylevel_other" placeholder="Describe your activity level…" />
+    </div>
+
+    <div class="field-card">
+      <div class="field-label"><span class="icon">🏋️</span> Experience level with resistance training?</div>
+      <div class="choices" id="q_experience">
+        <button class="choice-btn" onclick="choose(this,'q_experience')">🌱 Beginner — new to weights</button>
+        <button class="choice-btn" onclick="choose(this,'q_experience')">📈 Intermediate — 1–3 years</button>
+        <button class="choice-btn" onclick="choose(this,'q_experience')">🔱 Advanced — 3+ years</button>
+      </div>
+    </div>
+
+    <div class="field-card">
+      <div class="field-label"><span class="icon">🩺</span> Any injuries or physical limitations I should be aware of?</div>
+      <div class="field-hint">If yes, please explain in detail so I can program around it safely.</div>
+      <textarea id="q_injuries" placeholder="e.g. Lower back issue, knee pain, shoulder impingement — or 'None'…"></textarea>
+    </div>
+
+    <div class="field-card">
+      <div class="field-label"><span class="icon">🚫</span> Any exercises or equipment you dislike or prefer to avoid?</div>
+      <textarea id="q_avoidexercises" placeholder="e.g. Barbell squats, running, Smith machine — or 'None'…"></textarea>
+    </div>
+
+    <div class="field-card">
+      <div class="field-label"><span class="icon">📅</span> How many days per week can you commit to training?</div>
+      <div class="choices" id="q_commitdays">
+        <button class="choice-btn" onclick="choose(this,'q_commitdays')">2 days</button>
+        <button class="choice-btn" onclick="choose(this,'q_commitdays')">3 days</button>
+        <button class="choice-btn" onclick="choose(this,'q_commitdays')">4 days</button>
+        <button class="choice-btn" onclick="choose(this,'q_commitdays')">5 days</button>
+        <button class="choice-btn" onclick="choose(this,'q_commitdays')">6 days</button>
+      </div>
+    </div>
+
+    <div class="field-card">
+      <div class="field-label"><span class="icon">📋</span> Have you followed any structured training programmes in the past? If so, which ones?</div>
+      <textarea id="q_prevprograms" placeholder="e.g. PPL, 5/3/1, StrongLifts, PHUL — or 'No, first time'…"></textarea>
+    </div>
+
+    <div class="field-card">
+      <div class="field-label"><span class="icon">⚙️</span> What is your preferred training style?</div>
+      <div class="choices" id="q_trainingstyle">
+        <button class="choice-btn" onclick="chooseMulti(this,'q_trainingstyle')">🏋️ Heavy compound lifts</button>
+        <button class="choice-btn" onclick="chooseMulti(this,'q_trainingstyle')">💪 Hypertrophy / pump work</button>
+        <button class="choice-btn" onclick="chooseMulti(this,'q_trainingstyle')">🤸 Functional / athletic</button>
+        <button class="choice-btn" onclick="chooseMulti(this,'q_trainingstyle')">🏠 Bodyweight / calisthenics</button>
+        <button class="choice-btn" onclick="chooseMulti(this,'q_trainingstyle')">🔥 High-intensity / circuits</button>
+        <button class="choice-btn" onclick="chooseMulti(this,'q_trainingstyle')">📐 Structured splits (PPL, Upper/Lower etc.)</button>
+      </div>
+      <div class="multi-hint">Select all that apply</div>
+    </div>
+
+    <div class="field-card">
+      <div class="field-label"><span class="icon">🎯</span> Would you like to focus on any specific body parts or areas?</div>
+      <div class="choices" id="q_focusareas">
+        <button class="choice-btn" onclick="chooseMulti(this,'q_focusareas')">Chest</button>
+        <button class="choice-btn" onclick="chooseMulti(this,'q_focusareas')">Back</button>
+        <button class="choice-btn" onclick="chooseMulti(this,'q_focusareas')">Shoulders</button>
+        <button class="choice-btn" onclick="chooseMulti(this,'q_focusareas')">Arms</button>
+        <button class="choice-btn" onclick="chooseMulti(this,'q_focusareas')">Legs / Quads</button>
+        <button class="choice-btn" onclick="chooseMulti(this,'q_focusareas')">Hamstrings / Glutes</button>
+        <button class="choice-btn" onclick="chooseMulti(this,'q_focusareas')">Core / Abs</button>
+        <button class="choice-btn" onclick="chooseMulti(this,'q_focusareas')">Calves</button>
+        <button class="choice-btn" onclick="chooseMulti(this,'q_focusareas')">Full body balanced</button>
+      </div>
+      <div class="multi-hint">Select all that apply</div>
+    </div>
+
+    <div class="field-card">
+      <div class="field-label"><span class="icon">🗂️</span> How do you prefer your workouts to be structured?</div>
+      <div class="choices" id="q_workoutstructure">
+        <button class="choice-btn" onclick="choose(this,'q_workoutstructure')">PPL (Push / Pull / Legs)</button>
+        <button class="choice-btn" onclick="choose(this,'q_workoutstructure')">Upper / Lower split</button>
+        <button class="choice-btn" onclick="choose(this,'q_workoutstructure')">Full body sessions</button>
+        <button class="choice-btn" onclick="choose(this,'q_workoutstructure')">Body part splits (Bro split)</button>
+        <button class="choice-btn" onclick="choose(this,'q_workoutstructure')">No preference — coach decides</button>
+        <button class="choice-btn" onclick="choose(this,'q_workoutstructure','q_workoutstructure_other')">✏️ Other</button>
+      </div>
+      <input class="other-input" id="q_workoutstructure_other" placeholder="Describe your preferred structure…" />
+    </div>
+
+    <div class="field-card">
+      <div class="field-label"><span class="icon">❤️</span> What types of exercises do you enjoy the most?</div>
+      <textarea id="q_enjoyexercises" placeholder="e.g. Bench press, pull-ups, squats, RDLs, cable work — or 'Not sure yet'…"></textarea>
+    </div>
+
+    <div class="field-card">
+      <div class="field-label"><span class="icon">🧘</span> Would you like your training plan to include mobility / prehab work?</div>
+      <div class="choices" id="q_mobility">
+        <button class="choice-btn" onclick="choose(this,'q_mobility')">✅ Yes please</button>
+        <button class="choice-btn" onclick="choose(this,'q_mobility')">🤷 If you think it's needed</button>
+        <button class="choice-btn" onclick="choose(this,'q_mobility')">❌ No — keep it to lifting</button>
+      </div>
+    </div>
+
+    <div class="field-card">
+      <div class="field-label"><span class="icon">🏆</span> Do you have any specific strength goals?</div>
+      <textarea id="q_strengthgoals" placeholder="e.g. 100kg bench, bodyweight pull-ups, 200kg deadlift — or describe in your own words…"></textarea>
+    </div>
+
+    <div class="field-card">
+      <div class="field-label"><span class="icon">⏰</span> Preferred training time</div>
+      <div class="choices" id="q_traintime">
+        <button class="choice-btn" onclick="choose(this,'q_traintime')">🌅 Early morning (before work)</button>
+        <button class="choice-btn" onclick="choose(this,'q_traintime')">🌤️ Midday / lunch break</button>
+        <button class="choice-btn" onclick="choose(this,'q_traintime')">🌆 After work / evening</button>
+        <button class="choice-btn" onclick="choose(this,'q_traintime')">🔀 Varies each day</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================
+       SECTION 3 — TAILORED NUTRITION PLAN
+       =================================================== -->
+  <div class="form-section" id="section2">
+    <div class="section-header">
+      <div class="section-title">Tailored Nutrition Plan</div>
+      <div class="section-desc">This meal plan will be completely tailored to your routine, preferences, and dietary needs — ensuring it is both enjoyable and effective. It will include a detailed macronutrient breakdown of your daily calories and meals.<br><br>Please take a moment to fill out the following questions as honestly and in as much detail as possible.</div>
+    </div>
+
+    <div class="field-card">
+      <div class="field-label"><span class="icon">📐</span> Body Stats</div>
+      <div class="input-row">
+        <div>
+          <div class="input-label">Weight (kg)</div>
+          <input type="number" id="q_weight" placeholder="e.g. 85" />
+        </div>
+        <div>
+          <div class="input-label">Age</div>
+          <input type="number" id="q_age" placeholder="e.g. 28" />
+        </div>
+        <div>
+          <div class="input-label">Height (ft / in)</div>
+          <input type="text" id="q_height" placeholder="e.g. 5'11" />
+        </div>
+        <div>
+          <div class="input-label">Avg daily steps</div>
+          <input type="number" id="q_steps" placeholder="e.g. 8000" />
+        </div>
+      </div>
+    </div>
+
+    <div class="field-card">
+      <div class="field-label"><span class="icon">🏆</span> Main Goal(s)</div>
+      <div class="choices" id="q_maingoal">
+        <button class="choice-btn" onclick="chooseMulti(this,'q_maingoal')">🔥 Fat loss</button>
+        <button class="choice-btn" onclick="chooseMulti(this,'q_maingoal')">💪 Muscle / mass gain</button>
+        <button class="choice-btn" onclick="chooseMulti(this,'q_maingoal')">⚖️ Body recomposition</button>
+        <button class="choice-btn" onclick="chooseMulti(this,'q_maingoal')">🏃 Athletic performance</button>
+        <button class="choice-btn" onclick="chooseMulti(this,'q_maingoal')">❤️ General health &amp; energy</button>
+      </div>
+      <div class="multi-hint">Select all that apply</div>
+    </div>
+
+    <div class="field-card">
+      <div class="field-label"><span class="icon">⚠️</span> Do you have any known food allergies or intolerances?</div>
+      <textarea id="q_allergies" placeholder="e.g. Lactose intolerant, gluten allergy — or 'None'…"></textarea>
+    </div>
+
+    <div class="field-card">
+      <div class="field-label"><span class="icon">🍽️</span> How many meals do you typically eat in a day?</div>
+      <div class="choices" id="q_mealsperday">
+        <button class="choice-btn" onclick="choose(this,'q_mealsperday')">1–2 meals</button>
+        <button class="choice-btn" onclick="choose(this,'q_mealsperday')">3 meals</button>
+        <button class="choice-btn" onclick="choose(this,'q_mealsperday')">3 meals + snacks</button>
+        <button class="choice-btn" onclick="choose(this,'q_mealsperday')">4–5 meals</button>
+        <button class="choice-btn" onclick="choose(this,'q_mealsperday')">6+ meals / grazing</button>
+      </div>
+    </div>
+
+    <div class="field-card">
+      <div class="field-label"><span class="icon">🚫</span> Foods you dislike or will not eat</div>
+      <textarea id="q_foodsdislike" placeholder="e.g. Broccoli, fish, eggs, anything spicy — or 'None'…"></textarea>
+    </div>
+
+    <div class="field-card">
+      <div class="field-label"><span class="icon">✅</span> Foods you'd like to include that you'll actually stick to</div>
+      <textarea id="q_foodsinclude" placeholder="e.g. Chicken, rice, oats, Greek yogurt, bananas, cottage cheese…"></textarea>
+    </div>
+
+    <div class="field-card">
+      <div class="field-label"><span class="icon">📝</span> Describe your typical daily food intake</div>
+      <div class="field-hint">Include calories (if known), meal times, types of meals, snacks, water intake, caffeine, alcohol, etc.</div>
+      <textarea id="q_dailyintake" style="min-height:120px;" placeholder="e.g. Wake 7am — coffee + nothing. Lunch 1pm — meal deal from Tesco. 4pm — protein bar. Dinner 7pm — chicken and rice, homemade. 2 coffees per day. ~1.5L water. Maybe a beer at the weekend…"></textarea>
+    </div>
+
+    <div class="field-card">
+      <div class="field-label"><span class="icon">💛</span> Have you ever struggled with a difficult relationship with food, or had any eating disorders (past or present) I should be aware of?</div>
+      <div class="field-hint">This is completely confidential and helps me ensure your plan is supportive, not triggering.</div>
+      <div class="choices" id="q_foodrelationship">
+        <button class="choice-btn" onclick="choose(this,'q_foodrelationship')">✅ No, healthy relationship with food</button>
+        <button class="choice-btn" onclick="choose(this,'q_foodrelationship')">🤏 Some issues in the past, now fine</button>
+        <button class="choice-btn" onclick="choose(this,'q_foodrelationship')">⚠️ Yes, currently — I'd like you to be aware</button>
+      </div>
+    </div>
+
+    <div class="field-card">
+      <div class="field-label"><span class="icon">🔢</span> Have you or do you currently track your calories?</div>
+      <div class="choices" id="q_trackcals">
+        <button class="choice-btn" onclick="choose(this,'q_trackcals')">✅ Yes, regularly</button>
+        <button class="choice-btn" onclick="choose(this,'q_trackcals')">🤏 Occasionally / loosely</button>
+        <button class="choice-btn" onclick="choose(this,'q_trackcals')">❌ No, never have</button>
+        <button class="choice-btn" onclick="choose(this,'q_trackcals')">🔙 Used to, stopped</button>
+      </div>
+    </div>
+
+    <div class="field-card">
+      <div class="field-label"><span class="icon">⏰</span> If you go to the gym, what time do you usually train? Do you prefer training fasted?</div>
+      <div class="choices" id="q_gymtimefasted">
+        <button class="choice-btn" onclick="choose(this,'q_gymtimefasted')">🌅 Morning — fasted</button>
+        <button class="choice-btn" onclick="choose(this,'q_gymtimefasted')">🌅 Morning — with food beforehand</button>
+        <button class="choice-btn" onclick="choose(this,'q_gymtimefasted')">🌤️ Midday / lunchtime</button>
+        <button class="choice-btn" onclick="choose(this,'q_gymtimefasted')">🌆 After work / evening</button>
+        <button class="choice-btn" onclick="choose(this,'q_gymtimefasted')">🔀 Varies</button>
+      </div>
+    </div>
+
+    <div class="field-card">
+      <div class="field-label"><span class="icon">⏱️</span> Do you have any time constraints when preparing or eating meals?</div>
+      <textarea id="q_mealconstraints" placeholder="e.g. Only 15 mins at lunch, no time to cook on weekdays, meal prep on Sundays only…"></textarea>
+    </div>
+
+    <div class="field-card">
+      <div class="field-label"><span class="icon">🍳</span> Would you prefer meals that are quick to prepare, or are you okay with more involved recipes?</div>
+      <div class="choices" id="q_mealprep">
+        <button class="choice-btn" onclick="choose(this,'q_mealprep')">⚡ Quick and simple — 15 min max</button>
+        <button class="choice-btn" onclick="choose(this,'q_mealprep')">⏱️ Moderate — up to 30 mins</button>
+        <button class="choice-btn" onclick="choose(this,'q_mealprep')">👨‍🍳 Happy with more involved cooking</button>
+        <button class="choice-btn" onclick="choose(this,'q_mealprep')">📦 Meal prep once a week</button>
+      </div>
+    </div>
+
+    <div class="field-card">
+      <div class="field-label"><span class="icon">🏥</span> Do you have any medical conditions that may affect your diet or exercise plan?</div>
+      <textarea id="q_medical" placeholder="e.g. Type 2 diabetes, thyroid condition, high blood pressure — or 'None'…"></textarea>
+    </div>
+
+    <div class="field-card">
+      <div class="field-label"><span class="icon">🔥</span> What motivates you the most to reach your goals?</div>
+      <textarea id="q_motivation" placeholder="e.g. Looking better, feeling more confident, health for my kids, fitting into old clothes, performance…"></textarea>
+    </div>
+
+    <div class="field-card">
+      <div class="field-label"><span class="icon">🏅</span> Have you had success losing weight or fat before? If yes, what helped you the most?</div>
+      <textarea id="q_pastsuccess" placeholder="e.g. Calorie counting worked well, low carb, more structure — or 'No, first time trying'…"></textarea>
+    </div>
+  </div>
+
+
+</div><!-- /form-area -->
+
+<!-- SUCCESS PAGE -->
+  <div class="success-screen" style="display:none;" id="successScreen">
+
+    <!-- CONFIRMATION HERO -->
+    <div class="success-hero">
+      <div class="success-check">✓</div>
+      <div class="success-tag">Forms received</div>
+      <h1 class="success-title">You're officially <span>in the system.</span></h1>
+      <p class="success-sub">Your intake forms have been received and are being reviewed. This is the exact moment most people talk about making a change — you've already done it. The hard part is over.</p>
+
+      <!-- TIMELINE -->
+      <div class="timeline">
+        <div class="timeline-step">
+          <div class="t-circle">✓</div>
+          <div class="t-label"><strong>Right now</strong>Forms submitted</div>
+        </div>
+        <div class="timeline-step">
+          <div class="t-circle">2</div>
+          <div class="t-label"><strong>Within 24h</strong>Coach review</div>
+        </div>
+        <div class="timeline-step">
+          <div class="t-circle">3</div>
+          <div class="t-label"><strong>24–48h</strong>Plan delivered</div>
+        </div>
+        <div class="timeline-step">
+          <div class="t-circle">🚀</div>
+          <div class="t-label"><strong>Day 1</strong>You execute</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- WHAT HAPPENS NEXT -->
+    <div class="next-card">
+      <div class="next-card-title">⚡ What happens next</div>
+      <div class="next-steps">
+        <div class="next-step">
+          <div class="next-step-icon">🔍</div>
+          <div class="next-step-info">
+            <div class="next-step-title">Your forms are being reviewed in full</div>
+            <div class="next-step-desc">Every answer you gave will be analysed — your schedule, stress levels, training history, nutrition, all of it. Nothing is overlooked. Your plan is built around your actual life, not a template.</div>
+          </div>
+        </div>
+        <div class="next-step">
+          <div class="next-step-icon">📋</div>
+          <div class="next-step-info">
+            <div class="next-step-title">A fully customised plan is being built for you</div>
+            <div class="next-step-desc">Your training programme, nutrition framework, and weekly execution plan will be tailored specifically to your goals, your body, and your constraints. No generic plans here.</div>
+          </div>
+        </div>
+        <div class="next-step">
+          <div class="next-step-icon">📩</div>
+          <div class="next-step-info">
+            <div class="next-step-title">You'll hear from us within 24–48 hours</div>
+            <div class="next-step-desc">Check your inbox. Your complete plan will land there, ready to execute from Day 1. If you have any urgent questions in the meantime, reach out directly.</div>
+          </div>
+        </div>
+        <div class="next-step">
+          <div class="next-step-icon">🔥</div>
+          <div class="next-step-info">
+            <div class="next-step-title">While you wait — use this library</div>
+            <div class="next-step-desc">Everything below has been put together to start sharpening your mindset and knowledge right now. The clients who read ahead always hit the ground running faster.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- QUICK WINS CHECKLIST -->
+    <div class="checklist-card">
+      <div class="checklist-title">✅ Things you can do today while you wait</div>
+      <div class="checklist-items">
+        <div class="check-item">
+          <div class="check-box" onclick="toggleCheck(this)"></div>
+          <div class="check-text">Download MyFitnessPal or Cronometer and set up your profile — you'll likely need it for tracking</div>
+        </div>
+        <div class="check-item">
+          <div class="check-box" onclick="toggleCheck(this)"></div>
+          <div class="check-text">Take a front, side and back progress photo — you'll thank yourself in 12 weeks</div>
+        </div>
+        <div class="check-item">
+          <div class="check-box" onclick="toggleCheck(this)"></div>
+          <div class="check-text">Write down your #1 goal and put it somewhere you see every morning</div>
+        </div>
+        <div class="check-item">
+          <div class="check-box" onclick="toggleCheck(this)"></div>
+          <div class="check-text">Sort your gym bag / home setup — no friction on Day 1</div>
+        </div>
+        <div class="check-item">
+          <div class="check-box" onclick="toggleCheck(this)"></div>
+          <div class="check-text">Start hitting your water target today — aim for 2.5–3L minimum</div>
+        </div>
+        <div class="check-item">
+          <div class="check-box" onclick="toggleCheck(this)"></div>
+          <div class="check-text">Read at least one article from the Knowledge Library below</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MINDSET QUOTE -->
+    <div class="quote-banner">
+      <div class="quote-text">"Most people overestimate what they can do in a day and underestimate what they can do in a year with a consistent, well-structured plan. You now have the structure — your only job is to show up."</div>
+      <div class="quote-author">— Legal Edge Coaching</div>
+    </div>
+
+    <!-- YOUR FIRST 72 HOURS -->
+    <div class="seventy-two-card">
+      <div class="sth-header">
+        <div class="sth-lines"><span></span><span></span></div>
+        <div class="sth-title-wrap">
+          <div class="sth-eyebrow">Legal Edge</div>
+          <div class="sth-title">Your First 72 Hours</div>
+        </div>
+        <div class="sth-lines"><span></span><span></span></div>
+      </div>
+      <div class="sth-body">
+        <div class="sth-welcome">
+          <div class="sth-welcome-title">Welcome to the Reset</div>
+          <div class="sth-welcome-text">Nothing extreme starts today.<br>This week is about <strong>awareness and structure.</strong></div>
+        </div>
+        <div class="sth-section-label">For The Next 3 Days:</div>
+        <div class="sth-steps">
+          <div class="sth-step">
+            <div class="sth-num">1</div>
+            <div class="sth-step-content">
+              <div class="sth-step-title">Calendar Audit</div>
+              <div class="sth-step-desc">Block 3 realistic training slots for the next 4 weeks. Not aspirational. Realistic.</div>
+            </div>
+          </div>
+          <div class="sth-step">
+            <div class="sth-num">2</div>
+            <div class="sth-step-content">
+              <div class="sth-step-title">Routine Reflection</div>
+              <div class="sth-step-desc">Identify one existing habit that could be tightened up. Just observe. Gather awareness.</div>
+            </div>
+          </div>
+          <div class="sth-step">
+            <div class="sth-num">3</div>
+            <div class="sth-step-content">
+              <div class="sth-step-title">Sleep Awareness</div>
+              <div class="sth-step-desc">Set an intention to be more conscious of your nightly routine — it's not about strict bedtimes. We're shifting the focus, not flipping your life upside down.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- KNOWLEDGE LIBRARY -->
+    <div class="library-eyebrow">📚 Knowledge Library</div>
+    <div class="library-title" style="font-size:1.25rem; font-weight:800; color:var(--text); margin-bottom:8px;">Start learning while your plan is built</div>
+    <p class="library-desc">These resources cover everything you'll be executing soon — training principles, nutrition science, mindset, and recovery. The more you understand the "why", the better you'll execute the "what".</p>
+
+    <div class="lib-tabs">
+      <button class="lib-tab active" onclick="filterLib('all',this)">All</button>
+      <button class="lib-tab" onclick="filterLib('training',this)">🏋️ Training</button>
+      <button class="lib-tab" onclick="filterLib('nutrition',this)">🍽️ Nutrition</button>
+      <button class="lib-tab" onclick="filterLib('mindset',this)">🧠 Mindset</button>
+      <button class="lib-tab" onclick="filterLib('recovery',this)">😴 Recovery</button>
+    </div>
+
+    <div class="lib-grid" id="libGrid">
+
+      <div class="lib-card show" data-cat="training">
+        <div class="lib-card-type" style="color:#60a5fa;"><span class="type-dot" style="background:#60a5fa;"></span>Training</div>
+        <div class="lib-card-title">Progressive Overload: The Only Rule That Actually Matters</div>
+        <div class="lib-card-desc">Why adding weight, reps, or difficulty over time is the single most important driver of muscle growth and strength — and how to apply it practically every session.</div>
+        <button class="lib-card-read" onclick="openArticle('progressive-overload')" style="background:none;border:none;cursor:pointer;padding:0;font-family:inherit;margin-top:12px;">Read →</button>
+      </div>
+
+      <div class="lib-card show" data-cat="nutrition">
+        <div class="lib-card-type" style="color:#f472b6;"><span class="type-dot" style="background:#f472b6;"></span>Nutrition</div>
+        <div class="lib-card-title">Why Protein is Non-Negotiable (and How Much You Actually Need)</div>
+        <div class="lib-card-desc">Most people are severely under-eating protein. Here's the science behind why it's critical for fat loss AND muscle gain, and the simplest way to hit your target daily.</div>
+        <button class="lib-card-read" onclick="openArticle('protein')" style="background:none;border:none;cursor:pointer;padding:0;font-family:inherit;margin-top:12px;">Read →</button>
+      </div>
+
+      <div class="lib-card show" data-cat="mindset">
+        <div class="lib-card-type" style="color:#a78bfa;"><span class="type-dot" style="background:#a78bfa;"></span>Mindset</div>
+        <div class="lib-card-title">The Identity Shift: Stop "Trying to Get Fit" — Become Someone Who Is</div>
+        <div class="lib-card-desc">The reason most programmes fail isn't the training or the food — it's identity. Here's the mindset shift that separates people who sustain results from those who don't.</div>
+        <button class="lib-card-read" onclick="openArticle('identity-shift')" style="background:none;border:none;cursor:pointer;padding:0;font-family:inherit;margin-top:12px;">Read →</button>
+      </div>
+
+      <div class="lib-card show" data-cat="recovery">
+        <div class="lib-card-type" style="color:#34d399;"><span class="type-dot" style="background:#34d399;"></span>Recovery</div>
+        <div class="lib-card-title">Sleep is the Supplement You're Not Taking Seriously</div>
+        <div class="lib-card-desc">Poor sleep blunts fat loss, crushes testosterone, tanks performance, and kills recovery. If you could only optimise one thing outside the gym, this would be it.</div>
+        <button class="lib-card-read" onclick="openArticle('sleep')" style="background:none;border:none;cursor:pointer;padding:0;font-family:inherit;margin-top:12px;">Read →</button>
+      </div>
+
+      <div class="lib-card show" data-cat="nutrition">
+        <div class="lib-card-type" style="color:#f472b6;"><span class="type-dot" style="background:#f472b6;"></span>Nutrition</div>
+        <div class="lib-card-title">Calorie Deficit 101: How to Eat Less Without Feeling Like You're Starving</div>
+        <div class="lib-card-desc">A calorie deficit doesn't mean hunger and misery. Learn how to structure your eating so you stay in a deficit, stay full, and still perform well in the gym.</div>
+        <button class="lib-card-read" onclick="openArticle('calorie-deficit')" style="background:none;border:none;cursor:pointer;padding:0;font-family:inherit;margin-top:12px;">Read →</button>
+      </div>
+
+      <div class="lib-card show" data-cat="training">
+        <div class="lib-card-type" style="color:#60a5fa;"><span class="type-dot" style="background:#60a5fa;"></span>Training</div>
+        <div class="lib-card-title">Volume vs. Intensity: What Should You Actually Be Chasing?</div>
+        <div class="lib-card-desc">Two people can do completely different workouts and both get results — or neither does. Understanding the relationship between volume and intensity is the key to programming that works.</div>
+        <button class="lib-card-read" onclick="openArticle('volume-intensity')" style="background:none;border:none;cursor:pointer;padding:0;font-family:inherit;margin-top:12px;">Read →</button>
+      </div>
+
+      <div class="lib-card show" data-cat="mindset">
+        <div class="lib-card-type" style="color:#a78bfa;"><span class="type-dot" style="background:#a78bfa;"></span>Mindset</div>
+        <div class="lib-card-title">Why Consistency Beats Perfection Every Single Time</div>
+        <div class="lib-card-desc">Missing a session, having a bad food day, or a rough week doesn't ruin your progress — giving up does. Here's how to build the "never miss twice" mindset that keeps you moving.</div>
+        <button class="lib-card-read" onclick="openArticle('consistency')" style="background:none;border:none;cursor:pointer;padding:0;font-family:inherit;margin-top:12px;">Read →</button>
+      </div>
+
+      <div class="lib-card show" data-cat="recovery">
+        <div class="lib-card-type" style="color:#34d399;"><span class="type-dot" style="background:#34d399;"></span>Recovery</div>
+        <div class="lib-card-title">The Role of Stress in Body Composition (This One Surprises People)</div>
+        <div class="lib-card-desc">Chronic stress raises cortisol, which directly impacts fat storage and muscle retention. Understanding the stress-body relationship helps you manage recovery beyond just sleep and rest days.</div>
+        <button class="lib-card-read" onclick="openArticle('stress-body')" style="background:none;border:none;cursor:pointer;padding:0;font-family:inherit;margin-top:12px;">Read →</button>
+      </div>
+
+      <div class="lib-card show" data-cat="training">
+        <div class="lib-card-type" style="color:#60a5fa;"><span class="type-dot" style="background:#60a5fa;"></span>Training</div>
+        <div class="lib-card-title">Form Before Weight — Always. Here's Why.</div>
+        <div class="lib-card-desc">Ego lifting is the fastest route to an injury that sets you back months. This guide covers the key movement patterns, why they matter, and how to get strong without breaking your body.</div>
+        <button class="lib-card-read" onclick="openArticle('form')" style="background:none;border:none;cursor:pointer;padding:0;font-family:inherit;margin-top:12px;">Read →</button>
+      </div>
+
+      <div class="lib-card show" data-cat="nutrition">
+        <div class="lib-card-type" style="color:#f472b6;"><span class="type-dot" style="background:#f472b6;"></span>Nutrition</div>
+        <div class="lib-card-title">Meal Prep 101: How to Set Your Week Up in 90 Minutes on Sunday</div>
+        <div class="lib-card-desc">The single biggest predictor of nutritional consistency is having food ready. This is the exact meal prep approach — batching proteins, carbs, and keeping it so simple you'll actually do it.</div>
+        <button class="lib-card-read" onclick="openArticle('meal-prep')" style="background:none;border:none;cursor:pointer;padding:0;font-family:inherit;margin-top:12px;">Read →</button>
+      </div>
+
+      <div class="lib-card show" data-cat="mindset">
+        <div class="lib-card-type" style="color:#a78bfa;"><span class="type-dot" style="background:#a78bfa;"></span>Mindset</div>
+        <div class="lib-card-title">How to Stay On Track When Life Gets Busy (Because It Will)</div>
+        <div class="lib-card-desc">Work trips, late nights, family chaos — they're coming. Here's how to build a plan that bends without breaking, so you never have to "start over again" after a rough week.</div>
+        <button class="lib-card-read" onclick="openArticle('busy-life')" style="background:none;border:none;cursor:pointer;padding:0;font-family:inherit;margin-top:12px;">Read →</button>
+      </div>
+
+      <div class="lib-card show" data-cat="recovery">
+        <div class="lib-card-type" style="color:#34d399;"><span class="type-dot" style="background:#34d399;"></span>Recovery</div>
+        <div class="lib-card-title">Why Rest Days Are Actually Training Days</div>
+        <div class="lib-card-desc">Muscle is built during recovery, not during the workout. Here's what's happening physiologically on your rest days, and what you should be doing (and not doing) to maximise adaptation.</div>
+        <button class="lib-card-read" onclick="openArticle('rest-days')" style="background:none;border:none;cursor:pointer;padding:0;font-family:inherit;margin-top:12px;">Read →</button>
+      </div>
+
+    </div><!-- /lib-grid -->
+
+  </div><!-- /success-screen -->
+
+<!-- NAV BAR -->
+<div class="nav-bar" id="navBar">
+  <button class="btn btn-secondary" id="backBtn" onclick="navigate(-1)" style="display:none;">← Back</button>
+  <button class="btn btn-primary" id="nextBtn" onclick="navigate(1)">Continue →</button>
+</div>
+
+
+
+<!-- COACH BUTTON -->
+<button id="coachBtn" onclick="openCoach()">⚙ Coach View</button>
+
+<!-- PASSWORD MODAL -->
+<div class="pw-overlay" id="pwOverlay">
+  <div class="pw-box">
+    <div class="pw-icon">🔐</div>
+    <div class="pw-title">Coach Access</div>
+    <div class="pw-sub">Enter your password to view client submissions</div>
+    <input class="pw-input" type="password" id="pwInput" placeholder="••••••••"
+      onkeydown="if(event.key==='Enter')checkPw()" />
+    <div class="pw-error" id="pwError"></div>
+    <div class="pw-btns">
+      <button class="pw-cancel" onclick="closePwModal()">Cancel</button>
+      <button class="pw-submit" onclick="checkPw()">Enter</button>
+    </div>
+  </div>
+</div>
+
+<!-- COACH MODAL -->
+<div class="coach-overlay" id="coachOverlay">
+  <div class="coach-modal">
+    <div class="coach-header">
+      <div class="coach-title">⚙ Coach Dashboard — Client Responses</div>
+      <button class="coach-close" onclick="closeCoach()">✕</button>
+    </div>
+    <div class="client-switcher">
+      <span class="switcher-label">Client:</span>
+      <button class="client-tab active live" onclick="switchClient(0,this)">
+        <span class="dot"></span> Live Input
+      </button>
+      <button class="client-tab" onclick="switchClient(1,this)">
+        <span class="dot"></span> Jordan M.
+      </button>
+      <button class="client-tab" onclick="switchClient(2,this)">
+        <span class="dot"></span> Sophie R.
+      </button>
+      <button class="client-tab" onclick="switchClient(3,this)">
+        <span class="dot"></span> Marcus T.
+      </button>
+    </div>
+
+    <div class="coach-body">
+
+      <!-- LIVE PROFILE -->
+      <div class="client-profile active" id="profile0">
+        <div class="profile-hero">
+          <div class="profile-avatar" id="liveAvatar">?</div>
+          <div class="profile-info">
+            <div class="profile-name" id="liveName">Waiting for input…</div>
+            <div class="profile-meta" id="liveMeta">Form is currently in progress</div>
+          </div>
+          <div class="profile-badge pending">Live / In Progress</div>
+        </div>
+        <div id="liveData">
+          <div style="text-align:center; color:var(--muted); padding:30px; font-size:0.88rem;">
+            As the client fills out the form, their answers appear here automatically.
+          </div>
+        </div>
+      </div>
+
+      <!-- JORDAN -->
+      <div class="client-profile" id="profile1">
+        <div class="profile-hero">
+          <div class="profile-avatar">JM</div>
+          <div class="profile-info">
+            <div class="profile-name">Jordan Mitchell</div>
+            <div class="profile-meta">Submitted 6 Mar 2026, 9:14am</div>
+            <div class="stat-row">
+              <div class="stat-pill"><div class="stat-val">28</div><div class="stat-lbl">Age</div></div>
+              <div class="stat-pill"><div class="stat-val">86kg</div><div class="stat-lbl">Weight</div></div>
+              <div class="stat-pill"><div class="stat-val">5'11"</div><div class="stat-lbl">Height</div></div>
+              <div class="stat-pill"><div class="stat-val">7,200</div><div class="stat-lbl">Steps/day</div></div>
+            </div>
+          </div>
+          <div class="profile-badge">Submitted ✓</div>
+        </div>
+        <div class="data-section">
+          <div class="data-section-hdr">💼 Work &amp; Schedule</div>
+          <div class="data-grid">
+            <div class="data-item"><div class="data-key">Work type</div><div class="data-val">🔀 Hybrid</div></div>
+            <div class="data-item"><div class="data-key">Wake / Bed</div><div class="data-val">7:00am → 11:30pm</div></div>
+            <div class="data-item"><div class="data-key">Work hours</div><div class="data-val">9:00am – 5:30pm</div></div>
+            <div class="data-item"><div class="data-key">Peak energy</div><div class="data-val">🌅 Morning</div></div>
+            <div class="data-item"><div class="data-key">Energy crash</div><div class="data-val flag">3:30pm ⚠️</div></div>
+          </div>
+        </div>
+        <div class="data-section">
+          <div class="data-section-hdr">⚡ Stress &amp; Sleep</div>
+          <div class="data-grid">
+            <div class="data-item"><div class="data-key">Stress triggers</div><div class="data-val">Work deadlines, commute days</div></div>
+            <div class="data-item"><div class="data-key">Stress response</div><div class="data-val flag">🚫 Skip workouts, 🍕 Eat more</div></div>
+            <div class="data-item"><div class="data-key">Wearable</div><div class="data-val">🍎 Apple Watch</div></div>
+            <div class="data-item"><div class="data-key">Sleep</div><div class="data-val flag">6h ⚠️ (often less)</div></div>
+            <div class="data-item"><div class="data-key">Phone in bed</div><div class="data-val flag">Always 😬</div></div>
+            <div class="data-item"><div class="data-key">Weekends</div><div class="data-val flag">Sometimes derail</div></div>
+            <div class="data-item"><div class="data-key">Alcohol</div><div class="data-val flag">Weekends only</div></div>
+            <div class="data-item"><div class="data-key">Travels for work</div><div class="data-val">Occasionally</div></div>
+          </div>
+        </div>
+        <div class="data-section">
+          <div class="data-section-hdr">🏋️ Training</div>
+          <div class="data-grid">
+            <div class="data-item"><div class="data-key">Activity level</div><div class="data-val">3–4 days/wk</div></div>
+            <div class="data-item"><div class="data-key">Experience</div><div class="data-val">📈 Intermediate (1–3 yrs)</div></div>
+            <div class="data-item"><div class="data-key">Injuries</div><div class="data-val flag">Right shoulder impingement</div></div>
+            <div class="data-item"><div class="data-key">Avoid</div><div class="data-val">Overhead press (painful)</div></div>
+            <div class="data-item"><div class="data-key">Days committed</div><div class="data-val">4 days</div></div>
+            <div class="data-item"><div class="data-key">Previous programs</div><div class="data-val">PPL — found it shoulder-heavy</div></div>
+            <div class="data-item"><div class="data-key">Style</div><div class="data-val">Hypertrophy, Upper/Lower</div></div>
+            <div class="data-item"><div class="data-key">Focus areas</div><div class="data-val">Chest, Back, Arms</div></div>
+            <div class="data-item"><div class="data-key">Structure pref</div><div class="data-val">Upper / Lower split</div></div>
+            <div class="data-item"><div class="data-key">Enjoys</div><div class="data-val">Bench, cable work, pull-ups</div></div>
+            <div class="data-item"><div class="data-key">Mobility work</div><div class="data-val">If needed</div></div>
+            <div class="data-item"><div class="data-key">Strength goals</div><div class="data-val">100kg bench press</div></div>
+            <div class="data-item"><div class="data-key">Train time</div><div class="data-val">🌆 After work / evening</div></div>
+          </div>
+        </div>
+        <div class="data-section">
+          <div class="data-section-hdr">🍽️ Nutrition</div>
+          <div class="data-grid">
+            <div class="data-item"><div class="data-key">Goal</div><div class="data-val hi">🔥 Fat loss</div></div>
+            <div class="data-item"><div class="data-key">Allergies</div><div class="data-val good">None</div></div>
+            <div class="data-item"><div class="data-key">Meals/day</div><div class="data-val">3 meals + snacks</div></div>
+            <div class="data-item"><div class="data-key">Dislikes</div><div class="data-val">Mushrooms, offal</div></div>
+            <div class="data-item"><div class="data-key">Includes</div><div class="data-val">Chicken, rice, oats, eggs, protein shake</div></div>
+            <div class="data-item"><div class="data-key">Typical intake</div><div class="data-val flag">Skips breakfast, big lunch, late dinner — late-night snacking problem</div></div>
+            <div class="data-item"><div class="data-key">Food relationship</div><div class="data-val good">Healthy</div></div>
+            <div class="data-item"><div class="data-key">Calorie tracking</div><div class="data-val">Occasionally / loosely</div></div>
+            <div class="data-item"><div class="data-key">Train time / fasted</div><div class="data-val">Evening, with food beforehand</div></div>
+            <div class="data-item"><div class="data-key">Meal prep time</div><div class="data-val">30 mins max</div></div>
+            <div class="data-item"><div class="data-key">Medical</div><div class="data-val good">None</div></div>
+            <div class="data-item"><div class="data-key">Motivation</div><div class="data-val">Looking better for holiday, more confidence</div></div>
+            <div class="data-item"><div class="data-key">Past success</div><div class="data-val">Calorie counting worked but couldn't sustain it</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SOPHIE -->
+      <div class="client-profile" id="profile2">
+        <div class="profile-hero">
+          <div class="profile-avatar" style="background:linear-gradient(135deg,#c084fc,#a855f7);">SR</div>
+          <div class="profile-info">
+            <div class="profile-name">Sophie Ramirez</div>
+            <div class="profile-meta">Submitted 7 Mar 2026, 2:48pm</div>
+            <div class="stat-row">
+              <div class="stat-pill"><div class="stat-val">24</div><div class="stat-lbl">Age</div></div>
+              <div class="stat-pill"><div class="stat-val">62kg</div><div class="stat-lbl">Weight</div></div>
+              <div class="stat-pill"><div class="stat-val">5'5"</div><div class="stat-lbl">Height</div></div>
+              <div class="stat-pill"><div class="stat-val">9,400</div><div class="stat-lbl">Steps/day</div></div>
+            </div>
+          </div>
+          <div class="profile-badge">Submitted ✓</div>
+        </div>
+        <div class="data-section">
+          <div class="data-section-hdr">💼 Work &amp; Schedule</div>
+          <div class="data-grid">
+            <div class="data-item"><div class="data-key">Work type</div><div class="data-val">🏢 Fully in office</div></div>
+            <div class="data-item"><div class="data-key">Wake / Bed</div><div class="data-val">6:30am → 10:30pm</div></div>
+            <div class="data-item"><div class="data-key">Work hours</div><div class="data-val">8:30am – 5:00pm</div></div>
+            <div class="data-item"><div class="data-key">Peak energy</div><div class="data-val">🌅 Morning</div></div>
+            <div class="data-item"><div class="data-key">Energy crash</div><div class="data-val">2:00pm</div></div>
+          </div>
+        </div>
+        <div class="data-section">
+          <div class="data-section-hdr">⚡ Stress &amp; Sleep</div>
+          <div class="data-grid">
+            <div class="data-item"><div class="data-key">Stress triggers</div><div class="data-val">Work social pressure, feeling behind</div></div>
+            <div class="data-item"><div class="data-key">Stress response</div><div class="data-val flag">🍕 Eat more, 🔇 Withdraw socially</div></div>
+            <div class="data-item"><div class="data-key">Wearable</div><div class="data-val">❌ None</div></div>
+            <div class="data-item"><div class="data-key">Sleep</div><div class="data-val good">7.5h</div></div>
+            <div class="data-item"><div class="data-key">Phone in bed</div><div class="data-val flag">Sometimes</div></div>
+            <div class="data-item"><div class="data-key">Weekends</div><div class="data-val">Sometimes derail</div></div>
+            <div class="data-item"><div class="data-key">Alcohol</div><div class="data-val good">Rarely / special occasions</div></div>
+            <div class="data-item"><div class="data-key">Travels for work</div><div class="data-val good">No</div></div>
+          </div>
+        </div>
+        <div class="data-section">
+          <div class="data-section-hdr">🏋️ Training</div>
+          <div class="data-grid">
+            <div class="data-item"><div class="data-key">Activity level</div><div class="data-val">1–2 days/wk</div></div>
+            <div class="data-item"><div class="data-key">Experience</div><div class="data-val">🌱 Beginner (&lt;1 yr)</div></div>
+            <div class="data-item"><div class="data-key">Injuries</div><div class="data-val good">None</div></div>
+            <div class="data-item"><div class="data-key">Avoid</div><div class="data-val">Barbell squats — intimidating</div></div>
+            <div class="data-item"><div class="data-key">Days committed</div><div class="data-val">3 days</div></div>
+            <div class="data-item"><div class="data-key">Previous programs</div><div class="data-val">No, first time</div></div>
+            <div class="data-item"><div class="data-key">Style</div><div class="data-val">Functional, bodyweight, hypertrophy</div></div>
+            <div class="data-item"><div class="data-key">Focus areas</div><div class="data-val">Glutes, Hamstrings, Core, Shoulders</div></div>
+            <div class="data-item"><div class="data-key">Structure pref</div><div class="data-val">Full body sessions</div></div>
+            <div class="data-item"><div class="data-key">Enjoys</div><div class="data-val">Resistance bands, dumbbells, RDLs</div></div>
+            <div class="data-item"><div class="data-key">Mobility work</div><div class="data-val good">Yes please</div></div>
+            <div class="data-item"><div class="data-key">Strength goals</div><div class="data-val">Just feel strong and toned</div></div>
+            <div class="data-item"><div class="data-key">Train time</div><div class="data-val">🌅 Early morning</div></div>
+          </div>
+        </div>
+        <div class="data-section">
+          <div class="data-section-hdr">🍽️ Nutrition</div>
+          <div class="data-grid">
+            <div class="data-item"><div class="data-key">Goal</div><div class="data-val hi">⚖️ Body recomposition</div></div>
+            <div class="data-item"><div class="data-key">Allergies</div><div class="data-val flag">Gluten intolerance, dairy-free</div></div>
+            <div class="data-item"><div class="data-key">Meals/day</div><div class="data-val">3 meals</div></div>
+            <div class="data-item"><div class="data-key">Dislikes</div><div class="data-val">Red meat, most fish</div></div>
+            <div class="data-item"><div class="data-key">Includes</div><div class="data-val">Chicken, vegetables, rice, eggs, oat milk</div></div>
+            <div class="data-item"><div class="data-key">Typical intake</div><div class="data-val flag">Skips meals when busy — no routine</div></div>
+            <div class="data-item"><div class="data-key">Food relationship</div><div class="data-val flag">Some issues in the past, now fine</div></div>
+            <div class="data-item"><div class="data-key">Calorie tracking</div><div class="data-val">❌ Never</div></div>
+            <div class="data-item"><div class="data-key">Train time / fasted</div><div class="data-val">Morning — with food beforehand</div></div>
+            <div class="data-item"><div class="data-key">Meal prep time</div><div class="data-val">⚡ Quick and simple</div></div>
+            <div class="data-item"><div class="data-key">Medical</div><div class="data-val good">None</div></div>
+            <div class="data-item"><div class="data-key">Motivation</div><div class="data-val">Feeling strong, confidence, energy</div></div>
+            <div class="data-item"><div class="data-key">Past success</div><div class="data-val">No, first time properly trying</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MARCUS -->
+      <div class="client-profile" id="profile3">
+        <div class="profile-hero">
+          <div class="profile-avatar" style="background:linear-gradient(135deg,#34d399,#059669);">MT</div>
+          <div class="profile-info">
+            <div class="profile-name">Marcus Thompson</div>
+            <div class="profile-meta">Submitted 8 Mar 2026, 8:02am</div>
+            <div class="stat-row">
+              <div class="stat-pill"><div class="stat-val">35</div><div class="stat-lbl">Age</div></div>
+              <div class="stat-pill"><div class="stat-val">98kg</div><div class="stat-lbl">Weight</div></div>
+              <div class="stat-pill"><div class="stat-val">6'2"</div><div class="stat-lbl">Height</div></div>
+              <div class="stat-pill"><div class="stat-val">5,800</div><div class="stat-lbl">Steps/day</div></div>
+            </div>
+          </div>
+          <div class="profile-badge">Submitted ✓</div>
+        </div>
+        <div class="data-section">
+          <div class="data-section-hdr">💼 Work &amp; Schedule</div>
+          <div class="data-grid">
+            <div class="data-item"><div class="data-key">Work type</div><div class="data-val">🏠 Fully remote</div></div>
+            <div class="data-item"><div class="data-key">Wake / Bed</div><div class="data-val flag">6:00am → 12:30am ⚠️</div></div>
+            <div class="data-item"><div class="data-key">Work hours</div><div class="data-val">8:00am – 7:00pm</div></div>
+            <div class="data-item"><div class="data-key">Peak energy</div><div class="data-val">🌆 Evening</div></div>
+            <div class="data-item"><div class="data-key">Energy crash</div><div class="data-val flag">2:30pm ⚠️</div></div>
+          </div>
+        </div>
+        <div class="data-section">
+          <div class="data-section-hdr">⚡ Stress &amp; Sleep</div>
+          <div class="data-grid">
+            <div class="data-item"><div class="data-key">Stress triggers</div><div class="data-val flag">Work pressure, 2 young kids, finances</div></div>
+            <div class="data-item"><div class="data-key">Stress response</div><div class="data-val flag">🍺 Drink alcohol, 🚫 Skip workouts</div></div>
+            <div class="data-item"><div class="data-key">Wearable</div><div class="data-val">💪 Whoop</div></div>
+            <div class="data-item"><div class="data-key">Sleep</div><div class="data-val flag">5.5h ⚠️ (2 young kids)</div></div>
+            <div class="data-item"><div class="data-key">Phone in bed</div><div class="data-val flag">Always</div></div>
+            <div class="data-item"><div class="data-key">Weekends</div><div class="data-val flag">Yes, usually derail</div></div>
+            <div class="data-item"><div class="data-key">Alcohol</div><div class="data-val flag">3–4× a week ⚠️</div></div>
+            <div class="data-item"><div class="data-key">Travels for work</div><div class="data-val flag">Yes, regularly ✈️</div></div>
+          </div>
+        </div>
+        <div class="data-section">
+          <div class="data-section-hdr">🏋️ Training</div>
+          <div class="data-grid">
+            <div class="data-item"><div class="data-key">Activity level</div><div class="data-val">5–6 days/wk</div></div>
+            <div class="data-item"><div class="data-key">Experience</div><div class="data-val">🔱 Advanced (3+ yrs)</div></div>
+            <div class="data-item"><div class="data-key">Injuries</div><div class="data-val flag">Herniated disc L4/L5 — no heavy deadlifts</div></div>
+            <div class="data-item"><div class="data-key">Avoid</div><div class="data-val flag">Conventional deadlifts, heavy squats</div></div>
+            <div class="data-item"><div class="data-key">Days committed</div><div class="data-val">5 days</div></div>
+            <div class="data-item"><div class="data-key">Previous programs</div><div class="data-val">5/3/1 for 2 years — plateaued</div></div>
+            <div class="data-item"><div class="data-key">Style</div><div class="data-val">Heavy compounds, hypertrophy, PPL</div></div>
+            <div class="data-item"><div class="data-key">Focus areas</div><div class="data-val">Back, Legs, Calves</div></div>
+            <div class="data-item"><div class="data-key">Structure pref</div><div class="data-val">PPL</div></div>
+            <div class="data-item"><div class="data-key">Enjoys</div><div class="data-val">Bench, rows, lat pulldown, RDLs</div></div>
+            <div class="data-item"><div class="data-key">Mobility work</div><div class="data-val good">Yes — back needs it</div></div>
+            <div class="data-item"><div class="data-key">Strength goals</div><div class="data-val">140kg bench, visible back thickness</div></div>
+            <div class="data-item"><div class="data-key">Train time</div><div class="data-val">🌅 Early morning (5:30am)</div></div>
+          </div>
+        </div>
+        <div class="data-section">
+          <div class="data-section-hdr">🍽️ Nutrition</div>
+          <div class="data-grid">
+            <div class="data-item"><div class="data-key">Goal</div><div class="data-val hi">💪 Muscle gain</div></div>
+            <div class="data-item"><div class="data-key">Allergies</div><div class="data-val good">None</div></div>
+            <div class="data-item"><div class="data-key">Meals/day</div><div class="data-val">4–5 meals</div></div>
+            <div class="data-item"><div class="data-key">Dislikes</div><div class="data-val">Tofu, most vegetables except spinach</div></div>
+            <div class="data-item"><div class="data-key">Includes</div><div class="data-val">Steak, chicken, rice, eggs, Greek yogurt, oats</div></div>
+            <div class="data-item"><div class="data-key">Typical intake</div><div class="data-val flag">Eats out 4× a week for work — hard to track consistently</div></div>
+            <div class="data-item"><div class="data-key">Food relationship</div><div class="data-val good">Healthy</div></div>
+            <div class="data-item"><div class="data-key">Calorie tracking</div><div class="data-val">Yes, regularly (MyFitnessPal)</div></div>
+            <div class="data-item"><div class="data-key">Train time / fasted</div><div class="data-val">Morning — fasted at 5:30am</div></div>
+            <div class="data-item"><div class="data-key">Meal prep time</div><div class="data-val">📦 Meal prep on Sundays</div></div>
+            <div class="data-item"><div class="data-key">Medical</div><div class="data-val good">None</div></div>
+            <div class="data-item"><div class="data-key">Motivation</div><div class="data-val">Wants to look and feel elite — proof to himself</div></div>
+            <div class="data-item"><div class="data-key">Past success</div><div class="data-val">Gained 8kg on 5/3/1 bulk but too much fat — wants cleaner approach</div></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+// ======= CONFIG =======
+const COACH_PASSWORD = 'legaledge2025'; // 🔑 Change this to your password
+
+// ======= STATE =======
+let currentStep = 0;
+const totalSteps = 3;
+
+// ======= NAVIGATION =======
+function navigate(dir) {
+  const sections = document.querySelectorAll('.form-section');
+  const steps = document.querySelectorAll('.step');
+  if (dir === 1 && currentStep === totalSteps - 1) {
+    // Submit — show confirmation page
+    showConfirmation();
+    return;
+  }
+  if (dir === 1 && currentStep < totalSteps - 1) {
+    sections[currentStep].classList.remove('active');
+    currentStep++;
+    sections[currentStep].classList.add('active');
+  } else if (dir === -1 && currentStep > 0) {
+    sections[currentStep].classList.remove('active');
+    currentStep--;
+    sections[currentStep].classList.add('active');
+  }
+  steps.forEach((s, i) => {
+    s.classList.remove('active','done');
+    if (i < currentStep) { s.classList.add('done'); s.querySelector('.step-circle').textContent = '✓'; }
+    else { if (i === currentStep) s.classList.add('active'); s.querySelector('.step-circle').textContent = i + 1; }
+  });
+  document.getElementById('backBtn').style.display = currentStep > 0 ? 'block' : 'none';
+  document.getElementById('nextBtn').textContent = currentStep === totalSteps - 1 ? 'Submit ✓' : 'Continue →';
+  updateLive();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ======= CHOICE BUTTONS =======
+function choose(btn, groupId, otherId) {
+  document.getElementById(groupId).querySelectorAll('.choice-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  if (otherId) {
+    const oi = document.getElementById(otherId);
+    oi.classList.toggle('show', btn.textContent.includes('Other') || btn.textContent.includes('✏️'));
+  }
+  updateLive();
+}
+function chooseMulti(btn) {
+  btn.classList.toggle('selected');
+  updateLive();
+}
+
+// ======= HELPERS =======
+function gv(id) { const e = document.getElementById(id); return e ? (e.value || '—') : '—'; }
+function gc(id) {
+  const e = document.getElementById(id); if (!e) return '—';
+  const s = e.querySelector('.choice-btn.selected');
+  if (!s) return '—';
+  // Check for "other" input
+  if (s.textContent.includes('✏️') || s.textContent.includes('Other')) {
+    const otherId = id + '_other';
+    const oi = document.getElementById(otherId);
+    const v = oi ? oi.value.trim() : '';
+    return v || s.textContent.trim();
+  }
+  return s.textContent.trim();
+}
+function gm(id) {
+  const e = document.getElementById(id); if (!e) return '—';
+  const sels = e.querySelectorAll('.choice-btn.selected');
+  return sels.length ? Array.from(sels).map(b => b.textContent.trim()).join(', ') : '—';
+}
+function fmtTime(id) {
+  const v = gv(id); if (v === '—') return '—';
+  const [h, m] = v.split(':');
+  const hr = parseInt(h), mins = m;
+  const ampm = hr >= 12 ? 'pm' : 'am';
+  const fmt = hr > 12 ? hr - 12 : (hr === 0 ? 12 : hr);
+  return `${fmt}:${mins}${ampm}`;
+}
+
+// ======= LIVE UPDATER =======
+function updateLive() {
+  const name = gv('q_name');
+  const av = document.getElementById('liveAvatar');
+  const nameEl = document.getElementById('liveName');
+  const metaEl = document.getElementById('liveMeta');
+  if (name && name !== '—') {
+    const initials = name.trim().split(' ').map(w=>w[0]||'').join('').toUpperCase().slice(0,2);
+    av.textContent = initials || '?';
+    nameEl.textContent = name;
+    metaEl.textContent = 'Form in progress — Step ' + (currentStep + 1) + ' of 3';
+  } else {
+    av.textContent = '?'; nameEl.textContent = 'Waiting for input…'; metaEl.textContent = 'Form is currently in progress';
+  }
+
+  document.getElementById('liveData').innerHTML = `
+    <div class="data-section">
+      <div class="data-section-hdr">💼 Work &amp; Schedule</div>
+      <div class="data-grid">
+        <div class="data-item"><div class="data-key">Work type</div><div class="data-val">${gc('q_worktype')}</div></div>
+        <div class="data-item"><div class="data-key">Wake up</div><div class="data-val">${fmtTime('q_waketime')}</div></div>
+        <div class="data-item"><div class="data-key">Work hours</div><div class="data-val">${fmtTime('q_workstart')} – ${fmtTime('q_workend')}</div></div>
+        <div class="data-item"><div class="data-key">Bedtime</div><div class="data-val">${fmtTime('q_bedtime')}</div></div>
+        <div class="data-item"><div class="data-key">Peak energy</div><div class="data-val">${gc('q_energy')}</div></div>
+        <div class="data-item"><div class="data-key">Energy crash</div><div class="data-val">${fmtTime('q_crashtime')}</div></div>
+        <div class="data-item"><div class="data-key">Stress triggers</div><div class="data-val">${gv('q_stresstriggers')}</div></div>
+        <div class="data-item"><div class="data-key">Stress response</div><div class="data-val">${gm('q_stressresponse')}</div></div>
+        <div class="data-item"><div class="data-key">Wearable</div><div class="data-val">${gc('q_wearable')}</div></div>
+        <div class="data-item"><div class="data-key">Sleep</div><div class="data-val">${gv('q_sleep')}h</div></div>
+        <div class="data-item"><div class="data-key">Phone in bed</div><div class="data-val">${gc('q_phoneinbed')}</div></div>
+        <div class="data-item"><div class="data-key">Weekends</div><div class="data-val">${gc('q_weekends')}</div></div>
+        <div class="data-item"><div class="data-key">Alcohol</div><div class="data-val">${gc('q_alcoholfreq')}</div></div>
+        <div class="data-item"><div class="data-key">Travels</div><div class="data-val">${gc('q_travel')}</div></div>
+      </div>
+    </div>
+    <div class="data-section">
+      <div class="data-section-hdr">🏋️ Training</div>
+      <div class="data-grid">
+        <div class="data-item"><div class="data-key">Activity level</div><div class="data-val">${gc('q_activitylevel')}</div></div>
+        <div class="data-item"><div class="data-key">Experience</div><div class="data-val">${gc('q_experience')}</div></div>
+        <div class="data-item"><div class="data-key">Injuries</div><div class="data-val">${gv('q_injuries')}</div></div>
+        <div class="data-item"><div class="data-key">Avoid</div><div class="data-val">${gv('q_avoidexercises')}</div></div>
+        <div class="data-item"><div class="data-key">Days committed</div><div class="data-val">${gc('q_commitdays')}</div></div>
+        <div class="data-item"><div class="data-key">Prev programs</div><div class="data-val">${gv('q_prevprograms')}</div></div>
+        <div class="data-item"><div class="data-key">Style</div><div class="data-val">${gm('q_trainingstyle')}</div></div>
+        <div class="data-item"><div class="data-key">Focus areas</div><div class="data-val">${gm('q_focusareas')}</div></div>
+        <div class="data-item"><div class="data-key">Structure</div><div class="data-val">${gc('q_workoutstructure')}</div></div>
+        <div class="data-item"><div class="data-key">Enjoys</div><div class="data-val">${gv('q_enjoyexercises')}</div></div>
+        <div class="data-item"><div class="data-key">Mobility</div><div class="data-val">${gc('q_mobility')}</div></div>
+        <div class="data-item"><div class="data-key">Strength goals</div><div class="data-val">${gv('q_strengthgoals')}</div></div>
+        <div class="data-item"><div class="data-key">Train time</div><div class="data-val">${gc('q_traintime')}</div></div>
+      </div>
+    </div>
+    <div class="data-section">
+      <div class="data-section-hdr">🍽️ Nutrition</div>
+      <div class="data-grid">
+        <div class="data-item"><div class="data-key">Weight</div><div class="data-val">${gv('q_weight')} kg</div></div>
+        <div class="data-item"><div class="data-key">Age</div><div class="data-val">${gv('q_age')}</div></div>
+        <div class="data-item"><div class="data-key">Height</div><div class="data-val">${gv('q_height')}</div></div>
+        <div class="data-item"><div class="data-key">Daily steps</div><div class="data-val">${gv('q_steps')}</div></div>
+        <div class="data-item"><div class="data-key">Goal</div><div class="data-val hi">${gm('q_maingoal')}</div></div>
+        <div class="data-item"><div class="data-key">Allergies</div><div class="data-val">${gv('q_allergies')}</div></div>
+        <div class="data-item"><div class="data-key">Meals/day</div><div class="data-val">${gc('q_mealsperday')}</div></div>
+        <div class="data-item"><div class="data-key">Dislikes</div><div class="data-val">${gv('q_foodsdislike')}</div></div>
+        <div class="data-item"><div class="data-key">Includes</div><div class="data-val">${gv('q_foodsinclude')}</div></div>
+        <div class="data-item"><div class="data-key">Typical intake</div><div class="data-val">${gv('q_dailyintake')}</div></div>
+        <div class="data-item"><div class="data-key">Food relationship</div><div class="data-val">${gc('q_foodrelationship')}</div></div>
+        <div class="data-item"><div class="data-key">Cal tracking</div><div class="data-val">${gc('q_trackcals')}</div></div>
+        <div class="data-item"><div class="data-key">Train fasted?</div><div class="data-val">${gc('q_gymtimefasted')}</div></div>
+        <div class="data-item"><div class="data-key">Meal constraints</div><div class="data-val">${gv('q_mealconstraints')}</div></div>
+        <div class="data-item"><div class="data-key">Meal prep</div><div class="data-val">${gc('q_mealprep')}</div></div>
+        <div class="data-item"><div class="data-key">Medical</div><div class="data-val">${gv('q_medical')}</div></div>
+        <div class="data-item"><div class="data-key">Motivation</div><div class="data-val">${gv('q_motivation')}</div></div>
+        <div class="data-item"><div class="data-key">Past success</div><div class="data-val">${gv('q_pastsuccess')}</div></div>
+      </div>
+    </div>
+  `;
+}
+document.addEventListener('input', updateLive);
+
+// ======= COACH AUTH =======
+function openCoach() { document.getElementById('pwOverlay').classList.add('show'); setTimeout(()=>document.getElementById('pwInput').focus(),50); }
+function closePwModal() { document.getElementById('pwOverlay').classList.remove('show'); document.getElementById('pwInput').value=''; document.getElementById('pwError').textContent=''; }
+function checkPw() {
+  if (document.getElementById('pwInput').value === COACH_PASSWORD) {
+    closePwModal(); updateLive();
+    document.getElementById('coachOverlay').style.display='block';
+    switchClient(0, document.querySelector('.client-tab'));
+  } else {
+    document.getElementById('pwError').textContent='Incorrect password. Try again.';
+    document.getElementById('pwInput').value='';
+    document.getElementById('pwInput').focus();
+  }
+}
+function closeCoach() { document.getElementById('coachOverlay').style.display='none'; }
+
+// ======= CLIENT SWITCHER =======
+function switchClient(idx, tab) {
+  document.querySelectorAll('.client-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.client-profile').forEach(p=>p.classList.remove('active'));
+  tab.classList.add('active');
+  document.getElementById('profile'+idx).classList.add('active');
+  if (idx===0) updateLive();
+}
+
+// Close on backdrop / ESC
+document.getElementById('coachOverlay').addEventListener('click', e=>{ if(e.target===document.getElementById('coachOverlay')) closeCoach(); });
+document.addEventListener('keydown', e=>{ if(e.key==='Escape'){closeCoach();closePwModal();} });
+
+updateLive();
+
+// ======= PREVIEW MODE (add #preview to URL to jump straight to confirmation page) =======
+if (window.location.hash === '#preview') {
+  showConfirmation();
+}
+
+// ======= LIBRARY FILTER =======
+function filterLib(cat, tab) {
+  document.querySelectorAll('.lib-tab').forEach(t => t.classList.remove('active'));
+  tab.classList.add('active');
+  document.querySelectorAll('.lib-card').forEach(card => {
+    if (cat === 'all' || card.dataset.cat === cat) {
+      card.classList.add('show');
+    } else {
+      card.classList.remove('show');
+    }
+  });
+}
+
+// ======= CHECKLIST TOGGLE =======
+function toggleCheck(box) {
+  box.classList.toggle('checked');
+  box.textContent = box.classList.contains('checked') ? '✓' : '';
+  const textEl = box.parentElement.querySelector('.check-text');
+  if (textEl) textEl.classList.toggle('checked-text', box.classList.contains('checked'));
+}
+
+// ======= SHOW CONFIRMATION (for previewing) =======
+function showConfirmation() {
+  // Hide the form area and nav
+  const fa = document.getElementById('formArea');
+  if (fa) fa.style.display = 'none';
+  const nav = document.getElementById('navBar');
+  if (nav) nav.style.display = 'none';
+  const cb = document.getElementById('coachBtn');
+  if (cb) cb.style.bottom = '20px';
+  // Show confirmation page
+  const s = document.getElementById('successScreen');
+  if (s) s.style.display = 'block';
+  // Update live data in coach view
+  updateLive();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ===== ARTICLE LIBRARY =====
+const ARTICLES = {
+  'progressive-overload': {
+    cat: 'Training', catColor: '#60a5fa',
+    title: 'Progressive Overload: The Only Rule That Actually Matters',
+    body: `
+      <p><strong>Progressive overload is the single most important concept in training.</strong> It simply means that over time, you need to ask more of your body than you did before. Without it, your muscles have no reason to adapt, grow, or get stronger. With it, almost any training programme will produce results.</p>
+      <div class="a-subhead">What counts as "more"?</div>
+      <p>Most people think progressive overload only means adding weight to the bar. But it can take several forms: more weight, more reps at the same weight, more sets, shorter rest periods, better range of motion, or cleaner technique. All of these represent progression.</p>
+      <p>For beginners, adding weight every session is realistic. For intermediate and advanced lifters, improvement often happens week to week or even month to month — and that's completely normal.</p>
+      <div class="a-tip">Practical rule: If you hit the top of your rep range (e.g. 3 sets of 10) with good form, add weight next session. If you can't hit the bottom of your rep range (e.g. 3 sets of 6), reduce the weight slightly.</div>
+      <div class="a-subhead">Why most people stop progressing</div>
+      <p>The most common reason people plateau is that they stop tracking. If you don't know what you lifted last week, you can't beat it. A simple training log — even just notes on your phone — eliminates this problem immediately.</p>
+      <p>The second reason is ego. Lifting heavier than you're ready for with poor form doesn't create overload — it creates injury risk. Progressions that are sustainable and controlled beat sporadic, form-breaking max efforts every time.</p>
+    `
+  },
+  'protein': {
+    cat: 'Nutrition', catColor: '#f472b6',
+    title: 'Why Protein is Non-Negotiable (and How Much You Actually Need)',
+    body: `
+      <p><strong>Protein is the building block of muscle tissue.</strong> When you train, you create micro-tears in your muscle fibres. Protein provides the amino acids your body uses to repair and rebuild those fibres — bigger and stronger than before. Without adequate protein, this process is severely blunted regardless of how well you train.</p>
+      <div class="a-subhead">The actual numbers</div>
+      <p>For most people trying to build muscle or maintain muscle during fat loss, the target is <strong>1.6–2.2g of protein per kg of bodyweight per day</strong>. At 80kg, that's 128–176g of protein daily. Most people are eating less than half of this.</p>
+      <p>During a calorie deficit (fat loss phase), hitting the higher end of that range becomes even more important. Higher protein intake helps preserve muscle tissue while you're in a deficit — so you lose fat, not muscle.</p>
+      <div class="a-tip">Easiest way to hit your target: build every meal around a protein source first (chicken, eggs, fish, steak, Greek yoghurt, cottage cheese, protein shake), then add the rest around it.</div>
+      <div class="a-subhead">The satiety bonus</div>
+      <p>Protein is the most satiating macronutrient. Gram for gram, it keeps you fuller for longer than carbohydrates or fats. If you're trying to eat in a deficit, increasing protein is one of the most effective tools for reducing hunger — without reducing food volume.</p>
+    `
+  },
+  'identity-shift': {
+    cat: 'Mindset', catColor: '#a78bfa',
+    title: 'The Identity Shift: Stop "Trying to Get Fit" — Become Someone Who Is',
+    body: `
+      <p><strong>The most sustainable form of motivation isn't willpower — it's identity.</strong> When you see yourself as "someone who trains" rather than "someone trying to get fit," your decisions change. You don't debate whether to go to the gym; it's just what you do, because it's who you are.</p>
+      <div class="a-subhead">Why willpower fails</div>
+      <p>Willpower is a finite resource. It depletes throughout the day with every decision you make. Relying on willpower to train consistently is a strategy that works temporarily and then collapses under stress, busyness, or fatigue. Identity doesn't deplete — it compounds.</p>
+      <div class="a-tip">James Clear's framing from Atomic Habits applies directly here: every time you complete a training session, you're casting a vote for the identity of "someone who trains." The goal isn't perfection — it's accumulating enough votes that the identity sticks.</div>
+      <div class="a-subhead">How to start the shift</div>
+      <p>You don't need to have already achieved the result to adopt the identity. Start making decisions from the perspective of the person you want to become. "What would a person who takes their health seriously do right now?" — and do that thing. The results follow the identity, not the other way around.</p>
+      <p>It also helps to remove friction. If you have to fight your environment every day, identity alone won't save you. Make training the default — schedule it, prepare your kit the night before, train at the same time each week until it becomes habitual structure rather than a daily decision.</p>
+    `
+  },
+  'sleep': {
+    cat: 'Recovery', catColor: '#34d399',
+    title: 'Sleep is the Supplement You\'re Not Taking Seriously',
+    body: `
+      <p><strong>If sleep were a supplement, it would be the most evidence-backed, performance-enhancing, fat-loss-supporting product ever created — and it's free.</strong> The problem is that most high performers treat sleep as the first thing to sacrifice when life gets busy. That's a costly mistake.</p>
+      <div class="a-subhead">What happens when you're sleep-deprived</div>
+      <p>Poor sleep (under 7 hours consistently) elevates cortisol, suppresses testosterone, blunts growth hormone release, impairs insulin sensitivity, increases appetite (specifically for high-calorie foods), reduces motivation to train, and significantly lowers performance output in the gym. You can train perfectly and eat well and still struggle to see results if sleep is chronically compromised.</p>
+      <div class="a-tip">Studies show that sleep-deprived individuals on a calorie-restricted diet lose significantly more muscle and less fat compared to those sleeping adequately on the same diet. Sleep isn't a nice-to-have — it's a physiological requirement for the results you're working toward.</div>
+      <div class="a-subhead">Practical improvements to make tonight</div>
+      <p>The biggest wins come from consistency — a regular sleep and wake time even on weekends. Beyond that: <strong>reduce phone use 45 minutes before bed</strong> (blue light delays melatonin onset), keep your bedroom cool (18–20°C is optimal), avoid alcohol close to sleep (it fragments sleep architecture), and avoid caffeine after 2pm if you're sensitive to it.</p>
+      <p>You don't need to overhaul everything at once. Pick one change this week and build from there.</p>
+    `
+  },
+  'calorie-deficit': {
+    cat: 'Nutrition', catColor: '#f472b6',
+    title: 'Calorie Deficit 101: How to Eat Less Without Feeling Like You\'re Starving',
+    body: `
+      <p><strong>Fat loss requires a calorie deficit — consuming less energy than you expend.</strong> There's no way around this physics. But a deficit doesn't have to mean hunger, misery, or eating tiny portions of plain food. How you structure the deficit makes all the difference.</p>
+      <div class="a-subhead">The size of the deficit matters</div>
+      <p>A <strong>moderate deficit of 300–500 calories per day</strong> is generally the sweet spot. It's enough to produce visible fat loss (roughly 0.3–0.5kg per week) while preserving muscle, maintaining performance in the gym, and keeping hunger manageable. Aggressive deficits of 1000+ calories tend to result in muscle loss, severe fatigue, and are almost impossible to sustain.</p>
+      <div class="a-tip">Don't try to out-exercise a huge deficit. A 45-minute session burns roughly 300–400 calories. It's far easier to not eat those calories than to burn them off. Focus on your intake first, use training to maintain muscle and performance.</div>
+      <div class="a-subhead">The tools that actually work</div>
+      <p><strong>Protein first:</strong> Higher protein intake preserves muscle, increases satiety, and has a higher thermic effect (your body burns more calories digesting it). Build every meal around protein and you'll naturally eat less without feeling deprived.</p>
+      <p><strong>Volume eating:</strong> Foods high in fibre and water content (vegetables, fruit, lean proteins) take up more space in your stomach per calorie. Eating a large plate of food that's 400 calories feels very different to a small plate of food that's also 400 calories.</p>
+      <p><strong>Consistency over perfection:</strong> One high-calorie day won't derail a week of good eating. What breaks fat loss is using one bad day as a reason to write off the whole week. Stay in a moderate deficit most days and you will make progress.</p>
+    `
+  },
+  'volume-intensity': {
+    cat: 'Training', catColor: '#60a5fa',
+    title: 'Volume vs. Intensity: What Should You Actually Be Chasing?',
+    body: `
+      <p><strong>Volume and intensity are the two fundamental drivers of muscle and strength development</strong> — but they work differently, and chasing the wrong one for your current level is one of the most common training mistakes.</p>
+      <div class="a-subhead">What they actually mean</div>
+      <p><strong>Volume</strong> = total work done (sets × reps × weight). It's the primary driver of muscle hypertrophy (size). Research consistently shows that higher weekly training volume per muscle group correlates with greater muscle growth, up to a recoverable limit.</p>
+      <p><strong>Intensity</strong> = how close you're working to your maximum effort. In the context of hypertrophy, this means proximity to failure. A set taken to 1–2 reps short of failure is a high-intensity set — and this appears to be necessary for maximum muscle stimulation regardless of rep range.</p>
+      <div class="a-tip">Key insight: Both matter, but volume is the variable you can't ignore for size. You can build muscle with 3 reps or 30 reps as long as you're working close to failure — but you need enough total sets per week per muscle group to drive adaptation (research suggests 10–20 working sets per muscle per week as a rough effective range).</div>
+      <div class="a-subhead">What this means for your training</div>
+      <p>For most people working a 4-day programme: prioritise getting enough quality sets in across the week (volume), taken close to failure (intensity). Add volume gradually over time as your work capacity improves. Don't sacrifice intensity chasing more sets — 5 high-quality sets beat 10 lazy ones every time.</p>
+    `
+  },
+  'consistency': {
+    cat: 'Mindset', catColor: '#a78bfa',
+    title: 'Why Consistency Beats Perfection Every Single Time',
+    body: `
+      <p><strong>The most common reason people fail to make lasting progress isn't a bad programme, the wrong diet, or lack of knowledge.</strong> It's inconsistency. And inconsistency usually comes from the same source: the all-or-nothing mentality.</p>
+      <div class="a-subhead">The all-or-nothing trap</div>
+      <p>It sounds like this: "I missed Monday's session, so the week is ruined — I'll start again next Monday." Or: "I went over my calories on Saturday, so I may as well just eat whatever this weekend and be strict from Monday." Each individual instance feels justified. But over months and years, this pattern costs you the majority of your progress.</p>
+      <div class="a-tip">The "never miss twice" rule is one of the most practical mindset frameworks in fitness: miss a session? Fine. Miss the next one? Not an option. One bad session, one bad day, or one bad week is noise. Patterns are what determine results.</div>
+      <div class="a-subhead">What 80% consistency actually produces</div>
+      <p>Training 4 days per week, 80% of the time = roughly 166 sessions per year. That's a transformative amount of work. The "perfect" programme followed 40% of the time is dramatically less effective than an "average" programme followed 90% of the time.</p>
+      <p>What builds the body is accumulated work over time. The goal isn't a perfect week — it's a year of solid, mostly-good weeks. Lower the bar for what constitutes a good session when life gets hard: a 20-minute workout on a busy day still counts, and it preserves the habit.</p>
+    `
+  },
+  'stress-body': {
+    cat: 'Recovery', catColor: '#34d399',
+    title: 'The Role of Stress in Body Composition (This One Surprises People)',
+    body: `
+      <p><strong>Most people think of body composition as a straightforward equation: train hard, eat well, results follow.</strong> But there's a third variable most people underestimate entirely: stress. Specifically, chronic psychological stress has measurable, direct effects on fat storage, muscle retention, and recovery.</p>
+      <div class="a-subhead">Cortisol: the stress hormone</div>
+      <p>When you're chronically stressed — work pressure, poor sleep, relationship tension, financial anxiety — your body elevates cortisol. In the short term, this is adaptive. In the long term, chronically elevated cortisol: promotes fat storage (particularly around the abdomen), breaks down muscle tissue for energy (catabolism), blunts the anabolic response to training, disrupts sleep quality, increases cravings for high-calorie food, and suppresses immune function.</p>
+      <div class="a-tip">You can be eating perfectly and training consistently and still struggle to lose fat if cortisol is chronically elevated. This is why "eat less and move more" isn't always the answer — sometimes the missing lever is stress management.</div>
+      <div class="a-subhead">What actually helps</div>
+      <p>You don't need to eliminate stress — that's neither realistic nor desirable. The goal is improving your body's ability to recover from it. Consistent sleep, strategic (not excessive) training volume, adequate calorie intake, social connection, and deliberate downtime all support this. Even 10 minutes of deliberate breathing or walking without your phone has measurable effects on cortisol reduction.</p>
+      <p>The clients who make the best progress are rarely those with the most time or fewest commitments — they're the ones who manage their stress and recovery as intentionally as they manage their training.</p>
+    `
+  },
+  'form': {
+    cat: 'Training', catColor: '#60a5fa',
+    title: 'Form Before Weight — Always. Here\'s Why.',
+    body: `
+      <p><strong>Lifting heavy with poor form is not training — it's injury risk.</strong> The short-term ego satisfaction of moving more weight is not worth the weeks or months of recovery from a preventable injury. And beyond injury prevention, proper technique is actually what creates the stimulus for muscle growth in the first place.</p>
+      <div class="a-subhead">Why technique matters for results (not just safety)</div>
+      <p>Muscle growth requires the target muscle to be under sufficient mechanical tension and metabolic stress. Poor technique usually means another muscle is compensating — you're not getting the stimulus where you intend it. A bench press where your chest barely activates builds a great front delt and tricep. A squat where you cave your knees and fold forward builds a lower back. Good technique = the right muscles doing the work.</p>
+      <div class="a-tip">The test: if you can't perform the movement with the same quality on the last rep as the first, the weight is too heavy. Ego lifting produces form breakdown, which produces compensation patterns, which produce injury — usually at the worst possible time.</div>
+      <div class="a-subhead">The key movement patterns to master</div>
+      <p>Most productive training comes down to a handful of fundamental movements: <strong>hip hinge</strong> (deadlift, Romanian deadlift), <strong>squat</strong> (squat, leg press), <strong>horizontal push</strong> (bench press, dumbbell press), <strong>horizontal pull</strong> (row variations), <strong>vertical pull</strong> (pull-up, lat pulldown), and <strong>vertical push</strong> (overhead press). Master these with good technique and you have everything you need to build a strong, balanced physique.</p>
+    `
+  },
+  'meal-prep': {
+    cat: 'Nutrition', catColor: '#f472b6',
+    title: 'Meal Prep 101: How to Set Your Week Up in 90 Minutes on Sunday',
+    body: `
+      <p><strong>Nutritional consistency doesn't come from willpower in the moment — it comes from having the right food already prepared.</strong> When you're home late, exhausted, and hungry, you'll eat whatever requires the least effort. Meal prep makes that thing the right thing.</p>
+      <div class="a-subhead">The minimal effective dose approach</div>
+      <p>You don't need to prep every meal for the week. Focus on the things that break down most easily: <strong>lunches</strong> (the meal most people skip or outsource to poor choices) and <strong>protein sources</strong> (the most time-consuming element to cook each day). Prep those and you've handled 80% of the problem.</p>
+      <div class="a-tip">The 90-minute Sunday method: Cook a large batch of protein (chicken thighs, salmon fillets, boiled eggs), a large batch of carbs (rice, sweet potato, oats portioned into bags), and wash/chop vegetables. That's roughly 5–6 days of lunches done. Dinners can be built around whatever protein source you have available.</div>
+      <div class="a-subhead">Keeping it sustainable</div>
+      <p>The biggest mistake with meal prep is over-complicating it. You're not running a restaurant. The goal is consistent, adequate nutrition — not culinary variety. Simple, repeatable meals that you enjoy and can scale up easily are infinitely more valuable than elaborate recipes that take 3 hours and you never make again.</p>
+      <p>Rotate 2–3 protein sources, 2–3 carb sources, and keep your go-to sauces and seasonings simple. After a few weeks it becomes almost automatic — and the time investment pays back every single day.</p>
+    `
+  },
+  'busy-life': {
+    cat: 'Mindset', catColor: '#a78bfa',
+    title: 'How to Stay On Track When Life Gets Busy (Because It Will)',
+    body: `
+      <p><strong>Every client will face periods where the plan gets disrupted.</strong> A work trip. A deadline week. A family illness. A period of poor sleep. Life doesn't pause for your training programme — and a good programme accounts for that from the start.</p>
+      <div class="a-subhead">The minimum effective dose</div>
+      <p>On your hardest weeks, your goal isn't to optimise — it's to maintain. Define your "minimum viable session" in advance: the shortest, simplest version of a workout that still counts as showing up. For most people, this is 20–30 minutes, 2–3 compound exercises, done at whatever time is available. This preserves the habit, prevents muscle loss, and keeps momentum alive.</p>
+      <div class="a-tip">Progress is never lost in a week. Muscle built over months doesn't disappear in 5 days of reduced training. What gets lost is the habit — and the habit is far harder to rebuild than the fitness. Protect the habit above all else.</div>
+      <div class="a-subhead">Nutrition on the road</div>
+      <p>Travel and work events are the most common disrupters. A few strategies that work: <strong>protein first at every meal</strong> (even in restaurant settings, you can always find a protein-based option), <strong>strategic hunger tolerance</strong> (it's okay to be slightly hungry at one meal to balance a heavier one), and <strong>avoiding the "might as well" spiral</strong> — one heavy dinner doesn't justify three days of unconstrained eating.</p>
+      <p>The goal during disrupted weeks is damage limitation and habit preservation. Get back to your normal structure the moment you're able, without guilt or a dramatic "restart."</p>
+    `
+  },
+  'rest-days': {
+    cat: 'Recovery', catColor: '#34d399',
+    title: 'Why Rest Days Are Actually Training Days',
+    body: `
+      <p><strong>Muscle is not built in the gym. It's built during recovery.</strong> The training session creates the stimulus — mechanical damage and metabolic stress in the muscle fibre. But the actual adaptation (repair, growth, strength increase) happens during the recovery period that follows. Skip recovery, and you're training but not adapting.</p>
+      <div class="a-subhead">What happens physiologically on a rest day</div>
+      <p>During recovery, your body goes through a process called muscle protein synthesis (MPS) — rebuilding muscle fibres slightly thicker and stronger than before. This process peaks in the 24–48 hours post-training and requires adequate protein intake, sleep, and sufficiently low systemic stress to complete effectively. Train again before this process is complete and you interfere with the adaptation.</p>
+      <div class="a-tip">More is not always better. Overtraining syndrome — characterised by decreased performance, persistent fatigue, sleep disruption, mood changes, and elevated resting heart rate — is the result of chronically exceeding your body's recovery capacity. It sets you back weeks or months.</div>
+      <div class="a-subhead">What to do on rest days</div>
+      <p>Rest doesn't mean sedentary. <strong>Active recovery</strong> — light walking, swimming, stretching, mobility work, low-intensity cycling — actually accelerates recovery by increasing blood flow to muscles without adding significant stress load. A 30-minute walk on a rest day is genuinely beneficial.</p>
+      <p>What to avoid: intense cardio sessions, heavy accessory work to "make up" for resting, or training a muscle group that's still sore from the previous session. Soreness (DOMS) indicates incomplete recovery — training through it extends the recovery time rather than shortening it.</p>
+    `
+  }
+};
+
+function openArticle(id) {
+  const a = ARTICLES[id];
+  if (!a) return;
+  const overlay = document.getElementById('articleOverlay');
+  document.getElementById('artCat').innerHTML = `<span class="type-dot" style="background:${a.catColor};width:8px;height:8px;border-radius:50%;display:inline-block;"></span> <span style="color:${a.catColor}">${a.cat}</span>`;
+  document.getElementById('artTitle').textContent = a.title;
+  document.getElementById('artBody').innerHTML = a.body;
+  overlay.classList.add('show');
+  overlay.scrollTop = 0;
+}
+function closeArticle() {
+  document.getElementById('articleOverlay').classList.remove('show');
+}
+// Close on backdrop click
+document.addEventListener('DOMContentLoaded', function() {
+  document.getElementById('articleOverlay').addEventListener('click', function(e) {
+    if (e.target === this) closeArticle();
+  });
+});
+
+</script>
+
+<!-- ARTICLE MODAL -->
+<div class="article-overlay" id="articleOverlay">
+  <div class="article-modal">
+    <button class="article-close" onclick="closeArticle()">✕</button>
+    <div class="article-hero">
+      <div class="article-cat" id="artCat"></div>
+      <div class="article-title" id="artTitle"></div>
+    </div>
+    <div class="article-body" id="artBody"></div>
+  </div>
+</div>
+
+</body>
+</html>
