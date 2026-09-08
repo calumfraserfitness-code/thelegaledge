@@ -1,4 +1,4 @@
-const URL='https://baxvhilvrhshlfizakak.supabase.co',KEY='sb_publishable_DRoPSo_3TPlU8mMeLQNruw_82hanHNi';
+const SUPABASE_URL='https://baxvhilvrhshlfizakak.supabase.co',KEY='sb_publishable_DRoPSo_3TPlU8mMeLQNruw_82hanHNi';
 const db=window.supabase?.createClient?.(URL,KEY)??null,$=s=>document.querySelector(s),$=s=>[...document.querySelectorAll(s)];
 const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 const iso=d=>new Date(d).toISOString().slice(0,10),fmt=(v,o={day:'numeric',month:'short',year:'numeric'})=>v?new Date(v+(String(v).length===10?'T12:00:00':'')).toLocaleDateString('en-IE',o):'—';
