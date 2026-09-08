@@ -518,6 +518,9 @@ create index if not exists meal_plan_meals_plan_id_idx on public.meal_plan_meals
 create index if not exists messages_sender_id_idx on public.messages(sender_id);
 create index if not exists program_weeks_copied_from_idx on public.program_weeks(copied_from_week_id);
 create index if not exists supplements_client_id_idx on public.supplements(client_id);
+create unique index if not exists clients_source_unique
+  on public.clients(source_system, source_id)
+  where source_system is not null and source_id is not null;
 create index if not exists training_programs_created_by_idx on public.training_programs(created_by);
 create index if not exists training_sessions_programme_day_idx on public.training_sessions(programme_day_id);
 
