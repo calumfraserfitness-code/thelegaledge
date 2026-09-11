@@ -30,6 +30,7 @@ const state = {
   clientView: 'planner',
   selectedSessionId: null,
   selectedNutritionPlanId: null,
+  trainingCategory: 'weights',
   progressRange: 'all',
   clientTab: 'overview',
   clients: [],
@@ -767,7 +768,11 @@ function diagnosticCard(report) {
   const score = report.score ?? data.health_score;
   const flagged = markers.filter((marker) => !['optimal','normal'].includes(String(marker.status || marker.classification || '').toLowerCase()));
   const section = (heading, value, colour) => value ? `<section class="report-section" style="--accent:${colour}"><span class="eyebrow">${heading}</span><div>${responseTree(value)}</div></section>` : '';
-  return `<article class="diagnostic-report"><header class="report-cover"><div><span class="eyebrow">${esc(title(report.report_type || 'report'))} · ${fmt(report.report_date)}</span><h2>${esc(report.title || 'Diagnostic report')}</h2><p>${esc(data.lab_source || '')}</p></div>${score != null ? `<div class="health-ring"><strong>${score}</strong><span>SCORE</span></div>` : ''}</header><section class="report-summary"><span class="eyebrow">COACH SUMMARY</span><p>${esc(report.summary || data.coach_summary || genetics.overview || 'No coach summary recorded.')}</p></section>${markers.length ? `<section class="report-table"><div class="panel-head"><div><h3>Blood markers</h3><span class="sub">${markers.length} tested · ${flagged.length} requiring attention</span></div></div><div class="data-table"><div class="data-head"><span>Marker</span><span>Result</span><span>Reference</span><span>Status</span></div>${markers.map((marker) => `<div class="data-row"><b>${esc(marker.marker_name || marker.name)}</b><span>${esc(marker.value)} ${esc(marker.unit || '')}</span><span>${esc(marker.reference_range_low ?? marker.reference_low ?? '—')}–${esc(marker.reference_range_high ?? marker.reference_high ?? '—')}</span><span class="marker-status">${esc(marker.status || marker.classification || '—')}</span></div>`).join('')}</div></section>` : ''}${Object.keys(genetics).length ? section('GENETIC INSIGHTS', genetics, '#9d72d5') : ''}<div class="recommendation-grid">${section('NUTRITION', data.action_nutrition || genetics.recommendations?.nutrition, '#4cc9a4')}${section('TRAINING', data.action_training || genetics.recommendations?.training, '#5da9e9')}${section('SUPPLEMENTS', data.action_supplements || genetics.recommendations?.supplements, '#d3a64b')}${section('RECOVERY', data.action_recovery || genetics.recommendations?.recovery, '#9d72d5')}</div>${section('FOLLOW-UP TESTING', data.action_followup, '#d98585')}${data.loom_url ? `<a class="loom-card" href="${esc(data.loom_url)}" target="_blank" rel="noopener"><span>▶</span><div><b>Coach video walkthrough</b><small>${esc(data.loom_description || 'Open report review')}</small></div></a>` : ''}</article>`;
+  const priorities = Array.isArray(genetics.top_priorities) ? genetics.top_priorities : [];
+  const categoryNotes = genetics.category_notes && typeof genetics.category_notes === 'object' ? genetics.category_notes : {};
+  const geneticInsights = Object.entries(categoryNotes).map(([name, insight]) => `<section class="genetic-card"><span class="eyebrow">${esc(title(name.replaceAll('_',' ')))}</span>${insight?.summary ? `<h3>${esc(insight.summary)}</h3>` : ''}${insight?.key_findings ? `<div class="finding-list">${responseTree(insight.key_findings)}</div>` : ''}${insight?.what_it_means ? `<p>${esc(insight.what_it_means)}</p>` : ''}</section>`).join('');
+  const priorityMarkup = priorities.length ? `<section class="priority-panel"><span class="eyebrow">TOP PRIORITIES</span><div>${priorities.map((item, index) => `<article><b>${index + 1}</b><p>${esc(typeof item === 'object' ? item.title || item.priority || item.summary || JSON.stringify(item) : item)}</p></article>`).join('')}</div></section>` : '';
+  return `<article class="diagnostic-report"><header class="report-cover"><div><span class="eyebrow">${esc(title(report.report_type || 'report'))} · ${fmt(report.report_date)}</span><h2>${esc(report.title || 'Diagnostic report')}</h2><p>${esc(data.lab_source || '')}</p></div>${score != null ? `<div class="health-ring"><strong>${score}</strong><span>SCORE</span></div>` : ''}</header><section class="report-summary"><span class="eyebrow">EXECUTIVE SUMMARY</span><p>${esc(report.summary || data.coach_summary || genetics.overview || 'No coach summary recorded.')}</p></section>${priorityMarkup}${geneticInsights ? `<section class="genetic-grid">${geneticInsights}</section>` : ''}${markers.length ? `<section class="report-table"><div class="panel-head"><div><h3>Blood markers</h3><span class="sub">${markers.length} tested · ${flagged.length} requiring attention</span></div></div><div class="data-table"><div class="data-head"><span>Marker</span><span>Result</span><span>Reference</span><span>Status</span></div>${markers.map((marker) => `<div class="data-row"><b>${esc(marker.marker_name || marker.name)}</b><span>${esc(marker.value)} ${esc(marker.unit || '')}</span><span>${esc(marker.reference_range_low ?? marker.reference_low ?? '—')}–${esc(marker.reference_range_high ?? marker.reference_high ?? '—')}</span><span class="marker-status">${esc(marker.status || marker.classification || '—')}</span></div>`).join('')}</div></section>` : ''}<div class="recommendation-grid">${section('NUTRITION', data.action_nutrition || genetics.recommendations?.nutrition, '#4cc9a4')}${section('TRAINING', data.action_training || genetics.recommendations?.training, '#5da9e9')}${section('SUPPLEMENTS', data.action_supplements || genetics.recommendations?.supplements, '#d3a64b')}${section('RECOVERY', data.action_recovery || genetics.recommendations?.recovery, '#9d72d5')}</div>${section('FOLLOW-UP TESTING', data.action_followup || genetics.followup_bloodwork, '#d98585')}${data.loom_url ? `<a class="loom-card" href="${esc(data.loom_url)}" target="_blank" rel="noopener"><span>▶</span><div><b>Coach video walkthrough</b><small>${esc(data.loom_description || 'Open report review')}</small></div></a>` : ''}</article>`;
 }
 
 function coachDiagnostics() {
@@ -874,16 +879,39 @@ function bindCompletionActions() {
 
 function clientTraining() {
   const week = currentWeek();
-  const sessions = state.data.sessions.filter((session) => !week || session.week_id === week.id).filter((session) => ['weights', 'resistance'].includes(session.training_type));
+  const allSessions = state.data.sessions.filter((session) => !week || session.week_id === week.id);
+  const categories = [
+    ['weights', 'Weights', allSessions.filter((session) => ['weights', 'resistance'].includes(session.training_type)).length],
+    ['cardio', 'Cardio', allSessions.filter((session) => session.training_type === 'cardio').length],
+    ['mobility', 'Mobility', allSessions.filter((session) => ['mobility', 'recovery'].includes(session.training_type)).length],
+    ['steps', 'Steps', 7]
+  ];
+  const categoryTabs = `<div class="training-category-tabs">${categories.map(([key, label, count]) => `<button type="button" data-training-category="${key}" class="${state.trainingCategory === key ? 'active' : ''}"><b>${label}</b><span>${count}</span></button>`).join('')}</div>`;
+  if (state.trainingCategory === 'steps') {
+    const days = weekDays();
+    $('#clientMain').innerHTML = clientHeader('', 'Training & activity', 'Your weights, cardio, mobility and steps in one clear place.') + categoryTabs + `<section class="panel"><div class="panel-head"><div><h2>Daily steps</h2><span class="sub">Minimum ${safeStepGoal().toLocaleString()} each day</span></div></div><div class="activity-list">${days.map((day) => { const actual = Number(day.step?.actual_steps || day.step?.steps || 0); return `<label class="task ${actual >= safeStepGoal() ? 'done' : ''}"><input type="checkbox" data-step-date="${day.date}" ${actual >= safeStepGoal() ? 'checked' : ''}><span><b>${fmt(day.date, { weekday: 'long', day: 'numeric', month: 'short' })}</b><small>${actual ? `${actual.toLocaleString()} recorded` : `${safeStepGoal().toLocaleString()} target`}</small></span></label>`; }).join('')}</div></section>`;
+    bindTrainingCategoryTabs(); bindCompletionActions(); return;
+  }
+  if (state.trainingCategory === 'cardio' || state.trainingCategory === 'mobility') {
+    const sessions = allSessions.filter((session) => state.trainingCategory === 'cardio' ? session.training_type === 'cardio' : ['mobility', 'recovery'].includes(session.training_type));
+    $('#clientMain').innerHTML = clientHeader('', 'Training & activity', 'Your weights, cardio, mobility and steps in one clear place.') + categoryTabs + `<section class="panel"><div class="panel-head"><div><h2>${state.trainingCategory === 'cardio' ? 'Cardio' : 'Mobility & recovery'}</h2><span class="sub">${sessions.length} sessions this week</span></div></div><div class="activity-list">${sessions.map((session) => `<div class="activity-session">${taskMarkup(session)}${session.notes ? `<p>${esc(session.notes)}</p>` : ''}<div class="activity-rx">${session.duration_minutes ? `<span>${session.duration_minutes} min</span>` : ''}${session.distance_km ? `<span>${session.distance_km} km</span>` : ''}${session.zone ? `<span>${esc(session.zone)}</span>` : ''}${session.heart_rate_target ? `<span>${esc(session.heart_rate_target)}</span>` : ''}</div></div>`).join('') || '<div class="empty">Nothing assigned in this section.</div>'}</div></section>`;
+    bindTrainingCategoryTabs(); bindCompletionActions(); return;
+  }
+  const sessions = allSessions.filter((session) => ['weights', 'resistance'].includes(session.training_type));
   const selected = sessions.find((session) => session.id === state.selectedSessionId);
   if (!selected) {
-    $('#clientMain').innerHTML = clientHeader('', 'Training', 'Choose a session to view the prescription and log each set.') + `<div class="session-picker">${sessions.map((session) => `<button class="session-tile" data-open-session="${session.id}"><span>${fmt(session.session_date, { weekday: 'short', day: 'numeric', month: 'short' })}</span><strong>${esc(session.title)}</strong><small>${exercisesForSession(session).length} exercises · ${session.status === 'completed' ? 'Completed' : 'Planned'}</small></button>`).join('') || '<div class="empty">No weights or resistance session is scheduled this week.</div>'}</div>`;
-    return bindOpenSessions();
+    $('#clientMain').innerHTML = clientHeader('', 'Training & activity', 'Your weights, cardio, mobility and steps in one clear place.') + categoryTabs + `<div class="session-picker">${sessions.map((session) => `<button class="session-tile" data-open-session="${session.id}"><span>${fmt(session.session_date, { weekday: 'short', day: 'numeric', month: 'short' })}</span><strong>${esc(session.title)}</strong><small>${exercisesForSession(session).length} exercises · ${session.status === 'completed' ? 'Completed' : 'Planned'}</small></button>`).join('') || '<div class="empty">No weights or resistance session is scheduled this week.</div>'}</div>`;
+    bindTrainingCategoryTabs(); return bindOpenSessions();
   }
-  $('#clientMain').innerHTML = `<button class="text-btn back-to-sessions" id="backToSessions">← All sessions</button>` + clientHeader('', selected.title, fmt(selected.session_date, { weekday: 'long', day: 'numeric', month: 'long' })) + `<section class="panel workout"><div class="panel-head"><div><h2>Workout prescription</h2><span class="sub">${exercisesForSession(selected).length} exercises</span></div>${taskMarkup(selected)}</div>${exercisesForSession(selected).map((exercise) => exerciseCard(exercise, true)).join('') || '<div class="empty">No exercise prescription is attached to this workout.</div>'}</section>`;
+  $('#clientMain').innerHTML = `<button class="text-btn back-to-sessions" id="backToSessions">← All sessions</button>` + clientHeader('', selected.title, fmt(selected.session_date, { weekday: 'long', day: 'numeric', month: 'long' })) + categoryTabs + `<section class="panel workout"><div class="panel-head"><div><h2>Workout prescription</h2><span class="sub">${exercisesForSession(selected).length} exercises</span></div>${taskMarkup(selected)}</div>${exercisesForSession(selected).map((exercise) => exerciseCard(exercise, true)).join('') || '<div class="empty">No exercise prescription is attached to this workout.</div>'}</section>`;
   $('#backToSessions').onclick = () => { state.selectedSessionId = null; clientTraining(); };
+  bindTrainingCategoryTabs();
   bindCompletionActions();
   $$('[data-exercise-log]').forEach((form) => form.onsubmit = saveExerciseLog);
+}
+
+function bindTrainingCategoryTabs() {
+  $$('[data-training-category]').forEach((button) => button.onclick = () => { state.trainingCategory = button.dataset.trainingCategory; state.selectedSessionId = null; clientTraining(); });
 }
 
 function clientOnboarding() {
