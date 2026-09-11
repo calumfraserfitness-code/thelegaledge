@@ -535,7 +535,8 @@ async function deleteActivitySession(id){if(!confirm('Delete this scheduled acti
 
 function programBuilderMarkup(program) {
   const days = [...(program.days || [])].sort((a, b) => a.day_index - b.day_index);
-  return `<section class="panel programme"><div class="panel-head"><div><span class="eyebrow">${title(program.status)}</span><h2>${esc(program.name)}</h2></div><button class="btn ghost small" data-toggle-day-form="${program.id}">+ Add training day</button></div><form class="editor-grid add-builder-form hidden" data-add-day="${program.id}"><label>Day name<input name="title" placeholder="e.g. Upper body" required></label><label>Category<select name="training_type"><option value="weights">Weights</option><option value="resistance">Resistance</option><option value="cardio">Cardio</option><option value="mobility">Mobility</option><option value="recovery">Recovery</option></select></label><label>Order<input name="day_index" type="number" min="0" value="${days.length}"></label><button class="btn primary small">Create day</button></form>${days.map(programDayBuilderMarkup).join('')}</section>`;
+  const groups = ['weights','resistance','cardio','mobility','recovery'].map((category) => ({ category, days: days.filter((day) => (day.training_type || 'weights') === category) })).filter((group) => group.days.length);
+  return `<section class="panel programme"><div class="panel-head"><div><span class="eyebrow">${title(program.status)}</span><h2>${esc(program.name)}</h2></div><button class="btn ghost small" data-toggle-day-form="${program.id}">+ Add training day</button></div><form class="editor-grid add-builder-form hidden" data-add-day="${program.id}"><label>Day name<input name="title" placeholder="e.g. Upper body" required></label><label>Category<select name="training_type"><option value="weights">Weights</option><option value="resistance">Resistance</option><option value="cardio">Cardio</option><option value="mobility">Mobility</option><option value="recovery">Recovery</option></select></label><label>Order<input name="day_index" type="number" min="0" value="${days.length}"></label><button class="btn primary small">Create day</button></form>${groups.map((group) => `<section class="training-type-group"><h3>${title(group.category)}</h3>${group.days.map(programDayBuilderMarkup).join('')}</section>`).join('')}</section>`;
 }
 
 function programDayBuilderMarkup(day) {
@@ -610,8 +611,17 @@ function nutritionUnit(amount, unit) {
 function usableIngredients(meal) {
   return (Array.isArray(meal?.ingredients) ? meal.ingredients : []).filter((ingredient) => {
     const name = String(ingredient?.name || '').trim();
-    return name && !/days\/week|delete day type|add meal|save meal plan|import with ai/i.test(name);
+    return name && !/^\d+(?:\.\d+)?$/.test(name) && !/days\/week|delete day type|add meal|save meal plan|import with ai/i.test(name);
   });
+}
+
+function cleanIngredient(ingredient) {
+  let name=String(ingredient?.name||'').trim(), quantity=ingredient?.quantity, unit=ingredient?.unit;
+  if ((quantity==null||quantity==='') && name) {
+    const match=name.match(/^(\d+(?:\.\d+)?)\s*(oz|g|kg|ml|lb|lbs|cup|cups|tbsp|tsp|slice|slices|scoop|scoops|whole|medium|large)?\s+(.+)$/i);
+    if(match){quantity=match[1];unit=match[2]||'count';name=match[3];}
+  }
+  return {...ingredient,name,quantity,unit};
 }
 
 function recoveredMealDescription(meal) {
@@ -631,7 +641,7 @@ function inferredAmount(ingredient, meal) {
 }
 
 function mealCardMarkup(meal, editable = false) {
-  const ingredients = usableIngredients(meal);
+  const ingredients = usableIngredients(meal).map(cleanIngredient);
   const description = recoveredMealDescription(meal);
   return `<section class="meal-card"><div class="meal-card-head"><div><span class="eyebrow">${esc(meal.meal_type || 'MEAL')}</span><h3>${esc(meal.name)}</h3></div><div><strong>${meal.calories ?? '—'} kcal</strong>${editable ? `<button class="text-btn" type="button" data-edit-meal="${meal.id}">Edit meal</button>` : ''}</div></div><div class="meal-macro-strip"><span>P ${meal.protein_g ?? '—'}g</span><span>C ${meal.carbs_g ?? '—'}g</span><span>F ${meal.fat_g ?? '—'}g</span></div>${ingredients.length ? `<h4 class="food-heading">Ingredients</h4><div class="ingredient-list">${ingredients.map((ingredient) => `<div><b>${esc(ingredient.name)}</b><span>${esc(inferredAmount(ingredient, meal) || 'Quantity not recovered')}</span></div>`).join('')}</div>` : '<div class="source-gap">Ingredients were not available in the recovered record.</div>'}${meal.cooking_instructions || description ? `<details class="meal-method" open><summary>Preparation</summary><p>${esc(meal.cooking_instructions || description)}</p></details>` : ''}${editable ? `<form class="meal-editor hidden" data-meal-editor="${meal.id}"><div class="editor-grid"><label>Name<input name="name" value="${esc(meal.name)}"></label><label>Meal type<input name="meal_type" value="${esc(meal.meal_type || '')}"></label><label>Calories<input name="calories" type="number" value="${meal.calories ?? ''}"></label><label>Protein (g)<input name="protein_g" type="number" value="${meal.protein_g ?? ''}"></label><label>Carbs (g)<input name="carbs_g" type="number" value="${meal.carbs_g ?? ''}"></label><label>Fat (g)<input name="fat_g" type="number" value="${meal.fat_g ?? ''}"></label><label class="wide">Ingredients — one per line (quantity | unit | food)<textarea name="ingredients" rows="5">${esc(ingredients.map((item) => `${item.quantity || ''} | ${item.unit || ''} | ${item.name}`).join('\n'))}</textarea></label><label class="wide">Preparation<textarea name="cooking_instructions" rows="5">${esc(meal.cooking_instructions || description)}</textarea></label></div><button class="btn primary small">Save meal</button></form>` : ''}</section>`;
 }
@@ -876,7 +886,8 @@ function diagnosticCard(report) {
   const data = report.data || {};
   const markers = Array.isArray(data.markers) ? data.markers : [];
   const genetics = data.genetic_data || {};
-  const score = report.score ?? data.health_score;
+  const scoreValue = Number(report.score ?? data.health_score);
+  const score = Number.isFinite(scoreValue) && scoreValue > 0 ? scoreValue : null;
   const flagged = markers.filter((marker) => !['optimal','normal'].includes(String(marker.status || marker.classification || '').toLowerCase()));
   const section = (heading, value, colour) => value ? `<section class="report-section" style="--accent:${colour}"><span class="eyebrow">${heading}</span><div>${responseTree(value)}</div></section>` : '';
   const priorities = Array.isArray(genetics.top_priorities) ? genetics.top_priorities : [];
