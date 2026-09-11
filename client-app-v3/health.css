@@ -1,0 +1,16 @@
+.health-summary { margin: 18px 0; }
+.connection-list article, .qa-day { display: flex; justify-content: space-between; gap: 24px; padding: 18px 0; border-bottom: 1px solid var(--line); }
+.connection-list article:last-of-type { border-bottom: 0; }
+.connection-list h3, .connection-list p { margin: 0; }
+.connection-list p { color: var(--muted); margin-top: 5px; }
+.import-preview { margin-top: 16px; border-color: rgba(185,152,83,.45); }
+.qa-day { display: block; }
+.qa-day > div { display: flex; justify-content: space-between; gap: 16px; }
+.qa-day ol { margin: 12px 0 0; padding-left: 22px; color: var(--muted); }
+@media (max-width: 700px) { .connection-list article, .qa-day > div { align-items: flex-start; flex-direction: column; gap: 8px; } }
+.qa-table { overflow-x: auto; }
+.qa-head, .qa-row { display: grid; grid-template-columns: 1.4fr repeat(5, minmax(110px, 1fr)); gap: 12px; min-width: 760px; padding: 13px 4px; align-items: center; }
+.qa-head { color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .08em; border-bottom: 1px solid var(--line); }
+.qa-row { border-bottom: 1px solid var(--line); font-size: 13px; }
+.qa-row .pass { color: #19765a; font-weight: 700; }
+.qa-row .fail { color: #a34242; font-weight: 700; }
