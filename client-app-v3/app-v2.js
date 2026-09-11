@@ -27,7 +27,8 @@ const state = {
   role: null,
   preview: false,
   coachView: 'dashboard',
-  clientView: 'today',
+  clientView: 'planner',
+  selectedSessionId: null,
   clientTab: 'overview',
   clients: [],
   client: null,
@@ -299,7 +300,7 @@ function renderClientWorkspace() {
     $('#clientHello').textContent = client.display_name;
     $('#returnCoach').classList.remove('hidden');
     show('#clientApp');
-    state.clientView = 'today';
+    state.clientView = 'planner';
     renderClient();
   };
   const views = {
@@ -383,7 +384,7 @@ function plannerCards({ interactive = false } = {}) {
   const days = weekDays();
   return `<div class="week-grid">${days.map((day) => `<article class="day-card ${day.date === iso(new Date()) ? 'today' : ''}">
     <div class="day-head"><strong>${DAYS[day.dateObject.getDay()]}</strong><span>${day.dateObject.getDate()}</span></div>
-    ${day.sessions.map((session) => `<label class="task ${session.status === 'completed' ? 'done' : ''}"><input type="checkbox" data-session-complete="${session.id}" ${session.status === 'completed' ? 'checked' : ''} ${interactive ? '' : 'disabled'}><span><b>${esc(session.title)}</b><small>${title(session.training_type)}${session.moved_from_date ? ` · Moved from ${fmt(session.moved_from_date, { weekday: 'long' })}` : ''}</small></span></label>`).join('')}
+    ${day.sessions.map((session) => `<div class="task-row ${session.status === 'completed' ? 'done' : ''}"><label class="task"><input type="checkbox" data-session-complete="${session.id}" ${session.status === 'completed' ? 'checked' : ''} ${interactive ? '' : 'disabled'}><span><b>${esc(session.title)}</b><small>${title(session.training_type)}${session.moved_from_date ? ` · Moved from ${fmt(session.moved_from_date, { weekday: 'long' })}` : ''}</small></span></label>${interactive ? `<button class="open-session" data-open-session="${session.id}" type="button">Open</button>` : ''}</div>`).join('')}
     <label class="task ${Number(day.step?.actual_steps || day.step?.steps || 0) >= safeStepGoal() ? 'done' : ''}"><input type="checkbox" data-step-date="${day.date}" ${Number(day.step?.actual_steps || day.step?.steps || 0) >= safeStepGoal() ? 'checked' : ''} ${interactive ? '' : 'disabled'}><span><b>${safeStepGoal().toLocaleString()} steps</b><small>Daily movement</small></span></label>
     ${day.nutrition ? `<div class="plan-item nutrition"><b>Nutrition</b><span>${day.nutrition.calorie_target || state.client.calorie_goal || 'Target'} kcal</span></div>` : ''}
     ${!day.sessions.length ? '<p class="source-gap">No training scheduled</p>' : ''}
@@ -574,19 +575,13 @@ function coachDiagnostics() {
 
 function renderClient() {
   if (!state.client) return;
-  ['cardio', 'mobility'].forEach((name) => {
-    const button = $(`#clientNav [data-client-view="${name}"]`);
-    if (button) button.classList.toggle('hidden', state.client[`${name}_enabled`] === false);
-  });
-  if (state.client[`${state.clientView}_enabled`] === false) state.clientView = 'today';
   $$('#clientNav button').forEach((button) => button.classList.toggle('active', button.dataset.clientView === state.clientView));
   const views = {
-    today: clientToday, planner: clientPlanner, training: clientTraining,
-    cardio: clientCardio, mobility: clientMobility, steps: clientSteps,
+    planner: clientPlanner, training: clientTraining,
     nutrition: clientNutrition, checkin: clientCheckin, progress: clientProgress,
-    diagnostics: clientDiagnostics
+    onboarding: clientOnboarding, legal: clientLegal, diagnostics: clientDiagnostics
   };
-  try { (views[state.clientView] || clientToday)(); }
+  try { (views[state.clientView] || clientPlanner)(); }
   catch (error) { renderError($('#clientMain'), error, renderClient); }
 }
 
@@ -630,6 +625,15 @@ function clientPlanner() {
   const completed = days.reduce((count, day) => count + day.sessions.filter((session) => session.status === 'completed').length + (Number(day.step?.actual_steps || day.step?.steps || 0) >= safeStepGoal() ? 1 : 0), 0);
   $('#clientMain').innerHTML = clientHeader('YOUR WEEK', 'Weekly planner', 'Training, steps, cardio, mobility and nutrition together.') + `<div class="planner-adherence"><strong>${completed}/${scheduled} completed</strong><span>${scheduled ? Math.round(completed / scheduled * 100) : 0}% adherence</span></div>${plannerCards({ interactive: true })}`;
   bindCompletionActions();
+  bindOpenSessions();
+}
+
+function bindOpenSessions() {
+  $$('[data-open-session]').forEach((button) => button.onclick = () => {
+    state.selectedSessionId = button.dataset.openSession;
+    state.clientView = 'training';
+    renderClient();
+  });
 }
 
 function bindCompletionActions() {
@@ -663,9 +667,24 @@ function bindCompletionActions() {
 function clientTraining() {
   const week = currentWeek();
   const sessions = state.data.sessions.filter((session) => !week || session.week_id === week.id).filter((session) => ['weights', 'resistance'].includes(session.training_type));
-  $('#clientMain').innerHTML = clientHeader('YOUR PROGRAMME', 'Training', 'Open a workout, watch the demonstration and record your performance.') + (sessions.length ? sessions.map((session) => `<section class="panel workout"><div class="panel-head"><div><span class="eyebrow">${fmt(session.session_date, { weekday: 'long', day: 'numeric', month: 'short' })}</span><h2>${esc(session.title)}</h2></div>${taskMarkup(session)}</div>${exercisesForSession(session).map((exercise) => exerciseCard(exercise, true)).join('') || '<div class="empty">No exercise prescription is attached to this workout.</div>'}</section>`).join('') : '<div class="empty">No weight or resistance workout is scheduled this week.</div>');
+  const selected = sessions.find((session) => session.id === state.selectedSessionId);
+  if (!selected) {
+    $('#clientMain').innerHTML = clientHeader('', 'Training', 'Choose a session to view the prescription and log each set.') + `<div class="session-picker">${sessions.map((session) => `<button class="session-tile" data-open-session="${session.id}"><span>${fmt(session.session_date, { weekday: 'short', day: 'numeric', month: 'short' })}</span><strong>${esc(session.title)}</strong><small>${exercisesForSession(session).length} exercises · ${session.status === 'completed' ? 'Completed' : 'Planned'}</small></button>`).join('') || '<div class="empty">No weights or resistance session is scheduled this week.</div>'}</div>`;
+    return bindOpenSessions();
+  }
+  $('#clientMain').innerHTML = `<button class="text-btn back-to-sessions" id="backToSessions">← All sessions</button>` + clientHeader('', selected.title, fmt(selected.session_date, { weekday: 'long', day: 'numeric', month: 'long' })) + `<section class="panel workout"><div class="panel-head"><div><h2>Workout prescription</h2><span class="sub">${exercisesForSession(selected).length} exercises</span></div>${taskMarkup(selected)}</div>${exercisesForSession(selected).map((exercise) => exerciseCard(exercise, true)).join('') || '<div class="empty">No exercise prescription is attached to this workout.</div>'}</section>`;
+  $('#backToSessions').onclick = () => { state.selectedSessionId = null; clientTraining(); };
   bindCompletionActions();
   $$('[data-exercise-log]').forEach((form) => form.onsubmit = saveExerciseLog);
+}
+
+function clientOnboarding() {
+  const record = state.data.onboarding[0];
+  $('#clientMain').innerHTML = clientHeader('', 'Onboarding', 'Your original coaching profile and responses.') + (record ? `<section class="panel response-sheet">${responseTree(record.responses)}</section>` : '<div class="empty">No onboarding record is available.</div>');
+}
+
+function clientLegal() {
+  $('#clientMain').innerHTML = clientHeader('', 'Legal & consent', 'Your recorded agreements and consent history.') + (state.data.legal.length ? state.data.legal.map((record) => `<section class="panel legal-record"><div class="panel-head"><h2>${esc(record.document_name || record.consent_type || 'Consent record')}</h2><span>${fmt(record.signed_at || record.accepted_at || record.created_at)}</span></div>${responseTree(record.details || record.responses || record.visible_content)}</section>`).join('') : '<div class="empty">No legal or consent record is available.</div>');
 }
 
 async function saveExerciseLog(event) {
