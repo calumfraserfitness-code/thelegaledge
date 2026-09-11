@@ -508,6 +508,17 @@ function ingredientAmount(ingredient) {
   return amount;
 }
 
+function nutritionUnit(amount, unit) {
+  if (amount == null || amount === '') return '';
+  const n = Number(amount);
+  const raw = `${amount}${unit ? ` ${unit}` : ''}`;
+  if (state.client?.weight_unit !== 'lbs' || !Number.isFinite(n)) return raw;
+  if (String(unit).toLowerCase() === 'g') return `${(n / 28.3495).toFixed(n < 30 ? 1 : 2).replace(/\.00$/, '')} oz`;
+  if (String(unit).toLowerCase() === 'kg') return `${(n * 2.20462).toFixed(1)} lb`;
+  if (String(unit).toLowerCase() === 'ml') return n >= 60 ? `${(n / 236.588).toFixed(2).replace(/0$/, '')} cups` : `${(n / 14.7868).toFixed(1)} tbsp`;
+  return raw;
+}
+
 function usableIngredients(meal) {
   return (Array.isArray(meal?.ingredients) ? meal.ingredients : []).filter((ingredient) => {
     const name = String(ingredient?.name || '').trim();
@@ -525,16 +536,16 @@ function recoveredMealDescription(meal) {
 function inferredAmount(ingredient, meal) {
   const direct = ingredientAmount(ingredient);
   if (!direct) return '';
-  if (ingredient.unit || !/^\d+(\.\d+)?$/.test(String(ingredient.quantity))) return direct;
+  if (ingredient.unit || !/^\d+(\.\d+)?$/.test(String(ingredient.quantity))) return nutritionUnit(ingredient.quantity, ingredient.unit);
   const name = String(ingredient.name || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const match = String(meal.preparation || '').match(new RegExp(`\\b${ingredient.quantity}\\s*(g|kg|ml|l|oz|lb|lbs|cup|cups|tbsp|tsp)\\b[^,.]*${name}`, 'i'));
-  return match ? `${ingredient.quantity}${match[1]}` : String(ingredient.quantity);
+  return match ? nutritionUnit(ingredient.quantity, match[1]) : String(ingredient.quantity);
 }
 
 function mealCardMarkup(meal, editable = false) {
   const ingredients = usableIngredients(meal);
   const description = recoveredMealDescription(meal);
-  return `<section class="meal-card"><div class="meal-card-head"><div><span class="eyebrow">${esc(meal.meal_type || 'MEAL')}</span><h3>${esc(meal.name)}</h3></div><div><strong>${meal.calories ?? '—'} kcal</strong>${editable ? `<button class="text-btn" type="button" data-edit-meal="${meal.id}">Edit</button>` : ''}</div></div><div class="meal-macro-strip"><span>P ${meal.protein_g ?? '—'}g</span><span>C ${meal.carbs_g ?? '—'}g</span><span>F ${meal.fat_g ?? '—'}g</span></div>${description ? `<p class="meal-description">${esc(description)}</p>` : ''}${ingredients.length ? `<div class="ingredient-list">${ingredients.map((ingredient) => `<div><b>${esc(ingredient.name)}</b>${inferredAmount(ingredient, meal) ? `<span>${esc(inferredAmount(ingredient, meal))}</span>` : ''}</div>`).join('')}</div>` : ''}${meal.cooking_instructions ? `<details class="meal-method"><summary>Preparation</summary><p>${esc(meal.cooking_instructions)}</p></details>` : ''}${editable ? `<form class="meal-editor hidden" data-meal-editor="${meal.id}"><div class="editor-grid"><label>Name<input name="name" value="${esc(meal.name)}"></label><label>Meal type<input name="meal_type" value="${esc(meal.meal_type || '')}"></label><label>Calories<input name="calories" type="number" value="${meal.calories ?? ''}"></label><label>Protein (g)<input name="protein_g" type="number" value="${meal.protein_g ?? ''}"></label><label>Carbs (g)<input name="carbs_g" type="number" value="${meal.carbs_g ?? ''}"></label><label>Fat (g)<input name="fat_g" type="number" value="${meal.fat_g ?? ''}"></label><label class="wide">Ingredients — one per line (quantity | unit | food)<textarea name="ingredients" rows="5">${esc(ingredients.map((item) => `${item.quantity || ''} | ${item.unit || ''} | ${item.name}`).join('\n'))}</textarea></label><label class="wide">Preparation<textarea name="cooking_instructions" rows="5">${esc(meal.cooking_instructions || description)}</textarea></label></div><button class="btn primary small">Save meal</button></form>` : ''}</section>`;
+  return `<section class="meal-card"><div class="meal-card-head"><div><span class="eyebrow">${esc(meal.meal_type || 'MEAL')}</span><h3>${esc(meal.name)}</h3></div><div><strong>${meal.calories ?? '—'} kcal</strong>${editable ? `<button class="text-btn" type="button" data-edit-meal="${meal.id}">Edit meal</button>` : ''}</div></div><div class="meal-macro-strip"><span>P ${meal.protein_g ?? '—'}g</span><span>C ${meal.carbs_g ?? '—'}g</span><span>F ${meal.fat_g ?? '—'}g</span></div>${ingredients.length ? `<h4 class="food-heading">Ingredients</h4><div class="ingredient-list">${ingredients.map((ingredient) => `<div><b>${esc(ingredient.name)}</b><span>${esc(inferredAmount(ingredient, meal) || 'Quantity not recovered')}</span></div>`).join('')}</div>` : '<div class="source-gap">Ingredients were not available in the recovered record.</div>'}${meal.cooking_instructions || description ? `<details class="meal-method" open><summary>Preparation</summary><p>${esc(meal.cooking_instructions || description)}</p></details>` : ''}${editable ? `<form class="meal-editor hidden" data-meal-editor="${meal.id}"><div class="editor-grid"><label>Name<input name="name" value="${esc(meal.name)}"></label><label>Meal type<input name="meal_type" value="${esc(meal.meal_type || '')}"></label><label>Calories<input name="calories" type="number" value="${meal.calories ?? ''}"></label><label>Protein (g)<input name="protein_g" type="number" value="${meal.protein_g ?? ''}"></label><label>Carbs (g)<input name="carbs_g" type="number" value="${meal.carbs_g ?? ''}"></label><label>Fat (g)<input name="fat_g" type="number" value="${meal.fat_g ?? ''}"></label><label class="wide">Ingredients — one per line (quantity | unit | food)<textarea name="ingredients" rows="5">${esc(ingredients.map((item) => `${item.quantity || ''} | ${item.unit || ''} | ${item.name}`).join('\n'))}</textarea></label><label class="wide">Preparation<textarea name="cooking_instructions" rows="5">${esc(meal.cooking_instructions || description)}</textarea></label></div><button class="btn primary small">Save meal</button></form>` : ''}</section>`;
 }
 
 function assignedMealsForPlan(plan) {
@@ -547,16 +558,87 @@ function assignedMealsForPlan(plan) {
 
 function assignedMealPlan(plan, editable = false) {
   const assignments = assignedMealsForPlan(plan);
-  return `<article class="panel nutrition-plan"><div class="panel-head"><div><span class="eyebrow">${esc(plan.day_type || 'PLAN')}</span><h2>${esc(plan.name)}</h2></div><span class="pill">${plan.days_per_week ?? '—'} DAYS / WEEK</span></div>${macroStrip(plan)}<div class="meal-grid">${assignments.map(({ meal }) => mealCardMarkup(meal, editable)).join('') || '<div class="empty">No assigned meals are available for this plan.</div>'}</div>${plan.coach_notes ? `<div class="coach-note"><b>Coach notes</b><p>${esc(plan.coach_notes)}</p></div>` : ''}</article>`;
+  const total = assignments.reduce((sum, { meal }) => ({ calories: sum.calories + Number(meal.calories || 0), protein: sum.protein + Number(meal.protein_g || 0), carbs: sum.carbs + Number(meal.carbs_g || 0), fat: sum.fat + Number(meal.fat_g || 0) }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
+  return `<article class="panel nutrition-plan"><div class="panel-head"><div><span class="eyebrow">${esc(nutritionDayLabel(plan))}</span><h2>${esc(nutritionDayLabel(plan))}</h2><p class="muted">${nutritionDayLabel(plan) === 'Busy Day' ? 'Prepare ahead, pack it, and keep the day simple.' : nutritionDayLabel(plan) === 'Training Day' ? 'Fuel training and recovery.' : 'Your lower-activity day structure.'}</p></div><span class="pill">${plan.days_per_week ?? '—'} DAYS / WEEK</span></div>${macroStrip(plan)}<div class="meal-grid">${assignments.map(({ meal }) => mealCardMarkup(meal, editable)).join('') || '<div class="empty">No assigned meals are available for this plan.</div>'}</div><div class="day-totals"><b>Meals shown</b><span>${Math.round(total.calories)} kcal</span><span>P ${Math.round(total.protein)}g</span><span>C ${Math.round(total.carbs)}g</span><span>F ${Math.round(total.fat)}g</span></div>${plan.coach_notes ? `<div class="coach-note"><b>Coach notes</b><p>${esc(plan.coach_notes)}</p></div>` : ''}</article>`;
 }
 
 function nutritionPlanMarkup(plan) {
   return assignedMealsForPlan(plan).length ? assignedMealPlan(plan) : mealPlan(plan);
 }
 
+function nutritionDayLabel(plan) {
+  return /non[- ]?training|rest/i.test(plan?.day_type || plan?.name || '') ? 'Rest Day' : (plan?.day_type || plan?.name || 'Plan');
+}
+
+function nutritionImportPrompt() {
+  const units = state.client?.weight_unit === 'lbs' ? 'US-friendly ounces, cups, tablespoons and counts' : 'grams, millilitres and counts';
+  return `Create a personalised 3-day nutrition plan for ${state.client?.display_name || 'this client'} using ${units}. Return JSON only. Keep meals practical, measured and close to the stated daily macros. Use exactly three day types: Training Day, Rest Day, Busy Day. Busy Day must use portable, batch-prepared or genuinely quick meals. Do not include foods that conflict with the client's onboarding restrictions.\n\nSchema:\n{"days":[{"day_type":"Training Day","name":"Training Day","days_per_week":3,"calories":2200,"protein_g":180,"carbs_g":230,"fat_g":60,"coach_notes":"","meals":[{"name":"Meal name","meal_type":"Breakfast","calories":500,"protein_g":40,"carbs_g":55,"fat_g":12,"ingredients":[{"quantity":2,"unit":"oz","name":"oats"}],"cooking_instructions":"Clear numbered preparation steps","swaps":["Alternative"]}]}]}`;
+}
+
+function nutritionImportPanel() {
+  return `<section id="nutritionImportPanel" class="panel import-prompt hidden"><div class="panel-head"><div><span class="eyebrow">FAST BUILD</span><h3>Import a complete 3-day plan</h3></div><button class="btn ghost small" type="button" id="copyNutritionPrompt">Copy AI prompt</button></div><p class="muted">Paste JSON with Training Day, Rest Day and Busy Day. The importer validates every meal before saving.</p><form id="nutritionJsonForm"><label class="field">Nutrition JSON<textarea name="nutrition_json" rows="12" placeholder='{"days":[...]}' required></textarea></label><button class="btn primary" type="submit">Validate & import plan</button></form></section>`;
+}
+
+async function copyNutritionPrompt() {
+  try { await navigator.clipboard.writeText(nutritionImportPrompt()); toast('Nutrition prompt copied'); }
+  catch { toast('Copy failed — select the prompt manually', 'error'); }
+}
+
+function validateNutritionImport(payload) {
+  if (!payload || !Array.isArray(payload.days) || payload.days.length !== 3) throw new Error('JSON must contain exactly three days.');
+  const required = ['Training Day', 'Rest Day', 'Busy Day'];
+  required.forEach((type) => { if (!payload.days.some((day) => day.day_type === type)) throw new Error(`${type} is missing.`); });
+  payload.days.forEach((day) => {
+    if (!Array.isArray(day.meals) || !day.meals.length) throw new Error(`${day.day_type} needs at least one meal.`);
+    ['calories', 'protein_g', 'carbs_g', 'fat_g'].forEach((key) => { if (!Number.isFinite(Number(day[key]))) throw new Error(`${day.day_type}: ${key} is required.`); });
+    day.meals.forEach((meal) => {
+      if (!meal.name || !Array.isArray(meal.ingredients) || !meal.ingredients.length) throw new Error(`${day.day_type}: every meal needs a name and ingredients.`);
+      ['calories', 'protein_g', 'carbs_g', 'fat_g'].forEach((key) => { if (!Number.isFinite(Number(meal[key]))) throw new Error(`${meal.name}: ${key} is required.`); });
+    });
+  });
+  return payload;
+}
+
+async function importNutritionJson(event) {
+  event.preventDefault();
+  let payload;
+  try { payload = validateNutritionImport(JSON.parse(new FormData(event.target).get('nutrition_json'))); }
+  catch (error) { return toast(error.message || 'Invalid JSON', 'error'); }
+  if (state.preview) return toast('JSON validated. Sign in to save it.');
+  setBusy(event.submitter, true);
+  try {
+    for (const day of payload.days) {
+      const existing = state.data.nutritionPlans.find((plan) => plan.day_type === day.day_type || (day.day_type === 'Rest Day' && plan.day_type === 'Non-Training Day'));
+      const planPatch = { client_id: state.client.id, name: day.name || day.day_type, day_type: day.day_type, days_per_week: Number(day.days_per_week || 1), calories: Number(day.calories), protein_g: Number(day.protein_g), carbs_g: Number(day.carbs_g), fat_g: Number(day.fat_g), coach_notes: day.coach_notes || null, is_active: true, source_system: 'coach_json', source_json: day };
+      let plan;
+      if (existing) {
+        [plan] = await query('Nutrition plan import', db.from('nutrition_plans').update(planPatch).eq('id', existing.id).select());
+        await query('Meal assignment reset', db.from('meal_assignments').delete().eq('nutrition_plan_id', existing.id).select());
+      } else [plan] = await query('Nutrition plan import', db.from('nutrition_plans').insert(planPatch).select());
+      for (let index = 0; index < day.meals.length; index += 1) {
+        const meal = day.meals[index];
+        const mealRow = { name: meal.name, meal_type: meal.meal_type || 'Meal', calories: Number(meal.calories), protein_g: Number(meal.protein_g), carbs_g: Number(meal.carbs_g), fat_g: Number(meal.fat_g), ingredients: meal.ingredients, cooking_instructions: meal.cooking_instructions || null, swaps: Array.isArray(meal.swaps) ? meal.swaps : [], tags: Array.isArray(meal.tags) ? meal.tags : [], source_system: 'coach_json' };
+        const [savedMeal] = await query('Meal import', db.from('meal_bank').insert(mealRow).select());
+        await query('Meal assignment', db.from('meal_assignments').insert({ meal_id: savedMeal.id, client_id: state.client.id, nutrition_plan_id: plan.id, historical: false, sort_order: index }).select());
+      }
+    }
+    toast('Three-day nutrition plan imported');
+    await loadClientData(state.client.id);
+    state.selectedNutritionPlanId = state.data.nutritionPlans.find((plan) => plan.day_type === 'Training Day')?.id;
+    coachNutrition();
+  } catch (error) { toast(error.message || 'Import failed', 'error'); }
+  finally { setBusy(event.submitter, false); }
+}
+
 function coachNutrition() {
   const plans = state.data.nutritionPlans.filter((plan) => plan.is_active !== false);
-  $('#clientWorkspaceBody').innerHTML = plans.length ? plans.map((plan) => `<form class="nutrition-editor" data-plan-editor="${plan.id}"><div class="editor-grid"><label>Plan name<input name="name" value="${esc(plan.name)}"></label><label>Calories<input name="calories" type="number" min="0" value="${plan.calories ?? ''}"></label><label>Protein (g)<input name="protein_g" type="number" min="0" value="${plan.protein_g ?? ''}"></label><label>Carbs (g)<input name="carbs_g" type="number" min="0" value="${plan.carbs_g ?? ''}"></label><label>Fat (g)<input name="fat_g" type="number" min="0" value="${plan.fat_g ?? ''}"></label><button class="btn primary small">Save targets</button></div></form>${assignedMealsForPlan(plan).length ? assignedMealPlan(plan, true) : mealPlan(plan)}`).join('') : '<div class="empty">No active nutrition plan is available for this client.</div>';
+  const selected = plans.find((plan) => plan.id === state.selectedNutritionPlanId) || plans.find((plan) => nutritionDayLabel(plan) === 'Training Day') || plans[0];
+  state.selectedNutritionPlanId = selected?.id || null;
+  $('#clientWorkspaceBody').innerHTML = `<section class="nutrition-tools"><div><h2>Nutrition plan</h2><p class="muted">Edit targets and every food without leaving this page.</p></div><button class="btn gold" type="button" id="toggleNutritionImport">Import 3-day JSON</button></section>${nutritionImportPanel()}${plans.length ? `<div class="nutrition-day-tabs">${plans.map((plan) => `<button type="button" data-coach-nutrition-plan="${plan.id}" class="${plan.id === selected.id ? 'active' : ''}">${esc(nutritionDayLabel(plan))}</button>`).join('')}</div><form class="nutrition-editor" data-plan-editor="${selected.id}"><div class="editor-grid"><label>Plan name<input name="name" value="${esc(selected.name)}"></label><label>Day type<select name="day_type"><option${selected.day_type === 'Training Day' ? ' selected' : ''}>Training Day</option><option${selected.day_type === 'Rest Day' || selected.day_type === 'Non-Training Day' ? ' selected' : ''}>Rest Day</option><option${selected.day_type === 'Busy Day' ? ' selected' : ''}>Busy Day</option></select></label><label>Calories<input name="calories" type="number" min="0" value="${selected.calories ?? ''}"></label><label>Protein (g)<input name="protein_g" type="number" min="0" value="${selected.protein_g ?? ''}"></label><label>Carbs (g)<input name="carbs_g" type="number" min="0" value="${selected.carbs_g ?? ''}"></label><label>Fat (g)<input name="fat_g" type="number" min="0" value="${selected.fat_g ?? ''}"></label><label>Days/week<input name="days_per_week" type="number" min="0" max="7" value="${selected.days_per_week ?? 1}"></label><button class="btn primary small">Save targets</button></div></form>${assignedMealsForPlan(selected).length ? assignedMealPlan(selected, true) : mealPlan(selected)}` : '<div class="empty">No active nutrition plan is available for this client. Use Import 3-day JSON to add it.</div>'}`;
+  $('#toggleNutritionImport').onclick = () => $('#nutritionImportPanel').classList.toggle('hidden');
+  $('#nutritionJsonForm').onsubmit = importNutritionJson;
+  $('#copyNutritionPrompt').onclick = copyNutritionPrompt;
+  $$('[data-coach-nutrition-plan]').forEach((button) => button.onclick = () => { state.selectedNutritionPlanId = button.dataset.coachNutritionPlan; coachNutrition(); });
   $$('[data-plan-editor]').forEach((form) => form.onsubmit = saveNutritionTargets);
   $$('[data-edit-meal]').forEach((button) => button.onclick = () => $(`[data-meal-editor="${button.dataset.editMeal}"]`)?.classList.toggle('hidden'));
   $$('[data-meal-editor]').forEach((form) => form.onsubmit = saveMeal);
@@ -582,7 +664,7 @@ async function saveNutritionTargets(event) {
   event.preventDefault();
   const plan = state.data.nutritionPlans.find((item) => item.id === event.target.dataset.planEditor);
   const fd = new FormData(event.target);
-  const patch = { name: String(fd.get('name') || '').trim() };
+  const patch = { name: String(fd.get('name') || '').trim(), day_type: String(fd.get('day_type') || plan.day_type), days_per_week: Number(fd.get('days_per_week') || 1) };
   for (const key of ['calories', 'protein_g', 'carbs_g', 'fat_g']) patch[key] = fd.get(key) === '' ? null : Number(fd.get(key));
   Object.assign(plan, patch);
   if (state.preview) { toast('Nutrition targets updated in preview'); return coachNutrition(); }
@@ -853,9 +935,9 @@ function clientSteps() {
 
 function clientNutrition() {
   const plans = state.data.nutritionPlans.filter((plan) => plan.is_active !== false);
-  const selected = plans.find((plan) => plan.id === state.selectedNutritionPlanId) || plans[0];
+  const selected = plans.find((plan) => plan.id === state.selectedNutritionPlanId) || plans.find((plan) => nutritionDayLabel(plan) === 'Training Day') || plans[0];
   state.selectedNutritionPlanId = selected?.id || null;
-  $('#clientMain').innerHTML = clientHeader('', 'Nutrition', 'Your targets and meals for each day type.') + (plans.length ? `<div class="nutrition-day-tabs">${plans.map((plan) => `<button type="button" data-nutrition-plan="${plan.id}" class="${plan.id === selected.id ? 'active' : ''}">${esc(plan.day_type || plan.name)}</button>`).join('')}</div>${nutritionPlanMarkup(selected)}` : '<div class="empty">No active nutrition plan is available.</div>');
+  $('#clientMain').innerHTML = clientHeader('', 'Nutrition', 'Your targets, exact foods and preparation for each type of day.') + (plans.length ? `<div class="nutrition-day-tabs">${plans.map((plan) => `<button type="button" data-nutrition-plan="${plan.id}" class="${plan.id === selected.id ? 'active' : ''}">${esc(nutritionDayLabel(plan))}</button>`).join('')}</div>${nutritionPlanMarkup(selected)}` : '<div class="empty">No active nutrition plan is available.</div>');
   $$('[data-nutrition-plan]').forEach((button) => button.onclick = () => { state.selectedNutritionPlanId = button.dataset.nutritionPlan; clientNutrition(); });
 }
 
