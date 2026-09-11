@@ -21,6 +21,6 @@ create policy legal_client_insert on public.legal_consents for insert to authent
   with check (exists(select 1 from public.clients c where c.id=client_id and c.profile_id=(select auth.uid())));
 
 update public.clients
-set onboarding_status='complete', plan_status=case when portal_enabled then 'published' else 'coach_building' end
+set onboarding_status='complete', plan_status='published', portal_enabled=true,
+    plan_published_at=coalesce(plan_published_at,now())
 where source_system is not null;
-
