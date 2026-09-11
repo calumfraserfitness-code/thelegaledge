@@ -1,5 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "jsr:@supabase/supabase-js@2";
+import { createClient } from "jsr:@supabase/supabase-js@2.57.4";
 
 const cors = {"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type"};
 const json = (body: unknown, status=200) => new Response(JSON.stringify(body), {status, headers:{...cors,"Content-Type":"application/json"}});
@@ -21,6 +21,7 @@ Deno.serve(async (req: Request) => {
   const password=String(body.password||"");
   const fullName=String(body.full_name||"").trim();
   if(!email||!fullName||password.length<8) return json({error:"Name, valid email and an 8+ character temporary password are required"},400);
+  console.log('[provision-client] validated coach request', {coach_id:user.id, email});
   const {data:created,error:createError}=await admin.auth.admin.createUser({email,password,email_confirm:true,user_metadata:{full_name:fullName},app_metadata:{role:"client"}});
   if(createError||!created.user) return json({error:createError?.message||"Could not create account"},400);
   const profile={id:created.user.id,role:"client",full_name:fullName,email};
@@ -29,5 +30,6 @@ Deno.serve(async (req: Request) => {
   const unit=body.market_region==="us"?"lbs":"kg";
   const {data:client,error:clientError}=await admin.from("clients").insert({profile_id:created.user.id,coach_id:user.id,display_name:fullName,email,phone:body.phone||null,status:"active",market_region:body.market_region||"other",weight_unit:unit,goal_summary:body.goal_summary||null,daily_steps_goal:Number(body.daily_steps_goal)||8000,checkin_day:Number(body.checkin_day??5),cardio_enabled:Boolean(body.cardio_enabled),mobility_enabled:Boolean(body.mobility_enabled),onboarding_status:"pending_legal",plan_status:"awaiting_onboarding",portal_enabled:false}).select().single();
   if(clientError){await admin.auth.admin.deleteUser(created.user.id);return json({error:clientError.message},400);}
+  console.log('[provision-client] client created', {coach_id:user.id,client_id:client.id,user_id:created.user.id});
   return json({client});
 });
