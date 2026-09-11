@@ -29,6 +29,7 @@ const state = {
   coachView: 'dashboard',
   clientView: 'planner',
   selectedSessionId: null,
+  selectedNutritionPlanId: null,
   clientTab: 'overview',
   clients: [],
   client: null,
@@ -434,8 +435,47 @@ function exercisesForSession(session) {
 
 function coachTraining() {
   const programs = state.data.programs;
-  $('#clientWorkspaceBody').innerHTML = programs.length ? programs.map((program) => `<section class="panel programme"><div class="panel-head"><div><span class="eyebrow">${title(program.status)}</span><h2>${esc(program.name)}</h2></div></div>${(program.days || []).sort((a, b) => a.day_index - b.day_index).map((day) => `<details class="programme-day" open><summary><div><b>${esc(day.title)}</b><span class="sub">${title(day.training_type)} · ${programDayExercises(day).length} exercises</span></div></summary>${programDayExercises(day).length ? programDayExercises(day).map((exercise) => `${exerciseCard(exercise)}<form class="exercise-editor" data-exercise-editor="${exercise.id}"><div class="editor-grid"><label>Name<input name="name" value="${esc(exercise.name)}" required></label><label>Sets<input name="sets" type="number" min="1" value="${exercise.sets ?? ''}"></label><label>Reps<input name="reps" value="${esc(exercise.reps || '')}"></label><label>Rest (sec)<input name="rest_seconds" type="number" min="0" value="${exercise.rest_seconds ?? ''}"></label><label>Tempo<input name="tempo" value="${esc(exercise.tempo || '')}"></label><label>RPE<input name="rpe" type="number" min="1" max="10" step="0.5" value="${exercise.rpe ?? ''}"></label><label>RIR<input name="rir" type="number" min="0" max="10" step="0.5" value="${exercise.rir ?? ''}"></label><label>Superset<input name="superset_group" value="${esc(exercise.superset_group || '')}"></label><label class="wide">Video URL<input name="video_url" type="url" value="${esc(exercise.video_url || '')}"></label><label class="wide">Instructions<textarea name="coach_instructions" rows="2">${esc(exercise.coach_instructions || exercise.notes || '')}</textarea></label></div><button class="btn primary small">Save exercise</button></form>`).join('') : '<div class="empty">Exercise-level data has not been recovered for this day.</div>'}</details>`).join('')}</section>`).join('') : '<div class="empty">No programme has been assigned.</div>';
+  $('#clientWorkspaceBody').innerHTML = programs.length ? programs.map(programBuilderMarkup).join('') : '<div class="empty">No programme has been assigned.</div>';
   $$('[data-exercise-editor]').forEach((form) => form.onsubmit = saveExercisePrescription);
+  $$('[data-toggle-day-form]').forEach((button) => button.onclick = () => $(`[data-add-day="${button.dataset.toggleDayForm}"]`)?.classList.toggle('hidden'));
+  $$('[data-toggle-exercise-form]').forEach((button) => button.onclick = (event) => { event.preventDefault(); event.stopPropagation(); $(`[data-add-exercise="${button.dataset.toggleExerciseForm}"]`)?.classList.toggle('hidden'); });
+  $$('[data-add-day]').forEach((form) => form.onsubmit = addProgramDay);
+  $$('[data-add-exercise]').forEach((form) => form.onsubmit = addProgramExercise);
+  $$('[data-delete-exercise]').forEach((button) => button.onclick = () => deleteProgramExercise(button.dataset.deleteExercise));
+}
+
+function programBuilderMarkup(program) {
+  const days = [...(program.days || [])].sort((a, b) => a.day_index - b.day_index);
+  return `<section class="panel programme"><div class="panel-head"><div><span class="eyebrow">${title(program.status)}</span><h2>${esc(program.name)}</h2></div><button class="btn ghost small" data-toggle-day-form="${program.id}">+ Add training day</button></div><form class="editor-grid add-builder-form hidden" data-add-day="${program.id}"><label>Day name<input name="title" placeholder="e.g. Upper body" required></label><label>Category<select name="training_type"><option value="weights">Weights</option><option value="resistance">Resistance</option><option value="cardio">Cardio</option><option value="mobility">Mobility</option><option value="recovery">Recovery</option></select></label><label>Order<input name="day_index" type="number" min="0" value="${days.length}"></label><button class="btn primary small">Create day</button></form>${days.map(programDayBuilderMarkup).join('')}</section>`;
+}
+
+function programDayBuilderMarkup(day) {
+  const exercises = programDayExercises(day);
+  return `<details class="programme-day" open><summary><div><b>${esc(day.title)}</b><span class="sub">${title(day.training_type)} · ${exercises.length} exercises</span></div><button type="button" class="text-btn" data-toggle-exercise-form="${day.id}">+ Add exercise</button></summary><form class="editor-grid add-builder-form hidden" data-add-exercise="${day.id}"><label>Name<input name="name" required></label><label>Sets<input name="sets" type="number" min="1" value="3"></label><label>Reps<input name="reps" value="8–12"></label><label>Rest (sec)<input name="rest_seconds" type="number" min="0" value="90"></label><label class="wide">Video URL<input name="video_url" type="url"></label><label>Superset group<input name="superset_group"></label><label class="wide">Instructions<textarea name="coach_instructions" rows="2"></textarea></label><button class="btn primary small">Add exercise</button></form>${exercises.length ? exercises.map(exerciseEditorMarkup).join('') : '<div class="empty">No exercises yet.</div>'}</details>`;
+}
+
+function exerciseEditorMarkup(exercise) {
+  return `${exerciseCard(exercise)}<form class="exercise-editor" data-exercise-editor="${exercise.id}"><div class="editor-grid"><label>Name<input name="name" value="${esc(exercise.name)}" required></label><label>Sets<input name="sets" type="number" min="1" value="${exercise.sets ?? ''}"></label><label>Reps<input name="reps" value="${esc(exercise.reps || '')}"></label><label>Rest (sec)<input name="rest_seconds" type="number" min="0" value="${exercise.rest_seconds ?? ''}"></label><label>Tempo<input name="tempo" value="${esc(exercise.tempo || '')}"></label><label>RPE<input name="rpe" type="number" min="1" max="10" step="0.5" value="${exercise.rpe ?? ''}"></label><label>RIR<input name="rir" type="number" min="0" max="10" step="0.5" value="${exercise.rir ?? ''}"></label><label>Superset<input name="superset_group" value="${esc(exercise.superset_group || '')}"></label><label class="wide">Video URL<input name="video_url" type="url" value="${esc(exercise.video_url || '')}"></label><label class="wide">Instructions<textarea name="coach_instructions" rows="2">${esc(exercise.coach_instructions || exercise.notes || '')}</textarea></label></div><div class="editor-actions"><button class="btn primary small">Save exercise</button><button class="btn ghost small danger" type="button" data-delete-exercise="${exercise.id}">Delete exercise</button></div></form>`;
+}
+
+async function addProgramDay(event) {
+  event.preventDefault(); const program = state.data.programs.find((item) => item.id === event.target.dataset.addDay); const fd = new FormData(event.target);
+  const row = { program_id: program.id, title: String(fd.get('title')).trim(), training_type: fd.get('training_type'), day_index: Number(fd.get('day_index') || 0) };
+  if (state.preview) { program.days.push({ ...row, id: `preview-day-${Date.now()}`, exercises: [] }); return coachTraining(); }
+  try { const [saved] = await query('Training day', db.from('training_program_days').insert(row).select()); saved.exercises = []; program.days.push(saved); toast('Training day added'); coachTraining(); } catch (error) { toast(error.message, 'error'); }
+}
+
+async function addProgramExercise(event) {
+  event.preventDefault(); const day = state.data.programs.flatMap((program) => program.days || []).find((item) => item.id === event.target.dataset.addExercise); const fd = new FormData(event.target);
+  const row = { program_day_id: day.id, name: String(fd.get('name')).trim(), sets: Number(fd.get('sets')) || null, reps: String(fd.get('reps') || '').trim() || null, rest_seconds: Number(fd.get('rest_seconds')) || null, video_url: String(fd.get('video_url') || '').trim() || null, superset_group: String(fd.get('superset_group') || '').trim() || null, coach_instructions: String(fd.get('coach_instructions') || '').trim() || null, sort_order: (day.exercises || []).length };
+  if (state.preview) { const saved = { ...row, id: `preview-exercise-${Date.now()}` }; day.exercises.push(saved); state.data.exercises.push(saved); return coachTraining(); }
+  try { const [saved] = await query('Exercise', db.from('program_exercises').insert(row).select()); day.exercises.push(saved); state.data.exercises.push(saved); toast('Exercise added'); coachTraining(); } catch (error) { toast(error.message, 'error'); }
+}
+
+async function deleteProgramExercise(id) {
+  if (!confirm('Delete this exercise prescription?')) return;
+  if (!state.preview) { try { await query('Delete exercise', db.from('program_exercises').delete().eq('id', id).select()); } catch (error) { return toast(error.message, 'error'); } }
+  state.data.programs.forEach((program) => (program.days || []).forEach((day) => { day.exercises = (day.exercises || []).filter((item) => item.id !== id); })); state.data.exercises = state.data.exercises.filter((item) => item.id !== id); toast('Exercise deleted'); coachTraining();
 }
 
 async function saveExercisePrescription(event) {
@@ -464,7 +504,36 @@ function mealPlan(plan) {
 
 function ingredientAmount(ingredient) {
   const amount = [ingredient?.quantity, ingredient?.unit].filter((value) => value != null && value !== '').join(' ');
-  return amount || 'As directed';
+  return amount;
+}
+
+function usableIngredients(meal) {
+  return (Array.isArray(meal?.ingredients) ? meal.ingredients : []).filter((ingredient) => {
+    const name = String(ingredient?.name || '').trim();
+    return name && !/days\/week|delete day type|add meal|save meal plan|import with ai/i.test(name);
+  });
+}
+
+function recoveredMealDescription(meal) {
+  const lines = String(meal?.preparation || '').split(/\n+/).map((line) => line.trim()).filter(Boolean);
+  return lines.find((line) => ![
+    meal?.meal_type, meal?.name
+  ].includes(line) && !/^(import with ai|save meal plan|add meal|add day type|total:|days\/week|[1-7]|delete day type)$/i.test(line) && !/^\d+\s*kcal/i.test(line) && !/^[pcf]\s*\d+/i.test(line)) || '';
+}
+
+function inferredAmount(ingredient, meal) {
+  const direct = ingredientAmount(ingredient);
+  if (!direct) return '';
+  if (ingredient.unit || !/^\d+(\.\d+)?$/.test(String(ingredient.quantity))) return direct;
+  const name = String(ingredient.name || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = String(meal.preparation || '').match(new RegExp(`\\b${ingredient.quantity}\\s*(g|kg|ml|l|oz|lb|lbs|cup|cups|tbsp|tsp)\\b[^,.]*${name}`, 'i'));
+  return match ? `${ingredient.quantity}${match[1]}` : String(ingredient.quantity);
+}
+
+function mealCardMarkup(meal, editable = false) {
+  const ingredients = usableIngredients(meal);
+  const description = recoveredMealDescription(meal);
+  return `<section class="meal-card"><div class="meal-card-head"><div><span class="eyebrow">${esc(meal.meal_type || 'MEAL')}</span><h3>${esc(meal.name)}</h3></div><div><strong>${meal.calories ?? '—'} kcal</strong>${editable ? `<button class="text-btn" type="button" data-edit-meal="${meal.id}">Edit</button>` : ''}</div></div><div class="meal-macro-strip"><span>P ${meal.protein_g ?? '—'}g</span><span>C ${meal.carbs_g ?? '—'}g</span><span>F ${meal.fat_g ?? '—'}g</span></div>${description ? `<p class="meal-description">${esc(description)}</p>` : ''}${ingredients.length ? `<div class="ingredient-list">${ingredients.map((ingredient) => `<div><b>${esc(ingredient.name)}</b>${inferredAmount(ingredient, meal) ? `<span>${esc(inferredAmount(ingredient, meal))}</span>` : ''}</div>`).join('')}</div>` : ''}${meal.cooking_instructions ? `<details class="meal-method"><summary>Preparation</summary><p>${esc(meal.cooking_instructions)}</p></details>` : ''}${editable ? `<form class="meal-editor hidden" data-meal-editor="${meal.id}"><div class="editor-grid"><label>Name<input name="name" value="${esc(meal.name)}"></label><label>Meal type<input name="meal_type" value="${esc(meal.meal_type || '')}"></label><label>Calories<input name="calories" type="number" value="${meal.calories ?? ''}"></label><label>Protein (g)<input name="protein_g" type="number" value="${meal.protein_g ?? ''}"></label><label>Carbs (g)<input name="carbs_g" type="number" value="${meal.carbs_g ?? ''}"></label><label>Fat (g)<input name="fat_g" type="number" value="${meal.fat_g ?? ''}"></label><label class="wide">Ingredients — one per line (quantity | unit | food)<textarea name="ingredients" rows="5">${esc(ingredients.map((item) => `${item.quantity || ''} | ${item.unit || ''} | ${item.name}`).join('\n'))}</textarea></label><label class="wide">Preparation<textarea name="cooking_instructions" rows="5">${esc(meal.cooking_instructions || description)}</textarea></label></div><button class="btn primary small">Save meal</button></form>` : ''}</section>`;
 }
 
 function assignedMealsForPlan(plan) {
@@ -475,9 +544,9 @@ function assignedMealsForPlan(plan) {
     .sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0));
 }
 
-function assignedMealPlan(plan) {
+function assignedMealPlan(plan, editable = false) {
   const assignments = assignedMealsForPlan(plan);
-  return `<article class="panel nutrition-plan"><div class="panel-head"><div><span class="eyebrow">${esc(plan.day_type || 'PLAN')}</span><h2>${esc(plan.name)}</h2></div><span class="pill">${plan.days_per_week ?? '—'} DAYS / WEEK</span></div>${macroStrip(plan)}<div class="meal-grid">${assignments.map(({ meal }) => `<section class="meal-card"><span class="eyebrow">${esc(meal.meal_type || 'MEAL')}</span><h3>${esc(meal.name)}</h3><div class="meal-macro-strip"><span>${meal.calories ?? '—'} kcal</span><span>P ${meal.protein_g ?? '—'}g</span><span>C ${meal.carbs_g ?? '—'}g</span><span>F ${meal.fat_g ?? '—'}g</span></div>${Array.isArray(meal.ingredients) && meal.ingredients.some((ingredient) => ingredient?.name) ? meal.ingredients.filter((ingredient) => ingredient?.name).map((ingredient) => `<div class="ingredient-row"><b>${esc(ingredient.name)}</b><span>${esc(ingredientAmount(ingredient))}</span></div>`).join('') : '<div class="empty">Structured ingredients were not recovered for this meal.</div>'}${meal.preparation ? `<details class="meal-method"><summary>Meal details and preparation</summary><p>${esc(meal.preparation)}</p></details>` : ''}${meal.cooking_instructions ? `<div class="meal-method"><b>Cooking instructions</b><p>${esc(meal.cooking_instructions)}</p></div>` : ''}</section>`).join('') || '<div class="empty">No assigned meals were recovered for this plan.</div>'}</div>${plan.coach_notes ? `<div class="coach-note"><b>Coach notes</b><p>${esc(plan.coach_notes)}</p></div>` : ''}</article>`;
+  return `<article class="panel nutrition-plan"><div class="panel-head"><div><span class="eyebrow">${esc(plan.day_type || 'PLAN')}</span><h2>${esc(plan.name)}</h2></div><span class="pill">${plan.days_per_week ?? '—'} DAYS / WEEK</span></div>${macroStrip(plan)}<div class="meal-grid">${assignments.map(({ meal }) => mealCardMarkup(meal, editable)).join('') || '<div class="empty">No assigned meals are available for this plan.</div>'}</div>${plan.coach_notes ? `<div class="coach-note"><b>Coach notes</b><p>${esc(plan.coach_notes)}</p></div>` : ''}</article>`;
 }
 
 function nutritionPlanMarkup(plan) {
@@ -486,8 +555,26 @@ function nutritionPlanMarkup(plan) {
 
 function coachNutrition() {
   const plans = state.data.nutritionPlans.filter((plan) => plan.is_active !== false);
-  $('#clientWorkspaceBody').innerHTML = plans.length ? plans.map((plan) => `<form class="nutrition-editor" data-plan-editor="${plan.id}"><div class="editor-grid"><label>Plan name<input name="name" value="${esc(plan.name)}"></label><label>Calories<input name="calories" type="number" min="0" value="${plan.calories ?? ''}"></label><label>Protein (g)<input name="protein_g" type="number" min="0" value="${plan.protein_g ?? ''}"></label><label>Carbs (g)<input name="carbs_g" type="number" min="0" value="${plan.carbs_g ?? ''}"></label><label>Fat (g)<input name="fat_g" type="number" min="0" value="${plan.fat_g ?? ''}"></label><button class="btn primary small">Save targets</button></div></form>${nutritionPlanMarkup(plan)}`).join('') : '<div class="empty">No active nutrition plan is available for this client.</div>';
+  $('#clientWorkspaceBody').innerHTML = plans.length ? plans.map((plan) => `<form class="nutrition-editor" data-plan-editor="${plan.id}"><div class="editor-grid"><label>Plan name<input name="name" value="${esc(plan.name)}"></label><label>Calories<input name="calories" type="number" min="0" value="${plan.calories ?? ''}"></label><label>Protein (g)<input name="protein_g" type="number" min="0" value="${plan.protein_g ?? ''}"></label><label>Carbs (g)<input name="carbs_g" type="number" min="0" value="${plan.carbs_g ?? ''}"></label><label>Fat (g)<input name="fat_g" type="number" min="0" value="${plan.fat_g ?? ''}"></label><button class="btn primary small">Save targets</button></div></form>${assignedMealsForPlan(plan).length ? assignedMealPlan(plan, true) : mealPlan(plan)}`).join('') : '<div class="empty">No active nutrition plan is available for this client.</div>';
   $$('[data-plan-editor]').forEach((form) => form.onsubmit = saveNutritionTargets);
+  $$('[data-edit-meal]').forEach((button) => button.onclick = () => $(`[data-meal-editor="${button.dataset.editMeal}"]`)?.classList.toggle('hidden'));
+  $$('[data-meal-editor]').forEach((form) => form.onsubmit = saveMeal);
+}
+
+async function saveMeal(event) {
+  event.preventDefault();
+  const id = event.target.dataset.mealEditor;
+  const assignment = state.data.mealAssignments.find((item) => item.meal?.id === id);
+  if (!assignment) return toast('Meal not found', 'error');
+  const fd = new FormData(event.target);
+  const ingredients = String(fd.get('ingredients') || '').split('\n').map((line) => line.trim()).filter(Boolean).map((line) => { const [quantity, unit, ...name] = line.split('|').map((part) => part.trim()); return { quantity: quantity || null, unit: unit || null, name: name.join(' | ') || unit || quantity }; }).filter((item) => item.name);
+  const patch = { name: String(fd.get('name') || '').trim(), meal_type: String(fd.get('meal_type') || '').trim() || null, ingredients, cooking_instructions: String(fd.get('cooking_instructions') || '').trim() || null };
+  for (const key of ['calories', 'protein_g', 'carbs_g', 'fat_g']) patch[key] = fd.get(key) === '' ? null : Number(fd.get(key));
+  Object.assign(assignment.meal, patch);
+  if (state.preview) { toast('Meal updated in preview'); return coachNutrition(); }
+  setBusy(event.submitter, true);
+  try { await query('Meal update', db.from('meal_bank').update(patch).eq('id', id).select()); toast('Meal saved'); coachNutrition(); }
+  catch (error) { toast(error.message, 'error'); setBusy(event.submitter, false); }
 }
 
 async function saveNutritionTargets(event) {
@@ -727,7 +814,10 @@ function clientSteps() {
 
 function clientNutrition() {
   const plans = state.data.nutritionPlans.filter((plan) => plan.is_active !== false);
-  $('#clientMain').innerHTML = clientHeader('YOUR NUTRITION', 'Nutrition', 'Targets first, then your actual meals and ingredients.') + (plans.length ? plans.map(nutritionPlanMarkup).join('') : '<div class="empty">No active nutrition plan is available.</div>');
+  const selected = plans.find((plan) => plan.id === state.selectedNutritionPlanId) || plans[0];
+  state.selectedNutritionPlanId = selected?.id || null;
+  $('#clientMain').innerHTML = clientHeader('', 'Nutrition', 'Your targets and meals for each day type.') + (plans.length ? `<div class="nutrition-day-tabs">${plans.map((plan) => `<button type="button" data-nutrition-plan="${plan.id}" class="${plan.id === selected.id ? 'active' : ''}">${esc(plan.day_type || plan.name)}</button>`).join('')}</div>${nutritionPlanMarkup(selected)}` : '<div class="empty">No active nutrition plan is available.</div>');
+  $$('[data-nutrition-plan]').forEach((button) => button.onclick = () => { state.selectedNutritionPlanId = button.dataset.nutritionPlan; clientNutrition(); });
 }
 
 function slider(name, label, value = 5, inverse = false) {
