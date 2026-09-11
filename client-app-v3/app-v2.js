@@ -101,6 +101,7 @@ function currentWeek() {
 function safeStepGoal(client = state.client) {
   return Math.max(8000, Number(client?.daily_steps_goal || 0));
 }
+function normalizeClient(client){return {...client,display_name:client.display_name||client.profile?.full_name||'Unnamed client',daily_steps_goal:safeStepGoal(client)};}
 
 async function query(label, promise) {
   const result = await promise;
@@ -112,11 +113,7 @@ async function loadCoach() {
   const clients = await query('Clients', db.from('clients')
     .select('*,profile:profiles!clients_profile_id_fkey(full_name,email)')
     .order('start_date'));
-  state.clients = clients.map((client) => ({
-    ...client,
-    display_name: client.display_name || client.profile?.full_name || 'Unnamed client',
-    daily_steps_goal: safeStepGoal(client)
-  }));
+  state.clients = clients.map(normalizeClient);
 }
 
 async function loadClientData(clientId) {
@@ -273,17 +270,34 @@ function renderCoach() {
 function renderDashboard() {
   const active = state.clients.filter((client) => client.status === 'active');
   const archived = state.clients.length - active.length;
-  $('#coachMain').innerHTML = pageHead('COACH WORKSPACE', 'Client overview', '<button class="btn primary" data-coach-view-link="clients">View all clients</button>') + `
+  $('#coachMain').innerHTML = pageHead('COACH WORKSPACE', 'Client overview', '<button class="btn ghost" data-coach-view-link="clients">View all clients</button><button class="btn primary" data-add-client>+ Add client</button>') + `
     <div class="stats"><div class="stat"><span>ACTIVE CLIENTS</span><strong>${active.length}</strong></div><div class="stat"><span>PAST / ARCHIVED</span><strong>${archived}</strong></div><div class="stat"><span>CHECK-INS</span><strong>Weekly</strong></div><div class="stat"><span>STEP BASELINE</span><strong>8,000</strong></div></div>
     <section class="panel"><div class="panel-head"><div><h3>Active clients</h3><span class="sub">Open a client to manage their current week.</span></div></div>${clientRows(active)}</section>`;
   $('[data-coach-view-link]')?.addEventListener('click', () => { state.coachView = 'clients'; renderCoach(); });
+  bindAddClient();
   bindClientRows();
 }
 
 function renderRoster() {
-  $('#coachMain').innerHTML = pageHead('CLIENT MANAGEMENT', 'All clients', '<input id="clientSearch" class="search" placeholder="Search clients…">') + `<section class="panel">${clientRows(state.clients)}</section>`;
+  $('#coachMain').innerHTML = pageHead('CLIENT MANAGEMENT', 'All clients', '<input id="clientSearch" class="search" placeholder="Search clients…"><button class="btn primary" data-add-client>+ Add client</button>') + `<section class="panel">${clientRows(state.clients)}</section>`;
+  bindAddClient();
   bindClientRows();
   $('#clientSearch').oninput = (event) => $$('[data-client-id]').forEach((row) => row.classList.toggle('hidden', !row.innerText.toLowerCase().includes(event.target.value.toLowerCase())));
+}
+
+function bindAddClient() { $$('[data-add-client]').forEach((button) => button.onclick = showAddClient); }
+
+function showAddClient() {
+  const modal = document.createElement('div'); modal.className='modal-backdrop';
+  modal.innerHTML=`<section class="modal-card"><div class="panel-head"><div><span class="eyebrow">5-MINUTE SETUP</span><h2>Add a client</h2></div><button class="icon-btn" data-close-modal>✕</button></div><form id="addClientForm" class="editor-grid"><label>Full name<input name="full_name" required></label><label>Email<input name="email" type="email" required></label><label>Phone<input name="phone" type="tel"></label><label>Temporary password<input name="password" type="password" minlength="8" required></label><label>Region<select name="market_region"><option value="us">United States · lb/oz</option><option value="ireland">Ireland · kg/g</option><option value="uk">United Kingdom</option><option value="other">Other</option></select></label><label>Check-in day<select name="checkin_day">${DAYS.map((day,index)=>`<option value="${index}" ${index===5?'selected':''}>${day}</option>`).join('')}</select></label><label>Daily steps<input name="daily_steps_goal" type="number" min="8000" step="500" value="8000"></label><label class="wide">Goals<textarea name="goal_summary" rows="3" required></textarea></label><label class="toggle-field"><input name="cardio_enabled" type="checkbox"> Cardio required</label><label class="toggle-field"><input name="mobility_enabled" type="checkbox" checked> Mobility required</label><p class="wide muted">The client must accept legal/privacy terms and complete onboarding before their plan unlocks.</p><button class="btn primary wide">Create secure client login</button></form></section>`;
+  document.body.append(modal); modal.querySelector('[data-close-modal]').onclick=()=>modal.remove(); modal.onclick=(e)=>{if(e.target===modal)modal.remove();}; modal.querySelector('form').onsubmit=createClientAccount;
+}
+
+async function createClientAccount(event) {
+  event.preventDefault(); const fd=new FormData(event.target); const payload=Object.fromEntries(fd.entries()); payload.cardio_enabled=fd.has('cardio_enabled'); payload.mobility_enabled=fd.has('mobility_enabled'); payload.daily_steps_goal=Number(payload.daily_steps_goal); payload.checkin_day=Number(payload.checkin_day);
+  setBusy(event.submitter,true);
+  try { const {data,error}=await db.functions.invoke('provision-client',{body:payload}); if(error) throw error; if(data?.error) throw new Error(data.error); state.clients.unshift(normalizeClient(data.client)); event.target.closest('.modal-backdrop').remove(); toast('Client login created'); renderCoach(); }
+  catch(error){toast(error.message||'Could not create client','error');setBusy(event.submitter,false);}
 }
 
 const COACH_TABS = ['overview', 'planner', 'training', 'nutrition', 'check-ins', 'progress', 'onboarding', 'legal', 'diagnostics'];
@@ -334,6 +348,7 @@ function coachOverview() {
       <label class="field"><input name="track_weight" type="checkbox" ${client.track_weight !== false ? 'checked' : ''}> Track weight</label>
       <label class="field"><input name="cardio_enabled" type="checkbox" ${client.cardio_enabled !== false ? 'checked' : ''}> Cardio enabled</label>
       <label class="field"><input name="mobility_enabled" type="checkbox" ${client.mobility_enabled !== false ? 'checked' : ''}> Mobility enabled</label>
+      <label class="field"><input name="plan_published" type="checkbox" ${client.plan_status === 'published' ? 'checked' : ''}> Client workspace published</label>
       <button class="btn primary wide">Save controls</button>
     </form></section><section class="panel"><div class="panel-head"><h3>Latest check-in</h3></div>${last ? `<div class="score">${last.week_score ?? '—'}/10</div><p><b>Win</b><br>${esc(last.wins || '—')}</p><p><b>Challenge</b><br>${esc(last.challenges || '—')}</p>` : '<div class="empty">No check-ins yet.</div>'}</section></div>`;
   const form = $('#clientSettings');
@@ -355,6 +370,9 @@ async function saveClientControls(event) {
     track_weight: fd.has('track_weight'),
     cardio_enabled: fd.has('cardio_enabled'),
     mobility_enabled: fd.has('mobility_enabled')
+    ,plan_status: fd.has('plan_published') ? 'published' : 'coach_building'
+    ,plan_published_at: fd.has('plan_published') ? new Date().toISOString() : null
+    ,portal_enabled: fd.has('plan_published')
   };
   Object.assign(state.client, changes);
   if (state.preview) return toast('Preview controls updated');
@@ -437,7 +455,8 @@ function exercisesForSession(session) {
 
 function coachTraining() {
   const programs = state.data.programs;
-  $('#clientWorkspaceBody').innerHTML = programs.length ? programs.map(programBuilderMarkup).join('') : '<div class="empty">No programme has been assigned.</div>';
+  $('#clientWorkspaceBody').innerHTML = trainingSetupTools() + (programs.length ? programs.map(programBuilderMarkup).join('') : '<div class="empty">No programme has been assigned. Import a complete programme above.</div>');
+  bindTrainingSetupTools();
   $$('[data-exercise-editor]').forEach((form) => form.onsubmit = saveExercisePrescription);
   $$('[data-toggle-day-form]').forEach((button) => button.onclick = () => $(`[data-add-day="${button.dataset.toggleDayForm}"]`)?.classList.toggle('hidden'));
   $$('[data-toggle-exercise-form]').forEach((button) => button.onclick = (event) => { event.preventDefault(); event.stopPropagation(); $(`[data-add-exercise="${button.dataset.toggleExerciseForm}"]`)?.classList.toggle('hidden'); });
@@ -445,6 +464,28 @@ function coachTraining() {
   $$('[data-add-exercise]').forEach((form) => form.onsubmit = addProgramExercise);
   $$('[data-delete-exercise]').forEach((button) => button.onclick = () => deleteProgramExercise(button.dataset.deleteExercise));
 }
+
+function trainingPrompt() {
+  const onboarding=state.data.onboarding[0]?.responses?.text||JSON.stringify(state.data.onboarding[0]?.responses||{});
+  return `Build a scientific, practical training programme for ${state.client.display_name}, a busy legal professional. Use only the onboarding below. Do not invent injuries, equipment or availability. Return JSON only using this schema:\n{"programme_name":"12 Week Programme","days":[{"title":"Upper 1","training_type":"weights","coach_notes":"","exercises":[{"name":"Incline dumbbell press","sets":3,"reps":"6-10","rest_seconds":120,"tempo":"3-0-1","rpe":8,"rir":2,"superset_group":null,"video_url":null,"coach_instructions":""}]}]}\nValid training_type values: weights, resistance, cardio, mobility, recovery. Include mobility/cardio only when appropriate.\n\nONBOARDING:\n${onboarding}`;
+}
+
+function trainingSetupTools(){const week=currentWeek();return `<section class="panel fast-builder"><div class="panel-head"><div><span class="eyebrow">FAST BUILD</span><h2>Programme setup</h2><p class="muted">Copy the personalised prompt, paste the returned JSON, then edit every field below.</p></div><button class="btn ghost small" id="copyTrainingPrompt">Copy AI prompt</button></div><form id="trainingJsonForm"><label class="field">Programme JSON<textarea name="training_json" rows="7" placeholder='{"programme_name":"...","days":[...]}' required></textarea></label><button class="btn primary">Import programme</button></form><hr><form id="activityForm" class="editor-grid"><label>Activity<select name="training_type"><option value="cardio">Cardio</option><option value="mobility">Mobility</option><option value="recovery">Recovery</option><option value="weights">Weights</option></select></label><label>Date<input name="session_date" type="date" value="${iso(new Date())}" required></label><label>Title<input name="title" placeholder="e.g. Zone 2 bike" required></label><label>Duration (min)<input name="duration_minutes" type="number" min="0"></label><label class="wide">Instructions<textarea name="notes" rows="2"></textarea></label><button class="btn primary wide" ${week?'':'disabled'}>Add to current week</button></form>${state.data.sessions.map(sessionEditorMarkup).join('')}</section>`;}
+
+function sessionEditorMarkup(s){return `<form class="session-editor" data-session-editor="${s.id}"><select name="training_type"><option value="weights">Weights</option><option value="resistance">Resistance</option><option value="cardio">Cardio</option><option value="mobility">Mobility</option><option value="recovery">Recovery</option></select><input name="session_date" type="date" value="${esc(s.session_date)}"><input name="title" value="${esc(s.title)}"><input name="duration_minutes" type="number" min="0" value="${s.duration_minutes??''}" placeholder="Minutes"><button class="btn ghost small">Save</button><button class="text-btn danger" type="button" data-delete-session="${s.id}">Delete</button></form>`;}
+
+function bindTrainingSetupTools(){
+  $('#copyTrainingPrompt')?.addEventListener('click',async()=>{await navigator.clipboard.writeText(trainingPrompt());toast('Training prompt copied');});
+  $('#trainingJsonForm')?.addEventListener('submit',importTrainingJson); $('#activityForm')?.addEventListener('submit',addActivitySession);
+  $$('[data-session-editor]').forEach(form=>{form.training_type.value=state.data.sessions.find(s=>s.id===form.dataset.sessionEditor)?.training_type||'weights';form.onsubmit=saveActivitySession;});
+  $$('[data-delete-session]').forEach(button=>button.onclick=()=>deleteActivitySession(button.dataset.deleteSession));
+}
+
+async function importTrainingJson(event){event.preventDefault();let parsed;try{parsed=JSON.parse(new FormData(event.target).get('training_json'));if(!parsed.programme_name||!Array.isArray(parsed.days)||!parsed.days.length)throw new Error('Programme name and days are required');}catch(error){return toast(`Invalid JSON: ${error.message}`,'error');}setBusy(event.submitter,true);try{const [program]=await query('Programme',db.from('training_programs').insert({client_id:state.client.id,name:parsed.programme_name,status:'draft',created_by:state.user.id}).select());program.days=[];for(let i=0;i<parsed.days.length;i++){const day=parsed.days[i];const [savedDay]=await query('Training day',db.from('training_program_days').insert({program_id:program.id,title:day.title,training_type:day.training_type||'weights',day_index:i,coach_notes:day.coach_notes||null}).select());savedDay.exercises=[];for(let j=0;j<(day.exercises||[]).length;j++){const ex=day.exercises[j];const [saved]=await query('Exercise',db.from('program_exercises').insert({...ex,program_day_id:savedDay.id,sort_order:j}).select());savedDay.exercises.push(saved);state.data.exercises.push(saved);}program.days.push(savedDay);}state.data.programs.unshift(program);toast('Programme imported');coachTraining();}catch(error){toast(error.message,'error');setBusy(event.submitter,false);}}
+
+async function addActivitySession(event){event.preventDefault();const week=currentWeek(),fd=new FormData(event.target);const row={week_id:week.id,training_type:fd.get('training_type'),session_date:fd.get('session_date'),title:String(fd.get('title')).trim(),duration_minutes:Number(fd.get('duration_minutes'))||null,notes:String(fd.get('notes')||'').trim()||null};try{const [saved]=await query('Activity',db.from('training_sessions').insert(row).select());state.data.sessions.push(saved);toast('Activity added');coachTraining();}catch(error){toast(error.message,'error');}}
+async function saveActivitySession(event){event.preventDefault();const fd=new FormData(event.target),id=event.target.dataset.sessionEditor;const patch={training_type:fd.get('training_type'),session_date:fd.get('session_date'),title:String(fd.get('title')).trim(),duration_minutes:Number(fd.get('duration_minutes'))||null};try{await query('Activity',db.from('training_sessions').update(patch).eq('id',id).select());Object.assign(state.data.sessions.find(s=>s.id===id),patch);toast('Activity saved');}catch(error){toast(error.message,'error');}}
+async function deleteActivitySession(id){if(!confirm('Delete this scheduled activity?'))return;try{await query('Activity',db.from('training_sessions').delete().eq('id',id).select());state.data.sessions=state.data.sessions.filter(s=>s.id!==id);toast('Activity deleted');coachTraining();}catch(error){toast(error.message,'error');}}
 
 function programBuilderMarkup(program) {
   const days = [...(program.days || [])].sort((a, b) => a.day_index - b.day_index);
@@ -788,6 +829,9 @@ function diagnosticsMarkup() {
 
 function renderClient() {
   if (!state.client) return;
+  if(!state.preview&&state.client.onboarding_status!=='complete') return renderActivation();
+  if(!state.preview&&state.client.plan_status!=='published') return renderPlanPending();
+  $('#clientNav').classList.remove('hidden');
   $$('#clientNav button').forEach((button) => button.classList.toggle('active', button.dataset.clientView === state.clientView));
   const views = {
     planner: clientPlanner, training: clientTraining,
@@ -797,6 +841,13 @@ function renderClient() {
   try { (views[state.clientView] || clientPlanner)(); }
   catch (error) { renderError($('#clientMain'), error, renderClient); }
 }
+
+function renderActivation(){if(state.client.onboarding_status==='pending_legal')return renderLegalGate();return renderOnboardingWizard();}
+function renderLegalGate(){show('#clientApp');$('#clientNav').classList.add('hidden');$('#clientMain').innerHTML=clientHeader('STEP 1 OF 2','Legal, health and privacy consent','Please read and accept before starting onboarding.')+`<form id="legalGate" class="panel legal-gate"><h2>Coaching participation and privacy notice</h2><p>The Legal Edge provides fitness, nutrition and lifestyle coaching and is not a substitute for medical diagnosis or treatment. You agree to disclose relevant health limitations and seek medical clearance where appropriate.</p><p>Your account stores coaching, health, progress and optional diagnostic information so your coach can deliver the service. Your information is restricted to you and authorised coaching staff, subject to the privacy policy and applicable law. Marketing use of photos is never automatic.</p><label class="toggle-field"><input name="health" type="checkbox" required> I confirm the information I provide will be accurate and I will report relevant health changes.</label><label class="toggle-field"><input name="privacy" type="checkbox" required> I accept the coaching privacy notice and account data processing.</label><label class="field">Full legal name<input name="signature_name" required></label><label class="field">Country<input name="country" required></label><label class="field">Date of birth<input name="date_of_birth" type="date" required></label><button class="btn primary">Accept and continue</button><small class="muted">Document version 1.0 · Final policy wording requires counsel review before broad US rollout.</small></form>`;$('#legalGate').onsubmit=submitLegalGate;}
+async function submitLegalGate(event){event.preventDefault();const fd=new FormData(event.target),now=new Date().toISOString();const row={client_id:state.client.id,consent_type:'coaching_privacy_health',document_name:'Coaching participation and privacy notice',document_version:'1.0',signed_at:now,accepted_at:now,signature_name:fd.get('signature_name'),signature_date:iso(new Date()),country:fd.get('country'),date_of_birth:fd.get('date_of_birth'),details:{health_confirmed:true,privacy_accepted:true}};setBusy(event.submitter,true);try{await query('Consent',db.from('legal_consents').insert(row).select());state.client.onboarding_status='pending_onboarding';renderOnboardingWizard();}catch(error){toast(error.message,'error');setBusy(event.submitter,false);}}
+function renderOnboardingWizard(){show('#clientApp');$('#clientNav').classList.add('hidden');$('#clientMain').innerHTML=clientHeader('STEP 2 OF 2','Build your coaching profile','Training, nutrition and lifestyle. Usually 8–10 minutes.')+`<form id="onboardingWizard" class="panel onboarding-wizard"><h2>Training</h2><div class="editor-grid"><label>Training days available<input name="training_days" type="number" min="1" max="7" required></label><label>Experience<select name="training_experience"><option>Beginner</option><option>Intermediate 1–3 years</option><option>Advanced 3+ years</option></select></label><label>Preferred time<input name="preferred_training_time" required></label><label>Preferred style<input name="preferred_style"></label><label class="wide">Injuries, pain or limitations<textarea name="injuries" required></textarea></label><label>Gym name<input name="gym_name"></label><label>Gym town/city<input name="gym_location"></label><label class="wide">Equipment available<textarea name="equipment"></textarea></label></div><h2>Nutrition</h2><div class="editor-grid"><label>Current weight<input name="current_weight" type="number" step="0.1" required></label><label>Weight unit<select name="weight_unit"><option value="lb">lb</option><option value="kg">kg</option></select></label><label>Meals per day<input name="meals_per_day" type="number" min="1" max="8"></label><label>Prep time<select name="meal_prep_time"><option>Under 15 minutes</option><option>Up to 30 minutes</option><option>Up to 60 minutes</option></select></label><label class="wide">Typical day of eating<textarea name="typical_eating" required></textarea></label><label class="wide">Allergies, restrictions and foods to avoid<textarea name="food_restrictions"></textarea></label><label class="wide">Foods you want included<textarea name="foods_to_include"></textarea></label></div><h2>Lifestyle</h2><div class="editor-grid"><label>Work pattern<input name="work_pattern" placeholder="Office, hybrid, unpredictable…" required></label><label>Typical work hours<input name="work_hours"></label><label>Sleep hours<input name="sleep_hours" type="number" step="0.5"></label><label>Current daily steps<input name="current_steps" type="number"></label><label>Wearable<select name="wearable"><option value="none">None</option><option>Apple Watch</option><option>Google / Fitbit</option><option>Garmin</option><option>WHOOP</option><option>Oura</option><option>Other</option></select></label><label>Stress level (1–10)<input name="stress" type="number" min="1" max="10"></label><label class="wide">Primary goals and what success looks like<textarea name="goals" required></textarea></label><label class="wide">Travel, alcohol, family or schedule factors<textarea name="lifestyle_factors"></textarea></label></div><button class="btn primary">Submit onboarding</button></form>`;$('#onboardingWizard').onsubmit=submitOnboardingWizard;}
+async function submitOnboardingWizard(event){event.preventDefault();const responses=Object.fromEntries(new FormData(event.target).entries()),now=new Date().toISOString();setBusy(event.submitter,true);try{await query('Onboarding',db.from('onboarding_responses').insert({client_id:state.client.id,version:2,submitted_at:now,completed_at:now,responses:{sections:{training:{training_days:responses.training_days,experience:responses.training_experience,preferred_time:responses.preferred_training_time,style:responses.preferred_style,injuries:responses.injuries,gym_name:responses.gym_name,gym_location:responses.gym_location,equipment:responses.equipment},nutrition:{current_weight:responses.current_weight,weight_unit:responses.weight_unit,meals_per_day:responses.meals_per_day,meal_prep_time:responses.meal_prep_time,typical_eating:responses.typical_eating,restrictions:responses.food_restrictions,foods_to_include:responses.foods_to_include},lifestyle:{work_pattern:responses.work_pattern,work_hours:responses.work_hours,sleep_hours:responses.sleep_hours,current_steps:responses.current_steps,wearable:responses.wearable,stress:responses.stress,goals:responses.goals,lifestyle_factors:responses.lifestyle_factors}}}}).select());state.client.onboarding_status='complete';state.client.plan_status='coach_building';renderPlanPending();}catch(error){toast(error.message,'error');setBusy(event.submitter,false);}}
+function renderPlanPending(){show('#clientApp');$('#clientNav').classList.add('hidden');$('#clientMain').innerHTML=`<section class="pending-plan"><img src="./assets/legal-edge-logo.svg" alt="The Legal Edge"><span class="eyebrow">ONBOARDING COMPLETE</span><h1>Your plan is being built.</h1><p>Calum is reviewing your training, nutrition and lifestyle information. Your full coaching workspace will unlock when the plan is published, normally within 24–48 hours.</p><div class="status-track"><span class="done">Account</span><span class="done">Legal</span><span class="done">Onboarding</span><span>Coach review</span></div></section>`;}
 
 function clientToday() {
   const today = iso(new Date());
