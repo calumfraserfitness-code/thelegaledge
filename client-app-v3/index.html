@@ -9,8 +9,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Libre+Caslon+Display&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./app.css">
+  <link rel="stylesheet" href="./health.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4" defer></script>
-  <script src="./app-v2.js?v=20260911-10" defer></script>
+  <script src="./app-v2.js?v=20260911-11" defer></script>
 </head>
 <body>
   <div id="toast" class="toast" aria-live="polite"></div>
@@ -24,12 +25,12 @@
       <button class="text-btn" id="resetBtn" type="button">Forgot password?</button>
       <button class="text-btn" id="ownerSetupBtn" type="button">First-time coach setup</button>
       <div id="authMsg" class="form-msg"></div>
-      <div class="preview-separator"><span>INTERACTIVE APP PREVIEW · BUILD 2026.09.11.10</span></div>
+      <div class="preview-separator"><span>INTERACTIVE APP PREVIEW · BUILD 2026.09.11.11</span></div>
       <button class="btn ghost" id="coachPreviewBtn" type="button">Open coach preview</button>
       <button class="btn ghost" id="clientPreviewBtn" type="button">Open client preview</button>
     </form>
   </section>
   <div id="coachApp" class="app-shell hidden"><aside class="sidebar"><div class="side-brand"><img class="brand-logo shell-logo" src="./assets/legal-edge-logo.svg" alt=""><div><strong>THE LEGAL EDGE</strong><span>Coach workspace</span></div></div><nav id="coachNav"><button class="side-link active" data-coach-view="dashboard"><span>⌂</span>Dashboard</button><button class="side-link" data-coach-view="clients"><span>◉</span>Clients</button></nav><div class="side-foot"><div class="avatar">CF</div><div><strong id="coachName">Calum Fraser</strong><span>Coach</span></div><button class="icon-btn logout" title="Sign out">↗</button></div></aside><header class="mobile-head"><div class="side-brand"><img class="brand-logo shell-logo" src="./assets/legal-edge-logo.svg" alt=""><strong>THE LEGAL EDGE</strong></div><button id="mobileMenu" class="icon-btn">☰</button></header><main id="coachMain" class="main"></main></div>
-  <div id="clientApp" class="client-shell hidden"><header class="client-head"><div class="side-brand"><img class="brand-logo shell-logo" src="./assets/legal-edge-logo.svg" alt=""><strong>THE LEGAL EDGE</strong></div><div class="head-actions"><button id="returnCoach" class="btn ghost small hidden" type="button">← Coach view</button><span id="clientHello"></span><details class="account-menu"><summary>Account</summary><div><button type="button" data-account-view="onboarding">Onboarding</button><button type="button" data-account-view="legal">Legal & consent</button><button type="button" class="logout">Sign out</button></div></details></div></header><main id="clientMain" class="client-main"></main><nav id="clientNav" class="client-nav"><button class="active" data-client-view="planner"><span>▦</span>Planner</button><button data-client-view="training"><span>◇</span>Training</button><button data-client-view="nutrition"><span>○</span>Nutrition</button><button data-client-view="checkin"><span>✓</span>Check-ins</button><button data-client-view="progress"><span>↗</span>Progress</button><button data-client-view="diagnostics"><span>＋</span>Diagnostics</button></nav></div>
+  <div id="clientApp" class="client-shell hidden"><header class="client-head"><div class="side-brand"><img class="brand-logo shell-logo" src="./assets/legal-edge-logo.svg" alt=""><strong>THE LEGAL EDGE</strong></div><div class="head-actions"><button id="returnCoach" class="btn ghost small hidden" type="button">← Coach view</button><span id="clientHello"></span><details class="account-menu"><summary>Account</summary><div><button type="button" data-account-view="health">Connected health</button><button type="button" data-account-view="legal">Documents & consent</button><button type="button" class="logout">Sign out</button></div></details></div></header><main id="clientMain" class="client-main"></main><nav id="clientNav" class="client-nav"><button class="active" data-client-view="planner"><span>▦</span>Planner</button><button data-client-view="training"><span>◇</span>Training</button><button data-client-view="nutrition"><span>○</span>Nutrition</button><button data-client-view="checkin"><span>✓</span>Check-ins</button><button data-client-view="progress"><span>↗</span>Progress</button><button data-client-view="diagnostics"><span>＋</span>Diagnostics</button></nav></div>
 </body>
 </html>
