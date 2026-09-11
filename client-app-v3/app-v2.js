@@ -30,6 +30,7 @@ const state = {
   clientView: 'planner',
   selectedSessionId: null,
   selectedNutritionPlanId: null,
+  progressRange: 'all',
   clientTab: 'overview',
   clients: [],
   client: null,
@@ -409,7 +410,7 @@ function coachPlanner() {
 }
 
 function exerciseCard(exercise, loggable = false) {
-  const previousLogs = (state.data.exerciseLogs || []).filter((log) => log.program_exercise_id === exercise.id);
+  const previousLogs = (state.data.exerciseLogs || []).filter((log) => log.program_exercise_id === exercise.id || (exercise.exercise_bank_id && log.exercise_bank_id === exercise.exercise_bank_id));
   const latestBySet = new Map();
   previousLogs.forEach((log) => { if (!latestBySet.has(log.set_number)) latestBySet.set(log.set_number, log); });
   const previous = previousLogs.length
@@ -417,7 +418,7 @@ function exerciseCard(exercise, loggable = false) {
     : exercise.previous_performance;
   return `<article class="exercise-card"><div class="exercise-title"><div><span class="eyebrow">${exercise.sort_order != null ? `EXERCISE ${Number(exercise.sort_order) + 1}` : 'EXERCISE'}</span><h3>${esc(exercise.name)}</h3></div>${exercise.video_url ? `<a class="btn ghost small" href="${esc(exercise.video_url)}" target="_blank" rel="noopener">Watch video</a>` : '<span class="pill">NO VIDEO</span>'}</div>
     <div class="prescription-grid"><div><span>SETS</span><strong>${exercise.sets ?? '—'}</strong></div><div><span>REPS</span><strong>${esc(exercise.reps || '—')}</strong></div><div><span>REST</span><strong>${exercise.rest_seconds ? `${exercise.rest_seconds}s` : '—'}</strong></div><div><span>TEMPO / INTENSITY</span><strong>${esc(exercise.tempo || exercise.rpe || exercise.rir || '—')}</strong></div></div>
-    ${previous ? `<p class="previous"><b>Previous:</b> ${esc(previous)}</p>` : ''}
+    ${previous ? `<p class="previous"><b>Previous:</b> ${esc(previous)}</p><details class="exercise-history"><summary>Exercise history</summary>${previousLogs.slice(0, 12).map((log) => `<div class="note-row"><b>${fmt(log.performed_at)}</b><span>Set ${log.set_number}: ${log.load ?? '—'} ${esc(log.load_unit || '')} × ${log.reps ?? '—'}</span></div>`).join('')}</details>` : ''}
     ${(exercise.coach_instructions || exercise.notes) ? `<p>${esc(exercise.coach_instructions || exercise.notes)}</p>` : ''}
     ${loggable ? `<form class="set-log" data-exercise-log="${exercise.id}">${Array.from({ length: Math.max(1, Number(exercise.sets || 1)) }, (_, index) => { const set = index + 1; const old = latestBySet.get(set); return `<div class="set-log-row"><b>Set ${set}</b><label>Reps<input name="reps_${set}" type="number" min="0" step="1" value="${old?.reps ?? ''}"></label><label>Load<input name="load_${set}" type="number" min="0" step="0.1" value="${old?.load ?? ''}"></label><label>RIR<input name="rir_${set}" type="number" min="0" max="10" step="0.5" value="${old?.rir ?? ''}"></label></div>`; }).join('')}<button class="btn primary small">Save workout sets</button></form>` : ''}
   </article>`;
@@ -629,10 +630,37 @@ function chart(values, colour = '#b99853') {
 }
 
 function coachProgress() {
-  const entries = [...state.data.progress].sort((a, b) => String(a.entry_date).localeCompare(String(b.entry_date)));
-  const factor = state.client.weight_unit === 'lbs' ? 2.20462 : 1;
-  $('#clientWorkspaceBody').innerHTML = `<div class="progress-summary"><div><span>START</span><strong>${displayWeight(state.client.start_weight_kg)}</strong></div><div><span>LATEST</span><strong>${displayWeight(entries.at(-1)?.weight_kg)}</strong></div><div><span>ENTRIES</span><strong>${entries.length}</strong></div></div><section class="panel"><div class="panel-head"><h3>Weight trend</h3></div>${chart(entries.map((entry) => Number(entry.weight_kg) * factor))}${entries.slice().reverse().map((entry) => `<div class="note-row"><b>${fmt(entry.entry_date)}</b><span>${displayWeight(entry.weight_kg)}${entry.waist_cm ? ` · Waist ${entry.waist_cm} cm` : ''}</span></div>`).join('') || '<div class="empty">No progress entries yet.</div>'}</section>`;
+  $('#clientWorkspaceBody').innerHTML = progressDashboardMarkup();
+  bindProgressRange(coachProgress);
 }
+
+function progressData() {
+  const entries = [...state.data.progress].filter((entry) => entry.weight_kg != null).sort((a, b) => String(a.entry_date).localeCompare(String(b.entry_date)));
+  const start = Number(state.client.start_weight_kg ?? entries[0]?.weight_kg);
+  const current = Number(entries.at(-1)?.weight_kg);
+  const goal = Number(state.client.goal_weight_kg);
+  const change = Number.isFinite(start) && Number.isFinite(current) ? current - start : null;
+  const remaining = Number.isFinite(goal) && Number.isFinite(current) ? goal - current : null;
+  const journey = Number.isFinite(goal) && Number.isFinite(start) ? goal - start : null;
+  const progress = journey && change != null ? Math.max(0, Math.min(100, Math.round(change / journey * 100))) : null;
+  const days = entries.length > 1 ? Math.max(1, (new Date(entries.at(-1).entry_date) - new Date(entries[0].entry_date)) / 864e5) : 0;
+  return { entries, start, current, goal, change, remaining, progress, weeklyRate: days && change != null ? change / (days / 7) : null };
+}
+
+function rangeEntries(entries) {
+  if (state.progressRange === 'all') return entries;
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - Number(state.progressRange) * 7);
+  return entries.filter((entry) => new Date(`${entry.entry_date}T12:00:00`) >= cutoff);
+}
+
+function progressDashboardMarkup() {
+  const model = progressData(), shown = rangeEntries(model.entries), factor = state.client.weight_unit === 'lbs' ? 2.20462 : 1;
+  const value = (kg, signed = false) => Number.isFinite(kg) ? displayWeight(kg, signed) : '—';
+  const measures = ['waist_cm','chest_cm','hips_cm','arm_cm','thigh_cm'].map((key) => { const rows = state.data.progress.filter((entry) => entry[key] != null).sort((a,b) => String(a.entry_date).localeCompare(String(b.entry_date))); return rows.length ? { name: title(key.replace('_cm','')), start: Number(rows[0][key]), current: Number(rows.at(-1)[key]) } : null; }).filter(Boolean);
+  return `<div class="progress-hero"><div><span>Current</span><strong>${value(model.current)}</strong><small>${model.entries.at(-1) ? `Latest weigh-in ${fmt(model.entries.at(-1).entry_date)}` : 'No weigh-ins'}</small></div><div class="goal-progress"><span>Goal progress</span><strong>${model.progress == null ? '—' : `${model.progress}%`}</strong><div class="progress-bar"><i style="width:${model.progress || 0}%"></i></div></div></div><div class="progress-metrics"><div><span>Start</span><strong>${value(model.start)}</strong></div><div><span>Total change</span><strong>${value(model.change, true)}</strong></div><div><span>Goal</span><strong>${value(model.goal)}</strong></div><div><span>To goal</span><strong>${value(model.remaining, true)}</strong></div><div><span>Weekly rate</span><strong>${value(model.weeklyRate, true)}</strong></div><div><span>Weigh-ins</span><strong>${model.entries.length}</strong></div></div><section class="panel"><div class="panel-head"><h3>Weight trend</h3><div class="range-tabs">${['4','8','12','all'].map((range) => `<button data-progress-range="${range}" class="${state.progressRange === range ? 'active' : ''}">${range === 'all' ? 'All time' : `${range} weeks`}</button>`).join('')}</div></div>${chart(shown.map((entry) => Number(entry.weight_kg) * factor))}<div>${shown.slice().reverse().map((entry) => `<div class="note-row"><b>${fmt(entry.entry_date)}</b><span>${displayWeight(entry.weight_kg)}${entry.waist_cm ? ` · Waist ${entry.waist_cm} cm` : ''}</span></div>`).join('') || '<div class="empty">No entries in this range.</div>'}</div></section>${measures.length ? `<section class="panel measurement-panel"><div class="panel-head"><h3>Measurements</h3></div><div class="measurement-grid">${measures.map((measure) => `<div><span>${measure.name}</span><strong>${measure.current} cm</strong><small>${measure.start} cm start · ${(measure.current - measure.start).toFixed(1)} cm</small></div>`).join('')}</div></section>` : ''}${milestones()}`;
+}
+
+function bindProgressRange(render) { $$('[data-progress-range]').forEach((button) => button.onclick = () => { state.progressRange = button.dataset.progressRange; render(); }); }
 
 function responseTree(value) {
   if (value == null || value === '') return '';
@@ -653,11 +681,22 @@ function coachLegal() {
 function diagnosticCard(report) {
   const data = report.data || {};
   const markers = Array.isArray(data.markers) ? data.markers : [];
-  return `<article class="panel diagnostic-report"><div class="panel-head"><div><span class="eyebrow">${esc(title(report.report_type || 'report'))}</span><h2>${esc(report.title || 'Diagnostic report')}</h2><span class="sub">${fmt(report.report_date)}</span></div>${report.score != null ? `<div class="score">${report.score}</div>` : ''}</div>${report.summary ? `<div class="coach-note"><b>Coach summary</b><p>${esc(report.summary)}</p></div>` : ''}${markers.length ? `<div class="marker-table">${markers.map((marker) => `<div class="note-row"><b>${esc(marker.marker_name || marker.name)}</b><span>${esc(marker.value)} ${esc(marker.unit || '')}</span><small>${esc(marker.status || marker.classification || '')}</small></div>`).join('')}</div>` : ''}${data.loom_url ? `<a class="loom-card" href="${esc(data.loom_url)}" target="_blank" rel="noopener"><span>▶</span><div><b>Coach video walkthrough</b><small>Open report review</small></div></a>` : ''}</article>`;
+  const genetics = data.genetic_data || {};
+  const score = report.score ?? data.health_score;
+  const flagged = markers.filter((marker) => !['optimal','normal'].includes(String(marker.status || marker.classification || '').toLowerCase()));
+  const section = (heading, value, colour) => value ? `<section class="report-section" style="--accent:${colour}"><span class="eyebrow">${heading}</span><div>${responseTree(value)}</div></section>` : '';
+  return `<article class="diagnostic-report"><header class="report-cover"><div><span class="eyebrow">${esc(title(report.report_type || 'report'))} · ${fmt(report.report_date)}</span><h2>${esc(report.title || 'Diagnostic report')}</h2><p>${esc(data.lab_source || '')}</p></div>${score != null ? `<div class="health-ring"><strong>${score}</strong><span>SCORE</span></div>` : ''}</header><section class="report-summary"><span class="eyebrow">COACH SUMMARY</span><p>${esc(report.summary || data.coach_summary || genetics.overview || 'No coach summary recorded.')}</p></section>${markers.length ? `<section class="report-table"><div class="panel-head"><div><h3>Blood markers</h3><span class="sub">${markers.length} tested · ${flagged.length} requiring attention</span></div></div><div class="data-table"><div class="data-head"><span>Marker</span><span>Result</span><span>Reference</span><span>Status</span></div>${markers.map((marker) => `<div class="data-row"><b>${esc(marker.marker_name || marker.name)}</b><span>${esc(marker.value)} ${esc(marker.unit || '')}</span><span>${esc(marker.reference_range_low ?? marker.reference_low ?? '—')}–${esc(marker.reference_range_high ?? marker.reference_high ?? '—')}</span><span class="marker-status">${esc(marker.status || marker.classification || '—')}</span></div>`).join('')}</div></section>` : ''}${Object.keys(genetics).length ? section('GENETIC INSIGHTS', genetics, '#9d72d5') : ''}<div class="recommendation-grid">${section('NUTRITION', data.action_nutrition || genetics.recommendations?.nutrition, '#4cc9a4')}${section('TRAINING', data.action_training || genetics.recommendations?.training, '#5da9e9')}${section('SUPPLEMENTS', data.action_supplements || genetics.recommendations?.supplements, '#d3a64b')}${section('RECOVERY', data.action_recovery || genetics.recommendations?.recovery, '#9d72d5')}</div>${section('FOLLOW-UP TESTING', data.action_followup, '#d98585')}${data.loom_url ? `<a class="loom-card" href="${esc(data.loom_url)}" target="_blank" rel="noopener"><span>▶</span><div><b>Coach video walkthrough</b><small>${esc(data.loom_description || 'Open report review')}</small></div></a>` : ''}</article>`;
 }
 
 function coachDiagnostics() {
-  $('#clientWorkspaceBody').innerHTML = state.data.diagnostics.map(diagnosticCard).join('') || '<div class="empty">No diagnostic reports are available.</div>';
+  $('#clientWorkspaceBody').innerHTML = diagnosticsMarkup();
+}
+
+function diagnosticsMarkup() {
+  const blood = state.data.diagnostics.filter((report) => /blood|lab/i.test(`${report.report_type} ${report.title}`));
+  const genetics = state.data.diagnostics.filter((report) => /genetic|genome|dna/i.test(`${report.report_type} ${report.title}`));
+  const other = state.data.diagnostics.filter((report) => !blood.includes(report) && !genetics.includes(report));
+  return state.data.diagnostics.length ? `<div class="diagnostic-group"><h2>Blood Work</h2>${blood.map(diagnosticCard).join('') || '<div class="empty compact">No blood work report.</div>'}</div><div class="diagnostic-group"><h2>Genetic Testing</h2>${genetics.map(diagnosticCard).join('') || '<div class="empty compact">No genetic report.</div>'}</div>${other.length ? `<div class="diagnostic-group"><h2>Other Reports</h2>${other.map(diagnosticCard).join('')}</div>` : ''}` : '<div class="empty">No diagnostic reports are available.</div>';
 }
 
 function renderClient() {
@@ -859,10 +898,9 @@ async function submitCheckin(event) {
 }
 
 function clientProgress() {
-  const entries = [...state.data.progress].sort((a, b) => String(a.entry_date).localeCompare(String(b.entry_date)));
-  const factor = state.client.weight_unit === 'lbs' ? 2.20462 : 1;
   const photos = state.data.files.filter((file) => file.file_type === 'progress_photo');
-  $('#clientMain').innerHTML = clientHeader('THE LONG VIEW', 'Progress', 'Your weight trend, measurements and progress-photo history.') + `<div class="progress-summary"><div><span>START</span><strong>${displayWeight(state.client.start_weight_kg)}</strong></div><div><span>LATEST</span><strong>${displayWeight(entries.at(-1)?.weight_kg)}</strong></div><div><span>ENTRIES</span><strong>${entries.length}</strong></div></div><section class="panel"><div class="panel-head"><h3>Weight trend</h3></div>${chart(entries.map((entry) => Number(entry.weight_kg) * factor))}${entries.slice().reverse().map((entry) => `<div class="note-row"><b>${fmt(entry.entry_date)}</b><span>${displayWeight(entry.weight_kg)}</span></div>`).join('')}</section><form id="progressForm" class="panel checkin-form"><div class="panel-head wide"><h3>Log progress</h3></div><label class="field">Weight (${state.client.weight_unit === 'lbs' ? 'lb' : 'kg'})<input name="weight_display" type="number" step="0.1"></label><label class="field">Waist (cm)<input name="waist_cm" type="number" step="0.1"></label><button class="btn primary wide">Save progress</button></form><section class="panel"><div class="panel-head"><div><h3>Progress photos</h3><span class="sub">Front, side and back by week</span></div><span class="pill">${photos.length} PHOTOS</span></div><form id="photoForm" class="photo-form"><label>View<select name="photo_view"><option>front</option><option>side</option><option>back</option></select></label><label>Week<input name="week_number" type="number" min="1" value="${currentWeek()?.week_number || ''}"></label><label>Photo<input name="photo" type="file" accept="image/*" required></label><button class="btn primary">Upload photo</button></form>${photos.map((photo) => `<div class="note-row"><b>Week ${photo.week_number || '—'} · ${title(photo.photo_view || 'photo')}</b><span>${fmt(photo.created_at)} · ${esc(photo.original_name || '')}</span></div>`).join('') || '<div class="empty">No progress photos uploaded yet.</div>'}</section>`;
+  $('#clientMain').innerHTML = clientHeader('', 'Progress', '') + progressDashboardMarkup() + `<form id="progressForm" class="panel checkin-form"><div class="panel-head wide"><h3>Log progress</h3></div><label class="field">Weight (${state.client.weight_unit === 'lbs' ? 'lb' : 'kg'})<input name="weight_display" type="number" step="0.1" inputmode="decimal"></label><label class="field">Waist (cm)<input name="waist_cm" type="number" step="0.1" inputmode="decimal"></label><button class="btn primary wide">Save progress</button></form><section class="panel"><div class="panel-head"><div><h3>Progress photos</h3><span class="sub">Front, side and back by week</span></div><span class="pill">${photos.length} PHOTOS</span></div><form id="photoForm" class="photo-form"><label>View<select name="photo_view"><option>front</option><option>side</option><option>back</option></select></label><label>Week<input name="week_number" type="number" min="1" value="${currentWeek()?.week_number || ''}"></label><label>Photo<input name="photo" type="file" accept="image/*" required></label><button class="btn primary">Upload photo</button></form>${photos.map((photo) => `<div class="note-row"><b>Week ${photo.week_number || '—'} · ${title(photo.photo_view || 'photo')}</b><span>${fmt(photo.created_at)} · ${esc(photo.original_name || '')}</span></div>`).join('') || '<div class="empty">No progress photos yet.</div>'}</section>`;
+  bindProgressRange(clientProgress);
   $('#progressForm').onsubmit = submitProgress;
   $('#photoForm').onsubmit = uploadProgressPhoto;
 }
@@ -900,7 +938,7 @@ async function submitProgress(event) {
 }
 
 function clientDiagnostics() {
-  $('#clientMain').innerHTML = clientHeader('YOUR HEALTH DATA', 'Reports', 'Coach-reviewed bloodwork and genetic reports.') + (state.data.diagnostics.map(diagnosticCard).join('') || '<div class="empty">No report has been shared yet.</div>');
+  $('#clientMain').innerHTML = clientHeader('', 'Diagnostics', '') + diagnosticsMarkup();
 }
 
 function bindShell() {
@@ -941,6 +979,11 @@ function bindShell() {
     state.clientView = button.dataset.clientView;
     renderClient();
   };
+  $$('.account-menu [data-account-view]').forEach((button) => button.onclick = () => {
+    state.clientView = button.dataset.accountView;
+    renderClient();
+    button.closest('details').open = false;
+  });
 }
 
 bindShell();
