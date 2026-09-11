@@ -13,6 +13,7 @@ const fmt = (value, options = { day: 'numeric', month: 'short', year: 'numeric' 
   : '—';
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const title = (value) => String(value || '').replace(/\b\w/g, (letter) => letter.toUpperCase());
+const humanValue = (value) => Array.isArray(value) ? value.map(humanValue).filter(Boolean).join(' · ') : value && typeof value === 'object' ? Object.entries(value).map(([key, child]) => `${title(key.replaceAll('_',' '))}: ${humanValue(child)}`).join(' · ') : String(value ?? '');
 const monday = (value = new Date()) => {
   const date = new Date(value);
   const day = date.getDay();
@@ -34,8 +35,10 @@ const state = {
   progressRange: 'all',
   clientTab: 'overview',
   clients: [],
+  qaRows: [],
   client: null,
   data: emptyData(),
+  pendingNutritionImport: null,
   saveTimer: null
 };
 
@@ -44,7 +47,7 @@ function emptyData() {
     weeks: [], sessions: [], exercises: [], programs: [], nutritionPlans: [],
     nutritionDays: [], meals: [], habits: [], habitLogs: [], steps: [],
     checkins: [], progress: [], onboarding: [], legal: [], diagnostics: [], files: [],
-    mealAssignments: [], exerciseLogs: []
+    mealAssignments: [], exerciseLogs: [], healthConnections: [], healthDaily: [], healthWorkouts: []
   };
 }
 
@@ -110,10 +113,11 @@ async function query(label, promise) {
 }
 
 async function loadCoach() {
-  const clients = await query('Clients', db.from('clients')
+  const [clients, qaRows] = await Promise.all([query('Clients', db.from('clients')
     .select('*,profile:profiles!clients_profile_id_fkey(full_name,email)')
-    .order('start_date'));
+    .order('start_date')), query('Client QA', db.from('client_qa_summary').select('*'))]);
   state.clients = clients.map(normalizeClient);
+  state.qaRows = qaRows;
 }
 
 async function loadClientData(clientId) {
@@ -131,10 +135,13 @@ async function loadClientData(clientId) {
     query('Reports', db.from('diagnostic_reports').select('*').eq('client_id', clientId).order('report_date', { ascending: false })),
     query('Files', db.from('client_files').select('*').eq('client_id', clientId).order('created_at', { ascending: false })),
     query('Meal assignments', db.from('meal_assignments').select('*,meal:meal_bank(*)').eq('client_id', clientId).order('sort_order')),
-    query('Exercise logs', db.from('exercise_set_logs').select('*').eq('client_id', clientId).order('performed_at', { ascending: false }).limit(1000))
+    query('Exercise logs', db.from('exercise_set_logs').select('*').eq('client_id', clientId).order('performed_at', { ascending: false }).limit(1000)),
+    query('Health connections', db.from('client_health_connections').select('*').eq('client_id', clientId)),
+    query('Health summaries', db.from('client_health_daily').select('*').eq('client_id', clientId).order('date', { ascending: false }).limit(90)),
+    query('Imported workouts', db.from('client_health_workouts').select('*').eq('client_id', clientId).order('started_at', { ascending: false }).limit(100))
   ]);
   if (state.client?.id !== clientAtStart) return;
-  const [weeks, programs, nutritionPlans, habits, steps, checkins, progress, onboarding, legal, diagnostics, files, mealAssignments, exerciseLogs] = requests;
+  const [weeks, programs, nutritionPlans, habits, steps, checkins, progress, onboarding, legal, diagnostics, files, mealAssignments, exerciseLogs, healthConnections, healthDaily, healthWorkouts] = requests;
   let sessions = [];
   let exercises = [];
   let nutritionDays = [];
@@ -151,7 +158,7 @@ async function loadClientData(clientId) {
   if (state.client?.id !== clientAtStart) return;
   const recoveredExercises = programs.flatMap((program) => (program.days || []).flatMap((day) => day.exercises || []));
   const exerciseIndex = new Map([...recoveredExercises, ...exercises].map((exercise) => [exercise.id, exercise]));
-  state.data = { weeks, programs, nutritionPlans, habits, habitLogs: [], steps, checkins, progress, onboarding, legal, diagnostics, files, mealAssignments, exerciseLogs, sessions, exercises: [...exerciseIndex.values()], nutritionDays, meals };
+  state.data = { weeks, programs, nutritionPlans, habits, habitLogs: [], steps, checkins, progress, onboarding, legal, diagnostics, files, mealAssignments, exerciseLogs, healthConnections, healthDaily, healthWorkouts, sessions, exercises: [...exerciseIndex.values()], nutritionDays, meals };
 }
 
 function demoData() {
@@ -275,10 +282,16 @@ function renderDashboard() {
   const archived = state.clients.length - active.length;
   $('#coachMain').innerHTML = pageHead('COACH WORKSPACE', 'Client overview', '<button class="btn ghost" data-coach-view-link="clients">View all clients</button><button class="btn primary" data-add-client>+ Add client</button>') + `
     <div class="stats"><div class="stat"><span>ACTIVE CLIENTS</span><strong>${active.length}</strong></div><div class="stat"><span>PAST / ARCHIVED</span><strong>${archived}</strong></div><div class="stat"><span>CHECK-INS</span><strong>Weekly</strong></div><div class="stat"><span>STEP BASELINE</span><strong>8,000</strong></div></div>
-    <section class="panel"><div class="panel-head"><div><h3>Active clients</h3><span class="sub">Open a client to manage their current week.</span></div></div>${clientRows(active)}</section>`;
+    <section class="panel"><div class="panel-head"><div><h3>Active clients</h3><span class="sub">Open a client to manage their current week.</span></div></div>${clientRows(active)}</section>${qaDashboard(active)}`;
   $('[data-coach-view-link]')?.addEventListener('click', () => { state.coachView = 'clients'; renderCoach(); });
   bindAddClient();
   bindClientRows();
+}
+
+function qaDashboard(active) {
+  if (state.preview) return '';
+  const rows=active.map(client=>state.qaRows.find(row=>row.client_id===client.id)||{display_name:client.display_name});
+  return `<section class="panel"><div class="panel-head"><div><h3>Client plan QA</h3><span class="sub">Coach-only completeness checks. Clients never see this.</span></div></div><div class="qa-table"><div class="qa-head"><span>Client</span><span>Nutrition</span><span>Training</span><span>Planner</span><span>Progress</span><span>Health</span></div>${rows.map(row=>{const nutrition=Number(row.nutrition_days)>=3&&Number(row.assigned_meals)>=9&&Number(row.complete_meals)===Number(row.assigned_meals);const training=Number(row.active_programmes)>0&&Number(row.programme_days)>0&&Number(row.prescribed_exercises)>0;return `<div class="qa-row"><b>${esc(row.display_name)}</b><span class="${nutrition?'pass':'fail'}">${nutrition?'PASS':`${row.nutrition_days||0} days · ${row.complete_meals||0}/${row.assigned_meals||0} meals`}</span><span class="${training?'pass':'fail'}">${training?'PASS':`${row.programme_days||0} days · ${row.prescribed_exercises||0} exercises`}</span><span class="${Number(row.published_weeks)>0?'pass':'fail'}">${Number(row.published_weeks)>0?'PASS':'NOT PUBLISHED'}</span><span class="${Number(row.progress_entries)>0?'pass':'fail'}">${row.progress_entries||0} entries</span><span>${Number(row.health_connections)>0?'CONNECTED':'Not connected'}</span></div>`}).join('')}</div></section>`;
 }
 
 function renderRoster() {
@@ -348,7 +361,7 @@ function coachOverview() {
     <div class="metric"><span>CURRENT</span><strong>${displayWeight(latest)}</strong></div>
     <div class="metric"><span>CHANGE</span><strong>${change == null ? '—' : displayWeight(change, true)}</strong></div>
     <div class="metric"><span>DAILY STEPS</span><strong>${safeStepGoal().toLocaleString()}</strong></div>
-  </div><div class="grid-2"><section class="panel"><div class="panel-head"><h3>Client controls</h3></div>
+  </div>${healthSummaryMarkup()}<div class="grid-2"><section class="panel"><div class="panel-head"><h3>Client controls</h3></div>
     <form id="clientSettings" class="checkin-form">
       <label class="field">Status<select name="status"><option value="active">Active</option><option value="inactive">Past client</option><option value="archived">Archived</option></select></label>
       <label class="field">Check-in day<select name="checkin_day">${DAYS.map((day, index) => `<option value="${index}">${day}</option>`).join('')}</select></label>
@@ -364,6 +377,30 @@ function coachOverview() {
   form.status.value = client.status || 'active';
   form.checkin_day.value = String(client.checkin_day ?? 5);
   form.onsubmit = saveClientControls;
+}
+
+function preferredHealthDays() {
+  const rank = { apple_health: 1, google_health: 2, health_connect: 3, manual: 9 };
+  const byDate = new Map();
+  for (const row of state.data.healthDaily || []) {
+    const current = byDate.get(row.date);
+    if (!current || (rank[row.source] || 99) < (rank[current.source] || 99)) byDate.set(row.date, row);
+  }
+  return [...byDate.values()].sort((a,b) => String(b.date).localeCompare(String(a.date)));
+}
+
+function healthSummaryMarkup() {
+  const rows = preferredHealthDays().slice(0, 7);
+  if (!rows.length) return '<section class="panel health-summary"><div class="panel-head"><div><h3>Connected health</h3><span class="sub">No wearable data connected yet. Manual tracking remains available.</span></div></div></section>';
+  const avg = (key) => { const values=rows.map(r=>Number(r[key])).filter(Number.isFinite); return values.length ? values.reduce((a,b)=>a+b,0)/values.length : null; };
+  const steps=avg('steps'), sleep=avg('sleep_minutes'), resting=avg('resting_heart_rate'), latest=rows[0];
+  const hits=rows.filter(r=>Number(r.steps)>=safeStepGoal()).length;
+  return `<section class="panel health-summary"><div class="panel-head"><div><h3>Connected health</h3><span class="sub">Transparent seven-day summaries · latest ${fmt(latest.date)}</span></div><span class="pill">${esc(title(latest.source.replaceAll('_',' ')))}</span></div><div class="metric-strip"><div class="metric"><span>AVG STEPS</span><strong>${steps==null?'—':Math.round(steps).toLocaleString()}</strong><small>${hits}/${rows.length} target days</small></div><div class="metric"><span>AVG SLEEP</span><strong>${sleep==null?'—':`${Math.floor(sleep/60)}h ${Math.round(sleep%60)}m`}</strong></div><div class="metric"><span>RESTING HR</span><strong>${resting==null?'—':`${Math.round(resting)} bpm`}</strong></div><div class="metric"><span>LATEST WEIGHT</span><strong>${displayWeight(latest.weight_kg)}</strong></div></div></section>`;
+}
+
+function clientHealth() {
+  const providers=[['apple_health','Apple Health','Requires the Legal Edge iOS app and HealthKit permission.'],['google_health','Google / Fitbit','Secure Google OAuth connection.'],['health_connect','Android Health Connect','Requires the Legal Edge Android app and device permission.']];
+  $('#clientMain').innerHTML=clientHeader('ACCOUNT','Connected health','Control wearable connections and see when data last synced.')+healthSummaryMarkup()+`<section class="panel connection-list">${providers.map(([id,name,help])=>{const item=(state.data.healthConnections||[]).find(c=>c.provider===id);const connected=item?.status==='connected';return `<article><div><h3>${name}</h3><p>${connected?`Connected · Last synced ${fmt(item.last_synced_at)}`:help}</p></div><span class="pill ${connected?'active':''}">${connected?'CONNECTED':'NOT CONNECTED'}</span></article>`;}).join('')}<p class="source-gap">Connections only appear as active after the provider OAuth or native HealthKit/Health Connect flow succeeds. Manual entry stays available.</p></section>`;
 }
 
 async function saveClientControls(event) {
@@ -639,15 +676,30 @@ function validateNutritionImport(payload) {
   if (!payload || !Array.isArray(payload.days) || payload.days.length !== 3) throw new Error('JSON must contain exactly three days.');
   const required = ['Training Day', 'Rest Day', 'Busy Day'];
   required.forEach((type) => { if (!payload.days.some((day) => day.day_type === type)) throw new Error(`${type} is missing.`); });
+  const scheduledDays = payload.days.reduce((sum, day) => sum + Number(day.days_per_week || 0), 0);
+  if (scheduledDays !== 7) throw new Error('Days per week must total exactly 7.');
   payload.days.forEach((day) => {
-    if (!Array.isArray(day.meals) || !day.meals.length) throw new Error(`${day.day_type} needs at least one meal.`);
+    if (!Array.isArray(day.meals) || day.meals.length < 3) throw new Error(`${day.day_type} needs at least three complete meals.`);
     ['calories', 'protein_g', 'carbs_g', 'fat_g'].forEach((key) => { if (!Number.isFinite(Number(day[key]))) throw new Error(`${day.day_type}: ${key} is required.`); });
     day.meals.forEach((meal) => {
       if (!meal.name || !Array.isArray(meal.ingredients) || !meal.ingredients.length) throw new Error(`${day.day_type}: every meal needs a name and ingredients.`);
       ['calories', 'protein_g', 'carbs_g', 'fat_g'].forEach((key) => { if (!Number.isFinite(Number(meal[key]))) throw new Error(`${meal.name}: ${key} is required.`); });
+      meal.ingredients.forEach((ingredient) => {
+        if (!String(ingredient?.name || '').trim() || !Number.isFinite(Number(ingredient?.quantity)) || Number(ingredient.quantity) <= 0 || !String(ingredient?.unit || '').trim()) throw new Error(`${meal.name}: every ingredient needs a food, positive quantity and unit.`);
+      });
+      if (!String(meal.cooking_instructions || '').trim()) throw new Error(`${meal.name}: preparation instructions are required.`);
+      const macroCalories = Number(meal.protein_g) * 4 + Number(meal.carbs_g) * 4 + Number(meal.fat_g) * 9;
+      if (Math.abs(macroCalories - Number(meal.calories)) > Math.max(100, Number(meal.calories) * .15)) throw new Error(`${meal.name}: calories do not reconcile with its macros.`);
     });
+    const totals = day.meals.reduce((sum, meal) => ({calories:sum.calories+Number(meal.calories),protein_g:sum.protein_g+Number(meal.protein_g),carbs_g:sum.carbs_g+Number(meal.carbs_g),fat_g:sum.fat_g+Number(meal.fat_g)}), {calories:0,protein_g:0,carbs_g:0,fat_g:0});
+    if (Math.abs(totals.calories - Number(day.calories)) > Math.max(100, Number(day.calories) * .1)) throw new Error(`${day.day_type}: meal calories do not match the daily target.`);
+    for (const key of ['protein_g','carbs_g','fat_g']) if (Math.abs(totals[key] - Number(day[key])) > 10) throw new Error(`${day.day_type}: meal ${key.replace('_g','')} does not match the daily target.`);
   });
   return payload;
+}
+
+function nutritionImportPreview(payload) {
+  return `<section class="panel import-preview"><div class="panel-head"><div><span class="eyebrow">VALIDATED</span><h3>Review before import</h3></div><button class="btn primary" type="button" id="confirmNutritionImport">Import plan</button></div>${payload.days.map((day) => `<article class="qa-day"><div><b>${esc(day.day_type)}</b><span>${day.days_per_week}× weekly · ${day.calories} kcal · P ${day.protein_g}g · C ${day.carbs_g}g · F ${day.fat_g}g</span></div><ol>${day.meals.map((meal) => `<li><b>${esc(meal.name)}</b> — ${meal.calories} kcal · ${meal.ingredients.length} measured ingredients</li>`).join('')}</ol></article>`).join('')}</section>`;
 }
 
 async function importNutritionJson(event) {
@@ -655,8 +707,16 @@ async function importNutritionJson(event) {
   let payload;
   try { payload = validateNutritionImport(JSON.parse(new FormData(event.target).get('nutrition_json'))); }
   catch (error) { return toast(error.message || 'Invalid JSON', 'error'); }
-  if (state.preview) return toast('JSON validated. Sign in to save it.');
-  setBusy(event.submitter, true);
+  state.pendingNutritionImport = payload;
+  $('#nutritionImportPreview')?.remove();
+  $('#nutritionImportPanel').insertAdjacentHTML('afterend', `<div id="nutritionImportPreview">${nutritionImportPreview(payload)}</div>`);
+  $('#confirmNutritionImport').onclick = (clickEvent) => persistNutritionImport(payload, clickEvent.currentTarget);
+  toast('Plan validated — review and confirm');
+}
+
+async function persistNutritionImport(payload, button) {
+  if (state.preview) return toast('Plan validated. Sign in to import it.');
+  setBusy(button, true, 'Importing…');
   try {
     for (const day of payload.days) {
       const existing = state.data.nutritionPlans.find((plan) => plan.day_type === day.day_type || (day.day_type === 'Rest Day' && plan.day_type === 'Non-Training Day'));
@@ -676,9 +736,10 @@ async function importNutritionJson(event) {
     toast('Three-day nutrition plan imported');
     await loadClientData(state.client.id);
     state.selectedNutritionPlanId = state.data.nutritionPlans.find((plan) => plan.day_type === 'Training Day')?.id;
+    state.pendingNutritionImport = null;
     coachNutrition();
   } catch (error) { toast(error.message || 'Import failed', 'error'); }
-  finally { setBusy(event.submitter, false); }
+  finally { setBusy(button, false); }
 }
 
 function coachNutrition() {
@@ -808,7 +869,7 @@ function coachOnboarding() {
 }
 
 function coachLegal() {
-  $('#clientWorkspaceBody').innerHTML = state.data.legal.length ? state.data.legal.map((record) => `<section class="panel"><div class="panel-head"><div><h2>Consent record</h2><span class="sub">${fmt(record.signed_at || record.accepted_at || record.created_at)}</span></div><span class="pill">RECORDED</span></div><div class="detail-list">${Object.entries(record).filter(([key, value]) => !['id', 'client_id', 'created_at'].includes(key) && value != null && value !== '').map(([key, value]) => `<div class="detail"><label>${esc(title(key.replaceAll('_', ' ')))}</label>${esc(typeof value === 'object' ? JSON.stringify(value) : value)}</div>`).join('')}</div></section>`).join('') : '<div class="empty">No legal or consent record is available.</div>';
+  $('#clientWorkspaceBody').innerHTML = state.data.legal.length ? state.data.legal.map((record) => `<section class="panel"><div class="panel-head"><div><h2>Consent record</h2><span class="sub">${fmt(record.signed_at || record.accepted_at || record.created_at)}</span></div><span class="pill">RECORDED</span></div><div class="detail-list">${Object.entries(record).filter(([key, value]) => !['id', 'client_id', 'created_at'].includes(key) && value != null && value !== '').map(([key, value]) => `<div class="detail"><label>${esc(title(key.replaceAll('_', ' ')))}</label>${esc(humanValue(value))}</div>`).join('')}</div></section>`).join('') : '<div class="empty">No legal or consent record is available.</div>';
 }
 
 function diagnosticCard(report) {
@@ -821,7 +882,7 @@ function diagnosticCard(report) {
   const priorities = Array.isArray(genetics.top_priorities) ? genetics.top_priorities : [];
   const categoryNotes = genetics.category_notes && typeof genetics.category_notes === 'object' ? genetics.category_notes : {};
   const geneticInsights = Object.entries(categoryNotes).map(([name, insight]) => `<section class="genetic-card"><span class="eyebrow">${esc(title(name.replaceAll('_',' ')))}</span>${insight?.summary ? `<h3>${esc(insight.summary)}</h3>` : ''}${insight?.key_findings ? `<div class="finding-list">${responseTree(insight.key_findings)}</div>` : ''}${insight?.what_it_means ? `<p>${esc(insight.what_it_means)}</p>` : ''}</section>`).join('');
-  const priorityMarkup = priorities.length ? `<section class="priority-panel"><span class="eyebrow">TOP PRIORITIES</span><div>${priorities.map((item, index) => `<article><b>${index + 1}</b><p>${esc(typeof item === 'object' ? item.title || item.priority || item.summary || JSON.stringify(item) : item)}</p></article>`).join('')}</div></section>` : '';
+  const priorityMarkup = priorities.length ? `<section class="priority-panel"><span class="eyebrow">TOP PRIORITIES</span><div>${priorities.map((item, index) => `<article><b>${index + 1}</b><p>${esc(typeof item === 'object' ? item.title || item.priority || item.summary || humanValue(item) : item)}</p></article>`).join('')}</div></section>` : '';
   return `<article class="diagnostic-report"><header class="report-cover"><div><span class="eyebrow">${esc(title(report.report_type || 'report'))} · ${fmt(report.report_date)}</span><h2>${esc(report.title || 'Diagnostic report')}</h2><p>${esc(data.lab_source || '')}</p></div>${score != null ? `<div class="health-ring"><strong>${score}</strong><span>SCORE</span></div>` : ''}</header><section class="report-summary"><span class="eyebrow">EXECUTIVE SUMMARY</span><p>${esc(report.summary || data.coach_summary || genetics.overview || 'No coach summary recorded.')}</p></section>${priorityMarkup}${geneticInsights ? `<section class="genetic-grid">${geneticInsights}</section>` : ''}${markers.length ? `<section class="report-table"><div class="panel-head"><div><h3>Blood markers</h3><span class="sub">${markers.length} tested · ${flagged.length} requiring attention</span></div></div><div class="data-table"><div class="data-head"><span>Marker</span><span>Result</span><span>Reference</span><span>Status</span></div>${markers.map((marker) => `<div class="data-row"><b>${esc(marker.marker_name || marker.name)}</b><span>${esc(marker.value)} ${esc(marker.unit || '')}</span><span>${esc(marker.reference_range_low ?? marker.reference_low ?? '—')}–${esc(marker.reference_range_high ?? marker.reference_high ?? '—')}</span><span class="marker-status">${esc(marker.status || marker.classification || '—')}</span></div>`).join('')}</div></section>` : ''}<div class="recommendation-grid">${section('NUTRITION', data.action_nutrition || genetics.recommendations?.nutrition, '#4cc9a4')}${section('TRAINING', data.action_training || genetics.recommendations?.training, '#5da9e9')}${section('SUPPLEMENTS', data.action_supplements || genetics.recommendations?.supplements, '#d3a64b')}${section('RECOVERY', data.action_recovery || genetics.recommendations?.recovery, '#9d72d5')}</div>${section('FOLLOW-UP TESTING', data.action_followup || genetics.followup_bloodwork, '#d98585')}${data.loom_url ? `<a class="loom-card" href="${esc(data.loom_url)}" target="_blank" rel="noopener"><span>▶</span><div><b>Coach video walkthrough</b><small>${esc(data.loom_description || 'Open report review')}</small></div></a>` : ''}</article>`;
 }
 
@@ -845,7 +906,7 @@ function renderClient() {
   const views = {
     planner: clientPlanner, training: clientTraining,
     nutrition: clientNutrition, checkin: clientCheckin, progress: clientProgress,
-    onboarding: clientOnboarding, legal: clientLegal, diagnostics: clientDiagnostics
+    onboarding: clientOnboarding, legal: clientLegal, diagnostics: clientDiagnostics, health: clientHealth
   };
   try { (views[state.clientView] || clientPlanner)(); }
   catch (error) { renderError($('#clientMain'), error, renderClient); }
