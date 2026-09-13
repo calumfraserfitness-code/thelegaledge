@@ -16,3 +16,17 @@
 .qa-row .fail { color: #a34242; font-weight: 700; }
 .training-type-group { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--line); }
 .training-type-group > h3 { margin: 0 0 12px; color: var(--gold); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; }
+.week-editor { display: grid; grid-template-columns: minmax(180px,1fr) minmax(150px,.5fr) minmax(260px,2fr) auto; gap: 14px; align-items: end; margin: 18px 0; }
+.week-editor label { display: grid; gap: 7px; color: var(--muted); font-size: 12px; font-weight: 700; }
+.week-editor input, .week-editor textarea { width: 100%; }
+.add-meal-button { margin: 14px 0 20px; }
+.meal-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 5px; }
+.meal-macro-strip span b { display: block; color: var(--muted); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
+.photo-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); gap: 16px; margin-top: 18px; }
+.progress-photo { display: grid; gap: 7px; }
+.progress-photo img, .photo-placeholder { width: 100%; aspect-ratio: 3/4; border-radius: 14px; object-fit: cover; background: var(--soft); }
+.photo-placeholder { display: grid; place-items: center; padding: 18px; color: var(--muted); text-align: center; }
+.progress-photo b { font-size: 13px; }
+.progress-photo span { color: var(--muted); font-size: 12px; }
+@media (max-width: 900px) { .week-editor { grid-template-columns: 1fr 1fr; } .week-editor .wide { grid-column: 1/-1; } }
+@media (max-width: 600px) { .week-editor { grid-template-columns: 1fr; } .week-editor .wide { grid-column: auto; } .meal-card-head { align-items: flex-start; } .meal-actions { justify-content: flex-start; } }

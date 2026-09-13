@@ -460,7 +460,7 @@ function plannerCards({ interactive = false } = {}) {
 
 function coachPlanner() {
   const week = currentWeek();
-  $('#clientWorkspaceBody').innerHTML = `<div class="panel-head"><div><h3>${week ? esc(week.title || `Week ${week.week_number}`) : 'Current week'}</h3><span class="sub">${week?.published ? 'Published to client' : 'Draft'}</span></div>${week ? `<button class="btn primary small" id="publishWeek">${week.published ? 'Unpublish' : 'Publish week'}</button>` : ''}</div>${plannerCards()}`;
+  $('#clientWorkspaceBody').innerHTML = `<div class="panel-head"><div><h3>${week ? esc(week.title || `Week ${week.week_number}`) : 'Current week'}</h3><span class="sub">${week?.published ? 'Published to client' : 'Draft — client cannot see it yet'}</span></div><div class="editor-actions">${week ? `<button class="btn ghost small" id="duplicateWeek">Duplicate to next week</button><button class="btn primary small" id="publishWeek">${week.published ? 'Unpublish' : 'Publish week'}</button>` : ''}</div></div>${week ? `<form id="weekEditor" class="week-editor panel"><label>Week title<input name="title" value="${esc(week.title || `Week ${week.week_number}`)}"></label><label>Goal weight (${state.client.weight_unit === 'lbs' ? 'lb' : 'kg'})<input name="goal_weight_display" type="number" step="0.1" value="${week.goal_weight_kg ? (Number(week.goal_weight_kg) * (state.client.weight_unit === 'lbs' ? 2.20462 : 1)).toFixed(1) : ''}"></label><label class="wide">Coach note<textarea name="coach_note" rows="2">${esc(week.coach_note || '')}</textarea></label><button class="btn primary small">Save week</button></form>` : '<div class="empty">No programme week exists yet.</div>'}${plannerCards()}${state.data.sessions.length ? `<section class="panel"><div class="panel-head"><div><h3>Schedule editor</h3><span class="sub">Change a date to move an activity. Changes save without leaving the page.</span></div></div>${state.data.sessions.filter((session) => !week || session.week_id === week.id).map(sessionEditorMarkup).join('')}</section>` : ''}`;
   $('#publishWeek')?.addEventListener('click', async (event) => {
     const published = !week.published;
     week.published = published;
@@ -472,6 +472,57 @@ function coachPlanner() {
       coachPlanner();
     } catch (error) { week.published = !published; toast(error.message, 'error'); setBusy(event.currentTarget, false); }
   });
+  $('#weekEditor')?.addEventListener('submit', saveWeekDetails);
+  $('#duplicateWeek')?.addEventListener('click', duplicateCurrentWeek);
+  $$('[data-session-editor]').forEach((form) => { form.training_type.value = state.data.sessions.find((session) => session.id === form.dataset.sessionEditor)?.training_type || 'weights'; form.onsubmit = savePlannerSession; });
+  $$('[data-delete-session]').forEach((button) => button.onclick = () => deletePlannerSession(button.dataset.deleteSession));
+}
+
+async function saveWeekDetails(event) {
+  event.preventDefault();
+  const week = currentWeek(), fd = new FormData(event.target), shownGoal = Number(fd.get('goal_weight_display') || 0);
+  const patch = { title: String(fd.get('title') || '').trim() || null, coach_note: String(fd.get('coach_note') || '').trim() || null, goal_weight_kg: shownGoal ? shownGoal / (state.client.weight_unit === 'lbs' ? 2.20462 : 1) : null };
+  Object.assign(week, patch);
+  if (state.preview) { toast('Week updated in preview'); return coachPlanner(); }
+  setBusy(event.submitter, true);
+  try { await query('Week update', db.from('program_weeks').update(patch).eq('id', week.id).select()); toast('Week saved'); coachPlanner(); }
+  catch (error) { toast(error.message, 'error'); setBusy(event.submitter, false); }
+}
+
+async function savePlannerSession(event) {
+  event.preventDefault();
+  const id = event.target.dataset.sessionEditor, session = state.data.sessions.find((item) => item.id === id), fd = new FormData(event.target);
+  const nextDate = fd.get('session_date');
+  const patch = { training_type: fd.get('training_type'), session_date: nextDate, title: String(fd.get('title') || '').trim(), duration_minutes: Number(fd.get('duration_minutes')) || null, moved_from_date: nextDate !== session.session_date ? (session.moved_from_date || session.session_date) : session.moved_from_date };
+  if (state.preview) { Object.assign(session, patch); toast('Schedule updated in preview'); return coachPlanner(); }
+  setBusy(event.submitter, true);
+  try { const [saved] = await query('Schedule update', db.from('training_sessions').update(patch).eq('id', id).select()); Object.assign(session, saved); toast('Schedule saved'); coachPlanner(); }
+  catch (error) { toast(error.message, 'error'); setBusy(event.submitter, false); }
+}
+
+async function deletePlannerSession(id) {
+  if (!confirm('Remove this activity from the week? The programme prescription is kept.')) return;
+  if (!state.preview) { try { await query('Schedule delete', db.from('training_sessions').delete().eq('id', id).select()); } catch (error) { return toast(error.message, 'error'); } }
+  state.data.sessions = state.data.sessions.filter((session) => session.id !== id); toast('Activity removed from this week'); coachPlanner();
+}
+
+async function duplicateCurrentWeek(event) {
+  const source = currentWeek(); if (!source) return;
+  const start = new Date(`${source.week_start}T12:00:00`); start.setDate(start.getDate() + 7);
+  const nextStart = iso(start), nextNumber = Number(source.week_number || 0) + 1;
+  if (state.preview) return toast(`Week ${nextNumber} duplicated in preview`);
+  setBusy(event.currentTarget, true, 'Duplicating…');
+  try {
+    const [copy] = await query('Duplicate week', db.from('program_weeks').insert({ client_id: state.client.id, week_start: nextStart, week_number: nextNumber, title: `Week ${nextNumber}`, published: false, coach_note: source.coach_note || null, goal_weight_kg: source.goal_weight_kg || null, copied_from_week_id: source.id }).select());
+    const sourceSessions = state.data.sessions.filter((session) => session.week_id === source.id);
+    for (const session of sourceSessions) {
+      const date = new Date(`${session.session_date}T12:00:00`); date.setDate(date.getDate() + 7);
+      const { id, created_at, updated_at, completed_at, actual_value, actual_unit, client_notes, ...base } = session;
+      await query('Duplicate activity', db.from('training_sessions').insert({ ...base, week_id: copy.id, session_date: iso(date), status: 'planned', moved_from_date: null }));
+    }
+    toast(`Week ${nextNumber} created as a draft`); await loadClientData(state.client.id); coachPlanner();
+  } catch (error) { toast(error.message, 'error'); }
+  finally { setBusy(event.currentTarget, false); }
 }
 
 function exerciseCard(exercise, loggable = false) {
@@ -643,7 +694,7 @@ function inferredAmount(ingredient, meal) {
 function mealCardMarkup(meal, editable = false) {
   const ingredients = usableIngredients(meal).map(cleanIngredient);
   const description = recoveredMealDescription(meal);
-  return `<section class="meal-card"><div class="meal-card-head"><div><span class="eyebrow">${esc(meal.meal_type || 'MEAL')}</span><h3>${esc(meal.name)}</h3></div><div><strong>${meal.calories ?? '—'} kcal</strong>${editable ? `<button class="text-btn" type="button" data-edit-meal="${meal.id}">Edit meal</button>` : ''}</div></div><div class="meal-macro-strip"><span>P ${meal.protein_g ?? '—'}g</span><span>C ${meal.carbs_g ?? '—'}g</span><span>F ${meal.fat_g ?? '—'}g</span></div>${ingredients.length ? `<h4 class="food-heading">Ingredients</h4><div class="ingredient-list">${ingredients.map((ingredient) => `<div><b>${esc(ingredient.name)}</b><span>${esc(inferredAmount(ingredient, meal) || 'Quantity not recovered')}</span></div>`).join('')}</div>` : '<div class="source-gap">Ingredients were not available in the recovered record.</div>'}${meal.cooking_instructions || description ? `<details class="meal-method" open><summary>Preparation</summary><p>${esc(meal.cooking_instructions || description)}</p></details>` : ''}${editable ? `<form class="meal-editor hidden" data-meal-editor="${meal.id}"><div class="editor-grid"><label>Name<input name="name" value="${esc(meal.name)}"></label><label>Meal type<input name="meal_type" value="${esc(meal.meal_type || '')}"></label><label>Calories<input name="calories" type="number" value="${meal.calories ?? ''}"></label><label>Protein (g)<input name="protein_g" type="number" value="${meal.protein_g ?? ''}"></label><label>Carbs (g)<input name="carbs_g" type="number" value="${meal.carbs_g ?? ''}"></label><label>Fat (g)<input name="fat_g" type="number" value="${meal.fat_g ?? ''}"></label><label class="wide">Ingredients — one per line (quantity | unit | food)<textarea name="ingredients" rows="5">${esc(ingredients.map((item) => `${item.quantity || ''} | ${item.unit || ''} | ${item.name}`).join('\n'))}</textarea></label><label class="wide">Preparation<textarea name="cooking_instructions" rows="5">${esc(meal.cooking_instructions || description)}</textarea></label></div><button class="btn primary small">Save meal</button></form>` : ''}</section>`;
+  return `<section class="meal-card"><div class="meal-card-head"><div><span class="eyebrow">${esc(meal.meal_type || 'MEAL')}</span><h3>${esc(meal.name)}</h3></div><div><strong>${meal.calories ?? '—'} kcal</strong>${editable ? `<div class="meal-actions"><button class="text-btn" type="button" data-edit-meal="${meal.id}">Edit</button><button class="text-btn" type="button" data-duplicate-meal="${meal.id}">Duplicate</button><button class="text-btn danger" type="button" data-delete-meal="${meal.id}">Remove</button></div>` : ''}</div></div><div class="meal-macro-strip"><span><b>Protein</b> ${meal.protein_g ?? '—'}g</span><span><b>Carbs</b> ${meal.carbs_g ?? '—'}g</span><span><b>Fat</b> ${meal.fat_g ?? '—'}g</span></div>${ingredients.length ? `<h4 class="food-heading">Ingredients</h4><div class="ingredient-list">${ingredients.map((ingredient) => `<div><b>${esc(ingredient.name)}</b><span>${esc(inferredAmount(ingredient, meal) || 'Amount unavailable in source')}</span></div>`).join('')}</div>` : '<div class="source-gap">No ingredient list was present in the recovered source.</div>'}${meal.cooking_instructions || description ? `<details class="meal-method" open><summary>Preparation</summary><p>${esc(meal.cooking_instructions || description)}</p></details>` : ''}${editable ? `<form class="meal-editor hidden" data-meal-editor="${meal.id}"><div class="editor-grid"><label>Name<input name="name" value="${esc(meal.name)}" required></label><label>Meal type<input name="meal_type" value="${esc(meal.meal_type || '')}" required></label><label>Calories<input name="calories" type="number" min="0" value="${meal.calories ?? ''}"></label><label>Protein (g)<input name="protein_g" type="number" min="0" value="${meal.protein_g ?? ''}"></label><label>Carbs (g)<input name="carbs_g" type="number" min="0" value="${meal.carbs_g ?? ''}"></label><label>Fat (g)<input name="fat_g" type="number" min="0" value="${meal.fat_g ?? ''}"></label><label class="wide">Ingredients — one per line: quantity | unit | food<textarea name="ingredients" rows="7" placeholder="5 | oz | chicken breast">${esc(ingredients.map((item) => `${item.quantity || ''} | ${item.unit || ''} | ${item.name}`).join('\n'))}</textarea></label><label class="wide">Preparation<textarea name="cooking_instructions" rows="5">${esc(meal.cooking_instructions || description)}</textarea></label></div><button class="btn primary small">Save meal</button></form>` : ''}</section>`;
 }
 
 function assignedMealsForPlan(plan) {
@@ -756,14 +807,39 @@ function coachNutrition() {
   const plans = state.data.nutritionPlans.filter((plan) => plan.is_active !== false);
   const selected = plans.find((plan) => plan.id === state.selectedNutritionPlanId) || plans.find((plan) => nutritionDayLabel(plan) === 'Training Day') || plans[0];
   state.selectedNutritionPlanId = selected?.id || null;
-  $('#clientWorkspaceBody').innerHTML = `<section class="nutrition-tools"><div><h2>Nutrition plan</h2><p class="muted">Edit targets and every food without leaving this page.</p></div><button class="btn gold" type="button" id="toggleNutritionImport">Import 3-day JSON</button></section>${nutritionImportPanel()}${plans.length ? `<div class="nutrition-day-tabs">${plans.map((plan) => `<button type="button" data-coach-nutrition-plan="${plan.id}" class="${plan.id === selected.id ? 'active' : ''}">${esc(nutritionDayLabel(plan))}</button>`).join('')}</div><form class="nutrition-editor" data-plan-editor="${selected.id}"><div class="editor-grid"><label>Plan name<input name="name" value="${esc(selected.name)}"></label><label>Day type<select name="day_type"><option${selected.day_type === 'Training Day' ? ' selected' : ''}>Training Day</option><option${selected.day_type === 'Rest Day' || selected.day_type === 'Non-Training Day' ? ' selected' : ''}>Rest Day</option><option${selected.day_type === 'Busy Day' ? ' selected' : ''}>Busy Day</option></select></label><label>Calories<input name="calories" type="number" min="0" value="${selected.calories ?? ''}"></label><label>Protein (g)<input name="protein_g" type="number" min="0" value="${selected.protein_g ?? ''}"></label><label>Carbs (g)<input name="carbs_g" type="number" min="0" value="${selected.carbs_g ?? ''}"></label><label>Fat (g)<input name="fat_g" type="number" min="0" value="${selected.fat_g ?? ''}"></label><label>Days/week<input name="days_per_week" type="number" min="0" max="7" value="${selected.days_per_week ?? 1}"></label><button class="btn primary small">Save targets</button></div></form>${assignedMealsForPlan(selected).length ? assignedMealPlan(selected, true) : mealPlan(selected)}` : '<div class="empty">No active nutrition plan is available for this client. Use Import 3-day JSON to add it.</div>'}`;
+  $('#clientWorkspaceBody').innerHTML = `<section class="nutrition-tools"><div><h2>Nutrition plan</h2><p class="muted">Edit targets, foods, quantities and preparation without leaving this page.</p></div><button class="btn gold" type="button" id="toggleNutritionImport">Import 3-day JSON</button></section>${nutritionImportPanel()}${plans.length ? `<div class="nutrition-day-tabs">${plans.map((plan) => `<button type="button" data-coach-nutrition-plan="${plan.id}" class="${plan.id === selected.id ? 'active' : ''}">${esc(nutritionDayLabel(plan))}</button>`).join('')}</div><form class="nutrition-editor" data-plan-editor="${selected.id}"><div class="editor-grid"><label>Plan name<input name="name" value="${esc(selected.name)}"></label><label>Day type<select name="day_type"><option${selected.day_type === 'Training Day' ? ' selected' : ''}>Training Day</option><option${selected.day_type === 'Rest Day' || selected.day_type === 'Non-Training Day' ? ' selected' : ''}>Rest Day</option><option${selected.day_type === 'Busy Day' ? ' selected' : ''}>Busy Day</option></select></label><label>Calories<input name="calories" type="number" min="0" value="${selected.calories ?? ''}"></label><label>Protein (g)<input name="protein_g" type="number" min="0" value="${selected.protein_g ?? ''}"></label><label>Carbs (g)<input name="carbs_g" type="number" min="0" value="${selected.carbs_g ?? ''}"></label><label>Fat (g)<input name="fat_g" type="number" min="0" value="${selected.fat_g ?? ''}"></label><label>Days/week<input name="days_per_week" type="number" min="0" max="7" value="${selected.days_per_week ?? 1}"></label><button class="btn primary small">Save targets</button></div></form><button class="btn ghost add-meal-button" type="button" id="addMeal">+ Add meal to ${esc(nutritionDayLabel(selected))}</button>${assignedMealsForPlan(selected).length ? assignedMealPlan(selected, true) : mealPlan(selected)}` : '<div class="empty">No active nutrition plan is available for this client. Use Import 3-day JSON to add it.</div>'}`;
   $('#toggleNutritionImport').onclick = () => $('#nutritionImportPanel').classList.toggle('hidden');
   $('#nutritionJsonForm').onsubmit = importNutritionJson;
   $('#copyNutritionPrompt').onclick = copyNutritionPrompt;
   $$('[data-coach-nutrition-plan]').forEach((button) => button.onclick = () => { state.selectedNutritionPlanId = button.dataset.coachNutritionPlan; coachNutrition(); });
   $$('[data-plan-editor]').forEach((form) => form.onsubmit = saveNutritionTargets);
   $$('[data-edit-meal]').forEach((button) => button.onclick = () => $(`[data-meal-editor="${button.dataset.editMeal}"]`)?.classList.toggle('hidden'));
+  $('#addMeal')?.addEventListener('click', () => addMealToPlan(selected));
+  $$('[data-duplicate-meal]').forEach((button) => button.onclick = () => duplicateMealAssignment(button.dataset.duplicateMeal, selected));
+  $$('[data-delete-meal]').forEach((button) => button.onclick = () => removeMealAssignment(button.dataset.deleteMeal, selected));
   $$('[data-meal-editor]').forEach((form) => form.onsubmit = saveMeal);
+}
+
+async function addMealToPlan(plan) {
+  const meal = { name: 'New meal', meal_type: 'Meal', calories: null, protein_g: null, carbs_g: null, fat_g: null, ingredients: [], cooking_instructions: null, source_system: 'coach_created' };
+  if (state.preview) { state.data.mealAssignments.push({ id: `preview-assignment-${Date.now()}`, meal_id: `preview-meal-${Date.now()}`, client_id: state.client.id, nutrition_plan_id: plan.id, sort_order: assignedMealsForPlan(plan).length, meal: { ...meal, id: `preview-meal-${Date.now()}` } }); toast('Meal added in preview'); return coachNutrition(); }
+  try { const [savedMeal] = await query('Meal', db.from('meal_bank').insert(meal).select()); const [assignment] = await query('Meal assignment', db.from('meal_assignments').insert({ meal_id: savedMeal.id, client_id: state.client.id, nutrition_plan_id: plan.id, historical: false, sort_order: assignedMealsForPlan(plan).length }).select()); state.data.mealAssignments.push({ ...assignment, meal: savedMeal }); toast('Meal added — enter its foods and preparation'); coachNutrition(); }
+  catch (error) { toast(error.message, 'error'); }
+}
+
+async function duplicateMealAssignment(mealId, plan) {
+  const source = state.data.mealAssignments.find((item) => item.meal?.id === mealId)?.meal; if (!source) return;
+  const { id, created_at, updated_at, ...copy } = source; copy.name = `${source.name} copy`; copy.source_system = 'coach_created';
+  if (state.preview) { const next = { ...copy, id: `preview-meal-${Date.now()}` }; state.data.mealAssignments.push({ id: `preview-assignment-${Date.now()}`, client_id: state.client.id, nutrition_plan_id: plan.id, meal_id: next.id, sort_order: assignedMealsForPlan(plan).length, meal: next }); toast('Meal duplicated in preview'); return coachNutrition(); }
+  try { const [savedMeal] = await query('Meal copy', db.from('meal_bank').insert(copy).select()); const [assignment] = await query('Meal assignment', db.from('meal_assignments').insert({ meal_id: savedMeal.id, client_id: state.client.id, nutrition_plan_id: plan.id, historical: false, sort_order: assignedMealsForPlan(plan).length }).select()); state.data.mealAssignments.push({ ...assignment, meal: savedMeal }); toast('Meal duplicated'); coachNutrition(); }
+  catch (error) { toast(error.message, 'error'); }
+}
+
+async function removeMealAssignment(mealId, plan) {
+  const assignment = state.data.mealAssignments.find((item) => item.meal?.id === mealId && item.nutrition_plan_id === plan.id); if (!assignment) return;
+  if (!confirm('Remove this meal from this client day? The Meal Bank record is preserved.')) return;
+  if (!state.preview) { try { await query('Meal assignment', db.from('meal_assignments').delete().eq('id', assignment.id).select()); } catch (error) { return toast(error.message, 'error'); } }
+  state.data.mealAssignments = state.data.mealAssignments.filter((item) => item.id !== assignment.id); toast('Meal removed from this day'); coachNutrition();
 }
 
 async function saveMeal(event) {
@@ -796,12 +872,19 @@ async function saveNutritionTargets(event) {
 }
 
 function answersFor(checkin) {
-  if (checkin.original_answers && Object.keys(checkin.original_answers).length) return Object.entries(checkin.original_answers);
+  if (checkin.original_answers && Object.keys(checkin.original_answers).length) return flattenCheckinAnswers(checkin.original_answers);
   return [
     ['Biggest win', checkin.wins], ['Challenges', checkin.challenges],
     ['Training feedback', checkin.training_summary], ['Nutrition feedback', checkin.food_summary],
     ['Support needed', checkin.support_needed], ['Anything else', checkin.client_notes]
   ].filter(([, value]) => value);
+}
+
+function flattenCheckinAnswers(value, prefix = '') {
+  if (value == null || value === '') return [];
+  if (Array.isArray(value)) return value.flatMap((item, index) => flattenCheckinAnswers(item, `${prefix}${prefix ? ' — ' : ''}${index + 1}`));
+  if (typeof value === 'object') return Object.entries(value).flatMap(([key, child]) => flattenCheckinAnswers(child, `${prefix}${prefix ? ' — ' : ''}${title(key.replaceAll('_', ' '))}`));
+  return [[prefix || 'Response', String(value)]];
 }
 
 function checkinCard(checkin, coach = false) {
@@ -834,8 +917,10 @@ function chart(values, colour = '#b99853') {
 }
 
 function coachProgress() {
-  $('#clientWorkspaceBody').innerHTML = progressDashboardMarkup();
+  const photos = state.data.files.filter((file) => file.file_type === 'progress_photo');
+  $('#clientWorkspaceBody').innerHTML = progressDashboardMarkup() + `<section class="panel"><div class="panel-head"><div><h3>Progress photos</h3><span class="sub">Private client uploads</span></div><span class="pill">${photos.length} PHOTOS</span></div><div class="photo-grid">${photos.map((photo) => `<article class="progress-photo" data-photo-path="${esc(photo.storage_path)}"><div class="photo-placeholder">Loading private photo…</div><b>Week ${photo.week_number || '—'} · ${title(photo.photo_view || 'photo')}</b><span>${fmt(photo.created_at)}</span></article>`).join('') || '<div class="empty">No progress photos uploaded.</div>'}</div></section>`;
   bindProgressRange(coachProgress);
+  hydrateProgressPhotos();
 }
 
 function progressData() {
@@ -1128,7 +1213,7 @@ async function submitCheckin(event) {
     const [saved] = await query('Check-in', db.from('checkins').insert(row).select());
     state.data.checkins.unshift(saved);
     if (row.weight_kg) {
-      const progressRow = { client_id: state.client.id, entry_date: iso(new Date()), weight_kg: row.weight_kg, steps: row.average_steps || null };
+      const progressRow = { client_id: state.client.id, entry_date: iso(new Date()), weight_kg: row.weight_kg, steps: row.average_steps || null, training_adherence: row.training_adherence, nutrition_adherence: row.nutrition_adherence, notes: row.wins || row.challenges || null };
       const [progress] = await query('Progress', db.from('progress_entries').upsert(progressRow, { onConflict: 'client_id,entry_date' }).select());
       const index = state.data.progress.findIndex((entry) => entry.entry_date === progress.entry_date);
       if (index >= 0) state.data.progress[index] = progress; else state.data.progress.unshift(progress);
@@ -1141,10 +1226,20 @@ async function submitCheckin(event) {
 
 function clientProgress() {
   const photos = state.data.files.filter((file) => file.file_type === 'progress_photo');
-  $('#clientMain').innerHTML = clientHeader('', 'Progress', '') + progressDashboardMarkup() + `<form id="progressForm" class="panel checkin-form"><div class="panel-head wide"><h3>Log progress</h3></div><label class="field">Weight (${state.client.weight_unit === 'lbs' ? 'lb' : 'kg'})<input name="weight_display" type="number" step="0.1" inputmode="decimal"></label><label class="field">Waist (cm)<input name="waist_cm" type="number" step="0.1" inputmode="decimal"></label><button class="btn primary wide">Save progress</button></form><section class="panel"><div class="panel-head"><div><h3>Progress photos</h3><span class="sub">Front, side and back by week</span></div><span class="pill">${photos.length} PHOTOS</span></div><form id="photoForm" class="photo-form"><label>View<select name="photo_view"><option>front</option><option>side</option><option>back</option></select></label><label>Week<input name="week_number" type="number" min="1" value="${currentWeek()?.week_number || ''}"></label><label>Photo<input name="photo" type="file" accept="image/*" required></label><button class="btn primary">Upload photo</button></form>${photos.map((photo) => `<div class="note-row"><b>Week ${photo.week_number || '—'} · ${title(photo.photo_view || 'photo')}</b><span>${fmt(photo.created_at)} · ${esc(photo.original_name || '')}</span></div>`).join('') || '<div class="empty">No progress photos yet.</div>'}</section>`;
+  $('#clientMain').innerHTML = clientHeader('', 'Progress', '') + progressDashboardMarkup() + `<form id="progressForm" class="panel checkin-form"><div class="panel-head wide"><h3>Log progress</h3></div><label class="field">Weight (${state.client.weight_unit === 'lbs' ? 'lb' : 'kg'})<input name="weight_display" type="number" step="0.1" inputmode="decimal"></label><label class="field">Waist (cm)<input name="waist_cm" type="number" step="0.1" inputmode="decimal"></label><button class="btn primary wide">Save progress</button></form><section class="panel"><div class="panel-head"><div><h3>Progress photos</h3><span class="sub">Private front, side and back photos by week</span></div><span class="pill">${photos.length} PHOTOS</span></div><form id="photoForm" class="photo-form"><label>View<select name="photo_view"><option>front</option><option>side</option><option>back</option></select></label><label>Week<input name="week_number" type="number" min="1" value="${currentWeek()?.week_number || ''}"></label><label>Photo<input name="photo" type="file" accept="image/jpeg,image/png,image/webp" required></label><button class="btn primary">Upload photo</button></form><div class="photo-grid">${photos.map((photo) => `<article class="progress-photo" data-photo-path="${esc(photo.storage_path)}"><div class="photo-placeholder">Loading private photo…</div><b>Week ${photo.week_number || '—'} · ${title(photo.photo_view || 'photo')}</b><span>${fmt(photo.created_at)}</span></article>`).join('') || '<div class="empty">No progress photos yet.</div>'}</div></section>`;
   bindProgressRange(clientProgress);
   $('#progressForm').onsubmit = submitProgress;
   $('#photoForm').onsubmit = uploadProgressPhoto;
+  hydrateProgressPhotos();
+}
+
+async function hydrateProgressPhotos() {
+  if (!db || state.preview) return;
+  for (const card of $$('[data-photo-path]')) {
+    const { data, error } = await db.storage.from('client-files').createSignedUrl(card.dataset.photoPath, 900);
+    if (!error && data?.signedUrl) card.querySelector('.photo-placeholder').outerHTML = `<img src="${esc(data.signedUrl)}" alt="Private progress photo" loading="lazy">`;
+    else card.querySelector('.photo-placeholder').textContent = 'Photo unavailable';
+  }
 }
 
 async function uploadProgressPhoto(event) {
