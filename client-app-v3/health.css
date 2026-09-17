@@ -46,6 +46,8 @@
 .planner-nutrition select { width: 100%; padding: 8px; }
 @media (max-width: 650px) { .checkin-photos { grid-template-columns: 1fr; } .meal-build-actions form { flex-direction: column; min-width: 100%; } .bank-panel .panel-head { align-items: stretch; flex-direction: column; } }
 .health-import { margin: 18px 0; }
+.live-health { margin: 18px 0; border-color: rgba(185,152,83,.45); }
+.health-sync-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .health-import-form { display: grid; grid-template-columns: minmax(180px,.7fr) minmax(260px,1.5fr); gap: 14px; align-items: end; }
 .health-import-form .wide { grid-column: 1/-1; }
 .health-import-form input[type="file"] { background: var(--soft); padding: 12px; border: 1px dashed var(--line); border-radius: 10px; }
