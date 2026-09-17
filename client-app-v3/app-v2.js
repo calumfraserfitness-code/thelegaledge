@@ -47,7 +47,7 @@ function emptyData() {
     weeks: [], sessions: [], exercises: [], programs: [], nutritionPlans: [],
     nutritionDays: [], meals: [], habits: [], habitLogs: [], steps: [],
     checkins: [], progress: [], onboarding: [], legal: [], diagnostics: [], files: [],
-    mealAssignments: [], exerciseLogs: [], healthConnections: [], healthDaily: [], healthWorkouts: []
+    mealAssignments: [], exerciseLogs: [], exerciseBank: [], mealBank: [], healthConnections: [], healthDaily: [], healthWorkouts: []
   };
 }
 
@@ -138,10 +138,12 @@ async function loadClientData(clientId) {
     query('Exercise logs', db.from('exercise_set_logs').select('*').eq('client_id', clientId).order('performed_at', { ascending: false }).limit(1000)),
     query('Health connections', db.from('client_health_connections').select('*').eq('client_id', clientId)),
     query('Health summaries', db.from('client_health_daily').select('*').eq('client_id', clientId).order('date', { ascending: false }).limit(90)),
-    query('Imported workouts', db.from('client_health_workouts').select('*').eq('client_id', clientId).order('started_at', { ascending: false }).limit(100))
+    query('Imported workouts', db.from('client_health_workouts').select('*').eq('client_id', clientId).order('started_at', { ascending: false }).limit(100)),
+    state.role === 'coach' ? query('Exercise Bank', db.from('exercise_bank').select('*').order('name').limit(1000)) : Promise.resolve([]),
+    state.role === 'coach' ? query('Meal Bank', db.from('meal_bank').select('*').order('name').limit(1000)) : Promise.resolve([])
   ]);
   if (state.client?.id !== clientAtStart) return;
-  const [weeks, programs, nutritionPlans, habits, steps, checkins, progress, onboarding, legal, diagnostics, files, mealAssignments, exerciseLogs, healthConnections, healthDaily, healthWorkouts] = requests;
+  const [weeks, programs, nutritionPlans, habits, steps, checkins, progress, onboarding, legal, diagnostics, files, mealAssignments, exerciseLogs, healthConnections, healthDaily, healthWorkouts, exerciseBank, mealBank] = requests;
   let sessions = [];
   let exercises = [];
   let nutritionDays = [];
@@ -158,7 +160,7 @@ async function loadClientData(clientId) {
   if (state.client?.id !== clientAtStart) return;
   const recoveredExercises = programs.flatMap((program) => (program.days || []).flatMap((day) => day.exercises || []));
   const exerciseIndex = new Map([...recoveredExercises, ...exercises].map((exercise) => [exercise.id, exercise]));
-  state.data = { weeks, programs, nutritionPlans, habits, habitLogs: [], steps, checkins, progress, onboarding, legal, diagnostics, files, mealAssignments, exerciseLogs, healthConnections, healthDaily, healthWorkouts, sessions, exercises: [...exerciseIndex.values()], nutritionDays, meals };
+  state.data = { weeks, programs, nutritionPlans, habits, habitLogs: [], steps, checkins, progress, onboarding, legal, diagnostics, files, mealAssignments, exerciseLogs, exerciseBank, mealBank, healthConnections, healthDaily, healthWorkouts, sessions, exercises: [...exerciseIndex.values()], nutritionDays, meals };
 }
 
 function demoData() {
@@ -447,20 +449,20 @@ function weekDays() {
   });
 }
 
-function plannerCards({ interactive = false } = {}) {
+function plannerCards({ interactive = false, coachEdit = false } = {}) {
   const days = weekDays();
   return `<div class="week-grid">${days.map((day) => `<article class="day-card ${day.date === iso(new Date()) ? 'today' : ''}">
     <div class="day-head"><strong>${DAYS[day.dateObject.getDay()]}</strong><span>${day.dateObject.getDate()}</span></div>
     ${day.sessions.map((session) => `<div class="task-row ${session.status === 'completed' ? 'done' : ''}"><label class="task"><input type="checkbox" data-session-complete="${session.id}" ${session.status === 'completed' ? 'checked' : ''} ${interactive ? '' : 'disabled'}><span><b>${esc(session.title)}</b><small>${title(session.training_type)}${session.moved_from_date ? ` · Moved from ${fmt(session.moved_from_date, { weekday: 'long' })}` : ''}</small></span></label>${interactive ? `<button class="open-session" data-open-session="${session.id}" type="button">Open</button>` : ''}</div>`).join('')}
     <label class="task ${Number(day.step?.actual_steps || day.step?.steps || 0) >= safeStepGoal() ? 'done' : ''}"><input type="checkbox" data-step-date="${day.date}" ${Number(day.step?.actual_steps || day.step?.steps || 0) >= safeStepGoal() ? 'checked' : ''} ${interactive ? '' : 'disabled'}><span><b>${safeStepGoal().toLocaleString()} steps</b><small>Daily movement</small></span></label>
-    ${day.nutrition ? `<div class="plan-item nutrition"><b>Nutrition</b><span>${day.nutrition.calorie_target || state.client.calorie_goal || 'Target'} kcal</span></div>` : ''}
+    ${coachEdit ? `<label class="planner-nutrition">Nutrition<select data-nutrition-date="${day.date}"><option value="">Not assigned</option>${state.data.nutritionPlans.filter(plan=>plan.is_active!==false).map(plan=>`<option value="${plan.id}" ${day.nutrition?.nutrition_plan_id===plan.id?'selected':''}>${esc(nutritionDayLabel(plan))}</option>`).join('')}</select></label>` : (day.nutrition ? `<label class="task ${day.nutrition.adhered?'done':''}"><input type="checkbox" data-nutrition-complete="${day.date}" ${day.nutrition.adhered?'checked':''} ${interactive?'':'disabled'}><span><b>${esc(nutritionDayLabel(state.data.nutritionPlans.find(plan=>plan.id===day.nutrition.nutrition_plan_id)||{day_type:'Nutrition'}))}</b><small>${day.nutrition.calorie_target || state.client.calorie_goal || 'Target'} kcal</small></span></label>` : '<div class="plan-item nutrition"><b>Nutrition</b><span>Not assigned</span></div>')}
     ${!day.sessions.length ? '<p class="source-gap">No training scheduled</p>' : ''}
   </article>`).join('')}</div>`;
 }
 
 function coachPlanner() {
   const week = currentWeek();
-  $('#clientWorkspaceBody').innerHTML = `<div class="panel-head"><div><h3>${week ? esc(week.title || `Week ${week.week_number}`) : 'Current week'}</h3><span class="sub">${week?.published ? 'Published to client' : 'Draft — client cannot see it yet'}</span></div><div class="editor-actions">${week ? `<button class="btn ghost small" id="duplicateWeek">Duplicate to next week</button><button class="btn primary small" id="publishWeek">${week.published ? 'Unpublish' : 'Publish week'}</button>` : ''}</div></div>${week ? `<form id="weekEditor" class="week-editor panel"><label>Week title<input name="title" value="${esc(week.title || `Week ${week.week_number}`)}"></label><label>Goal weight (${state.client.weight_unit === 'lbs' ? 'lb' : 'kg'})<input name="goal_weight_display" type="number" step="0.1" value="${week.goal_weight_kg ? (Number(week.goal_weight_kg) * (state.client.weight_unit === 'lbs' ? 2.20462 : 1)).toFixed(1) : ''}"></label><label class="wide">Coach note<textarea name="coach_note" rows="2">${esc(week.coach_note || '')}</textarea></label><button class="btn primary small">Save week</button></form>` : '<div class="empty">No programme week exists yet.</div>'}${plannerCards()}${state.data.sessions.length ? `<section class="panel"><div class="panel-head"><div><h3>Schedule editor</h3><span class="sub">Change a date to move an activity. Changes save without leaving the page.</span></div></div>${state.data.sessions.filter((session) => !week || session.week_id === week.id).map(sessionEditorMarkup).join('')}</section>` : ''}`;
+  $('#clientWorkspaceBody').innerHTML = `<div class="panel-head"><div><h3>${week ? esc(week.title || `Week ${week.week_number}`) : 'Current week'}</h3><span class="sub">${week?.published ? 'Published to client' : 'Draft — client cannot see it yet'}</span></div><div class="editor-actions">${week ? `<button class="btn ghost small" id="duplicateWeek">Duplicate to next week</button><button class="btn primary small" id="publishWeek">${week.published ? 'Unpublish' : 'Publish week'}</button>` : ''}</div></div>${week ? `<form id="weekEditor" class="week-editor panel"><label>Week title<input name="title" value="${esc(week.title || `Week ${week.week_number}`)}"></label><label>Goal weight (${state.client.weight_unit === 'lbs' ? 'lb' : 'kg'})<input name="goal_weight_display" type="number" step="0.1" value="${week.goal_weight_kg ? (Number(week.goal_weight_kg) * (state.client.weight_unit === 'lbs' ? 2.20462 : 1)).toFixed(1) : ''}"></label><label class="wide">Coach note<textarea name="coach_note" rows="2">${esc(week.coach_note || '')}</textarea></label><button class="btn primary small">Save week</button></form>` : '<div class="empty">No programme week exists yet.</div>'}${plannerCards({coachEdit:true})}${state.data.sessions.length ? `<section class="panel"><div class="panel-head"><div><h3>Schedule editor</h3><span class="sub">Change a date to move an activity. Changes save without leaving the page.</span></div></div>${state.data.sessions.filter((session) => !week || session.week_id === week.id).map(sessionEditorMarkup).join('')}</section>` : ''}`;
   $('#publishWeek')?.addEventListener('click', async (event) => {
     const published = !week.published;
     week.published = published;
@@ -476,6 +478,17 @@ function coachPlanner() {
   $('#duplicateWeek')?.addEventListener('click', duplicateCurrentWeek);
   $$('[data-session-editor]').forEach((form) => { form.training_type.value = state.data.sessions.find((session) => session.id === form.dataset.sessionEditor)?.training_type || 'weights'; form.onsubmit = savePlannerSession; });
   $$('[data-delete-session]').forEach((button) => button.onclick = () => deletePlannerSession(button.dataset.deleteSession));
+  $$('[data-nutrition-date]').forEach(select=>select.onchange=()=>savePlannerNutrition(select));
+}
+
+async function savePlannerNutrition(select){
+  const week=currentWeek(), plan=state.data.nutritionPlans.find(item=>item.id===select.value), date=select.dataset.nutritionDate;
+  if(!week) return;
+  const existing=state.data.nutritionDays.find(item=>item.nutrition_date===date);
+  if(!plan){if(existing&&!state.preview)await query('Nutrition day',db.from('nutrition_days').delete().eq('id',existing.id).select());state.data.nutritionDays=state.data.nutritionDays.filter(item=>item!==existing);toast('Nutrition removed from day');return;}
+  const row={week_id:week.id,nutrition_date:date,nutrition_plan_id:plan.id,calorie_target:plan.calories,protein_target_g:plan.protein_g,carbs_target_g:plan.carbs_g,fat_target_g:plan.fat_g,adhered:existing?.adhered||false};
+  if(state.preview){if(existing)Object.assign(existing,row);else state.data.nutritionDays.push({...row,id:`preview-nutrition-${date}`});return toast('Nutrition assigned in preview');}
+  try{const [saved]=await query('Nutrition day',db.from('nutrition_days').upsert(row,{onConflict:'week_id,nutrition_date'}).select());if(existing)Object.assign(existing,saved);else state.data.nutritionDays.push(saved);toast(`${nutritionDayLabel(plan)} assigned`);}catch(error){toast(error.message,'error');}
 }
 
 async function saveWeekDetails(event) {
@@ -520,6 +533,8 @@ async function duplicateCurrentWeek(event) {
       const { id, created_at, updated_at, completed_at, actual_value, actual_unit, client_notes, ...base } = session;
       await query('Duplicate activity', db.from('training_sessions').insert({ ...base, week_id: copy.id, session_date: iso(date), status: 'planned', moved_from_date: null }));
     }
+    const sourceNutrition=state.data.nutritionDays.filter(day=>day.week_id===source.id);
+    for(const day of sourceNutrition){const date=new Date(`${day.nutrition_date}T12:00:00`);date.setDate(date.getDate()+7);const {id,...base}=day;await query('Duplicate nutrition day',db.from('nutrition_days').insert({...base,week_id:copy.id,nutrition_date:iso(date),adhered:false}));}
     toast(`Week ${nextNumber} created as a draft`); await loadClientData(state.client.id); coachPlanner();
   } catch (error) { toast(error.message, 'error'); }
   finally { setBusy(event.currentTarget, false); }
@@ -567,15 +582,54 @@ function trainingPrompt() {
   return `Build a scientific, practical training programme for ${state.client.display_name}, a busy legal professional. Use only the onboarding below. Do not invent injuries, equipment or availability. Return JSON only using this schema:\n{"programme_name":"12 Week Programme","days":[{"title":"Upper 1","training_type":"weights","coach_notes":"","exercises":[{"name":"Incline dumbbell press","sets":3,"reps":"6-10","rest_seconds":120,"tempo":"3-0-1","rpe":8,"rir":2,"superset_group":null,"video_url":null,"coach_instructions":""}]}]}\nValid training_type values: weights, resistance, cardio, mobility, recovery. Include mobility/cardio only when appropriate.\n\nONBOARDING:\n${onboarding}`;
 }
 
-function trainingSetupTools(){const week=currentWeek();return `<section class="panel fast-builder"><div class="panel-head"><div><span class="eyebrow">FAST BUILD</span><h2>Programme setup</h2><p class="muted">Copy the personalised prompt, paste the returned JSON, then edit every field below.</p></div><button class="btn ghost small" id="copyTrainingPrompt">Copy AI prompt</button></div><form id="trainingJsonForm"><label class="field">Programme JSON<textarea name="training_json" rows="7" placeholder='{"programme_name":"...","days":[...]}' required></textarea></label><button class="btn primary">Import programme</button></form><hr><form id="activityForm" class="editor-grid"><label>Activity<select name="training_type"><option value="cardio">Cardio</option><option value="mobility">Mobility</option><option value="recovery">Recovery</option><option value="weights">Weights</option></select></label><label>Date<input name="session_date" type="date" value="${iso(new Date())}" required></label><label>Title<input name="title" placeholder="e.g. Zone 2 bike" required></label><label>Duration (min)<input name="duration_minutes" type="number" min="0"></label><label class="wide">Instructions<textarea name="notes" rows="2"></textarea></label><button class="btn primary wide" ${week?'':'disabled'}>Add to current week</button></form>${state.data.sessions.map(sessionEditorMarkup).join('')}</section>`;}
+function trainingSetupTools(){
+  const week=currentWeek(), programs=state.data.programs.filter(program=>program.status!=='archived');
+  return `<section class="panel fast-builder"><div class="panel-head"><div><span class="eyebrow">FAST BUILD</span><h2>Programme setup</h2><p class="muted">Import once, edit every field, then place the programme into the current week.</p></div><button class="btn ghost small" id="copyTrainingPrompt">Copy AI prompt</button></div><form id="trainingJsonForm"><label class="field">Programme JSON<textarea name="training_json" rows="7" placeholder='{"programme_name":"...","days":[...]}' required></textarea></label><button class="btn primary">Import programme</button></form>${week&&programs.length?`<hr><form id="scheduleProgrammeForm" class="editor-grid"><label class="wide">Programme<select name="program_id">${programs.map(program=>`<option value="${program.id}">${esc(program.name)}</option>`).join('')}</select></label><p class="wide muted">Creates one scheduled session per programme day, starting Monday. Existing linked sessions are not duplicated.</p><button class="btn gold wide">Build current week from programme</button></form>`:''}<hr><form id="activityForm" class="editor-grid"><label>Activity<select name="training_type"><option value="cardio">Cardio</option><option value="mobility">Mobility</option><option value="recovery">Recovery</option><option value="weights">Weights</option></select></label><label>Date<input name="session_date" type="date" value="${iso(new Date())}" required></label><label>Title<input name="title" placeholder="e.g. Zone 2 bike" required></label><label>Duration (min)<input name="duration_minutes" type="number" min="0"></label><label class="wide">Instructions<textarea name="notes" rows="2"></textarea></label><button class="btn primary wide" ${week?'':'disabled'}>Add to current week</button></form>${state.data.sessions.map(sessionEditorMarkup).join('')}</section>${exerciseBankMarkup()}`;
+}
+
+function exerciseBankMarkup(){
+  const rows=state.data.exerciseBank||[], days=state.data.programs.flatMap(program=>program.days||[]);
+  return `<section class="panel bank-panel"><div class="panel-head"><div><h2>Exercise / video bank</h2><span class="sub">${rows.length} reusable movements and coaching cues.</span></div><input id="exerciseBankSearch" class="search" placeholder="Search exercises…"></div>${rows.length&&days.length?`<form id="addBankExercise" class="editor-grid bank-assign"><label>Exercise<select name="exercise_bank_id">${rows.map(exercise=>`<option value="${exercise.id}">${esc(exercise.name)}</option>`).join('')}</select></label><label>Training day<select name="program_day_id">${days.map(day=>`<option value="${day.id}">${esc(day.title)}</option>`).join('')}</select></label><label>Sets<input name="sets" type="number" min="1" value="3"></label><label>Reps<input name="reps" value="8–12"></label><label>Rest (sec)<input name="rest_seconds" type="number" min="0" value="90"></label><button class="btn primary">Add to programme</button></form>`:''}<div class="bank-grid">${rows.map(exercise=>`<article class="bank-card" data-bank-search="${esc(`${exercise.name} ${exercise.category||''} ${exercise.body_area||''}`.toLowerCase())}"><div><b>${esc(exercise.name)}</b><small>${esc(exercise.category||exercise.body_area||'Exercise')}</small></div>${exercise.video_url?`<a href="${esc(exercise.video_url)}" target="_blank" rel="noopener">Video</a>`:'<span class="muted">No video</span>'}</article>`).join('')||'<div class="empty">No reusable exercise records are available yet.</div>'}</div></section>`;
+}
 
 function sessionEditorMarkup(s){return `<form class="session-editor" data-session-editor="${s.id}"><select name="training_type"><option value="weights">Weights</option><option value="resistance">Resistance</option><option value="cardio">Cardio</option><option value="mobility">Mobility</option><option value="recovery">Recovery</option></select><input name="session_date" type="date" value="${esc(s.session_date)}"><input name="title" value="${esc(s.title)}"><input name="duration_minutes" type="number" min="0" value="${s.duration_minutes??''}" placeholder="Minutes"><button class="btn ghost small">Save</button><button class="text-btn danger" type="button" data-delete-session="${s.id}">Delete</button></form>`;}
 
 function bindTrainingSetupTools(){
   $('#copyTrainingPrompt')?.addEventListener('click',async()=>{await navigator.clipboard.writeText(trainingPrompt());toast('Training prompt copied');});
   $('#trainingJsonForm')?.addEventListener('submit',importTrainingJson); $('#activityForm')?.addEventListener('submit',addActivitySession);
+  $('#scheduleProgrammeForm')?.addEventListener('submit',scheduleProgrammeWeek);
+  $('#addBankExercise')?.addEventListener('submit',addExerciseFromBank);
+  $('#exerciseBankSearch')?.addEventListener('input',(event)=>$$('[data-bank-search]').forEach(card=>card.classList.toggle('hidden',!card.dataset.bankSearch.includes(event.target.value.toLowerCase()))));
   $$('[data-session-editor]').forEach(form=>{form.training_type.value=state.data.sessions.find(s=>s.id===form.dataset.sessionEditor)?.training_type||'weights';form.onsubmit=saveActivitySession;});
   $$('[data-delete-session]').forEach(button=>button.onclick=()=>deleteActivitySession(button.dataset.deleteSession));
+}
+
+async function addExerciseFromBank(event){
+  event.preventDefault(); const fd=new FormData(event.target), day=state.data.programs.flatMap(program=>program.days||[]).find(item=>item.id===fd.get('program_day_id')), bank=state.data.exerciseBank.find(item=>item.id===fd.get('exercise_bank_id'));
+  if(!day||!bank) return toast('Choose an exercise and training day','error');
+  const row={program_day_id:day.id,exercise_bank_id:bank.id,name:bank.name,sets:Number(fd.get('sets'))||null,reps:String(fd.get('reps')||'').trim()||null,rest_seconds:Number(fd.get('rest_seconds'))||null,video_url:bank.video_url||null,coach_instructions:bank.instructions||bank.coaching_cues||null,sort_order:(day.exercises||[]).length};
+  if(state.preview){const saved={...row,id:`preview-bank-${Date.now()}`};day.exercises.push(saved);state.data.exercises.push(saved);toast('Exercise added in preview');return coachTraining();}
+  setBusy(event.submitter,true);
+  try{const [saved]=await query('Bank exercise',db.from('program_exercises').insert(row).select());day.exercises.push(saved);state.data.exercises.push(saved);toast(`${bank.name} added to ${day.title}`);coachTraining();}
+  catch(error){toast(error.message,'error');setBusy(event.submitter,false);}
+}
+
+async function scheduleProgrammeWeek(event){
+  event.preventDefault();
+  const week=currentWeek(), program=state.data.programs.find(item=>item.id===new FormData(event.target).get('program_id'));
+  if(!week||!program) return toast('Choose a programme and current week','error');
+  const existing=new Set(state.data.sessions.filter(session=>session.week_id===week.id&&session.programme_day_id).map(session=>session.programme_day_id));
+  const start=monday(week.week_start);
+  const rows=[...(program.days||[])].sort((a,b)=>Number(a.day_index||0)-Number(b.day_index||0)).filter(day=>!existing.has(day.id)).map((day,index)=>({week_id:week.id,programme_day_id:day.id,session_date:iso(new Date(+start+Math.min(6,Math.max(0,Number(day.day_index??index)))*864e5)),training_type:day.training_type||'weights',title:day.title,notes:day.coach_notes||null,sort_order:index,status:'planned'}));
+  if(!rows.length) return toast('Every programme day is already scheduled this week');
+  if(state.preview){state.data.sessions.push(...rows.map((row,index)=>({...row,id:`preview-scheduled-${Date.now()}-${index}`})));toast(`${rows.length} sessions scheduled in preview`);return coachTraining();}
+  setBusy(event.submitter,true,'Building week…');
+  try{
+    const saved=await query('Schedule programme',db.from('training_sessions').insert(rows).select());
+    state.data.sessions.push(...saved);
+    await query('Activate programme',db.from('training_programs').update({status:'active',started_at:program.started_at||week.week_start}).eq('id',program.id).select());
+    program.status='active'; toast(`${saved.length} programme days added to the week`); coachTraining();
+  }catch(error){toast(error.message,'error');setBusy(event.submitter,false);}
 }
 
 async function importTrainingJson(event){event.preventDefault();let parsed;try{parsed=JSON.parse(new FormData(event.target).get('training_json'));if(!parsed.programme_name||!Array.isArray(parsed.days)||!parsed.days.length)throw new Error('Programme name and days are required');for(const day of parsed.days){if(!day.title)throw new Error('Every day needs a title');if(!['weights','resistance','cardio','mobility','recovery'].includes(day.training_type||'weights'))throw new Error(`Invalid category: ${day.training_type}`);}}catch(error){return toast(`Invalid JSON: ${error.message}`,'error');}if(state.preview){state.data.programs.unshift({id:`preview-program-${Date.now()}`,name:parsed.programme_name,status:'draft',days:parsed.days.map((day,i)=>({...day,id:`preview-day-${i}`,day_index:i,exercises:(day.exercises||[]).map((ex,j)=>({...ex,id:`preview-ex-${i}-${j}`,sort_order:j}))}))});toast('Programme imported in preview');return coachTraining();}setBusy(event.submitter,true);try{const [program]=await query('Programme',db.from('training_programs').insert({client_id:state.client.id,name:parsed.programme_name,status:'draft',created_by:state.user.id}).select());program.days=[];for(let i=0;i<parsed.days.length;i++){const day=parsed.days[i];const [savedDay]=await query('Training day',db.from('training_program_days').insert({program_id:program.id,title:day.title,training_type:day.training_type||'weights',day_index:i,coach_notes:day.coach_notes||null}).select());savedDay.exercises=[];for(let j=0;j<(day.exercises||[]).length;j++){const ex=day.exercises[j];const allowed=Object.fromEntries(['name','sets','reps','load','rest_seconds','tempo','rpe','rir','superset_group','video_url','coach_instructions'].filter(key=>ex[key]!=null).map(key=>[key,ex[key]]));const [saved]=await query('Exercise',db.from('program_exercises').insert({...allowed,program_day_id:savedDay.id,sort_order:j}).select());savedDay.exercises.push(saved);state.data.exercises.push(saved);}program.days.push(savedDay);}state.data.programs.unshift(program);toast('Programme imported');coachTraining();}catch(error){console.error('[training-import]',error);toast(error.message,'error');setBusy(event.submitter,false);}}
@@ -807,7 +861,7 @@ function coachNutrition() {
   const plans = state.data.nutritionPlans.filter((plan) => plan.is_active !== false);
   const selected = plans.find((plan) => plan.id === state.selectedNutritionPlanId) || plans.find((plan) => nutritionDayLabel(plan) === 'Training Day') || plans[0];
   state.selectedNutritionPlanId = selected?.id || null;
-  $('#clientWorkspaceBody').innerHTML = `<section class="nutrition-tools"><div><h2>Nutrition plan</h2><p class="muted">Edit targets, foods, quantities and preparation without leaving this page.</p></div><button class="btn gold" type="button" id="toggleNutritionImport">Import 3-day JSON</button></section>${nutritionImportPanel()}${plans.length ? `<div class="nutrition-day-tabs">${plans.map((plan) => `<button type="button" data-coach-nutrition-plan="${plan.id}" class="${plan.id === selected.id ? 'active' : ''}">${esc(nutritionDayLabel(plan))}</button>`).join('')}</div><form class="nutrition-editor" data-plan-editor="${selected.id}"><div class="editor-grid"><label>Plan name<input name="name" value="${esc(selected.name)}"></label><label>Day type<select name="day_type"><option${selected.day_type === 'Training Day' ? ' selected' : ''}>Training Day</option><option${selected.day_type === 'Rest Day' || selected.day_type === 'Non-Training Day' ? ' selected' : ''}>Rest Day</option><option${selected.day_type === 'Busy Day' ? ' selected' : ''}>Busy Day</option></select></label><label>Calories<input name="calories" type="number" min="0" value="${selected.calories ?? ''}"></label><label>Protein (g)<input name="protein_g" type="number" min="0" value="${selected.protein_g ?? ''}"></label><label>Carbs (g)<input name="carbs_g" type="number" min="0" value="${selected.carbs_g ?? ''}"></label><label>Fat (g)<input name="fat_g" type="number" min="0" value="${selected.fat_g ?? ''}"></label><label>Days/week<input name="days_per_week" type="number" min="0" max="7" value="${selected.days_per_week ?? 1}"></label><button class="btn primary small">Save targets</button></div></form><button class="btn ghost add-meal-button" type="button" id="addMeal">+ Add meal to ${esc(nutritionDayLabel(selected))}</button>${assignedMealsForPlan(selected).length ? assignedMealPlan(selected, true) : mealPlan(selected)}` : '<div class="empty">No active nutrition plan is available for this client. Use Import 3-day JSON to add it.</div>'}`;
+  $('#clientWorkspaceBody').innerHTML = `<section class="nutrition-tools"><div><h2>Nutrition plan</h2><p class="muted">Edit targets, foods, quantities and preparation without leaving this page.</p></div><button class="btn gold" type="button" id="toggleNutritionImport">Import 3-day JSON</button></section>${nutritionImportPanel()}${plans.length ? `<div class="nutrition-day-tabs">${plans.map((plan) => `<button type="button" data-coach-nutrition-plan="${plan.id}" class="${plan.id === selected.id ? 'active' : ''}">${esc(nutritionDayLabel(plan))}</button>`).join('')}</div><form class="nutrition-editor" data-plan-editor="${selected.id}"><div class="editor-grid"><label>Plan name<input name="name" value="${esc(selected.name)}"></label><label>Day type<select name="day_type"><option${selected.day_type === 'Training Day' ? ' selected' : ''}>Training Day</option><option${selected.day_type === 'Rest Day' || selected.day_type === 'Non-Training Day' ? ' selected' : ''}>Rest Day</option><option${selected.day_type === 'Busy Day' ? ' selected' : ''}>Busy Day</option></select></label><label>Calories<input name="calories" type="number" min="0" value="${selected.calories ?? ''}"></label><label>Protein (g)<input name="protein_g" type="number" min="0" value="${selected.protein_g ?? ''}"></label><label>Carbs (g)<input name="carbs_g" type="number" min="0" value="${selected.carbs_g ?? ''}"></label><label>Fat (g)<input name="fat_g" type="number" min="0" value="${selected.fat_g ?? ''}"></label><label>Days/week<input name="days_per_week" type="number" min="0" max="7" value="${selected.days_per_week ?? 1}"></label><button class="btn primary small">Save targets</button></div></form><div class="meal-build-actions"><button class="btn ghost add-meal-button" type="button" id="addMeal">+ Create new meal</button>${(state.data.mealBank||[]).length?`<form id="assignMealBank"><select name="meal_id">${state.data.mealBank.map(meal=>`<option value="${meal.id}">${esc(meal.name)}</option>`).join('')}</select><button class="btn ghost">Assign from Meal Bank</button></form>`:''}</div>${assignedMealsForPlan(selected).length ? assignedMealPlan(selected, true) : mealPlan(selected)}` : '<div class="empty">No active nutrition plan is available for this client. Use Import 3-day JSON to add it.</div>'}`;
   $('#toggleNutritionImport').onclick = () => $('#nutritionImportPanel').classList.toggle('hidden');
   $('#nutritionJsonForm').onsubmit = importNutritionJson;
   $('#copyNutritionPrompt').onclick = copyNutritionPrompt;
@@ -815,9 +869,21 @@ function coachNutrition() {
   $$('[data-plan-editor]').forEach((form) => form.onsubmit = saveNutritionTargets);
   $$('[data-edit-meal]').forEach((button) => button.onclick = () => $(`[data-meal-editor="${button.dataset.editMeal}"]`)?.classList.toggle('hidden'));
   $('#addMeal')?.addEventListener('click', () => addMealToPlan(selected));
+  $('#assignMealBank')?.addEventListener('submit',(event)=>assignMealFromBank(event,selected));
   $$('[data-duplicate-meal]').forEach((button) => button.onclick = () => duplicateMealAssignment(button.dataset.duplicateMeal, selected));
   $$('[data-delete-meal]').forEach((button) => button.onclick = () => removeMealAssignment(button.dataset.deleteMeal, selected));
   $$('[data-meal-editor]').forEach((form) => form.onsubmit = saveMeal);
+}
+
+async function assignMealFromBank(event,plan){
+  event.preventDefault(); const mealId=new FormData(event.target).get('meal_id');
+  if(state.data.mealAssignments.some(item=>item.nutrition_plan_id===plan.id&&item.meal_id===mealId)) return toast('That meal is already assigned to this day');
+  const meal=state.data.mealBank.find(item=>item.id===mealId); if(!meal) return toast('Meal not found','error');
+  const row={meal_id:mealId,client_id:state.client.id,nutrition_plan_id:plan.id,historical:false,sort_order:assignedMealsForPlan(plan).length};
+  if(state.preview){state.data.mealAssignments.push({...row,id:`preview-assignment-${Date.now()}`,meal});toast('Meal assigned in preview');return coachNutrition();}
+  setBusy(event.submitter,true);
+  try{const [saved]=await query('Meal assignment',db.from('meal_assignments').insert(row).select());state.data.mealAssignments.push({...saved,meal});toast(`${meal.name} assigned`);coachNutrition();}
+  catch(error){toast(error.message,'error');setBusy(event.submitter,false);}
 }
 
 async function addMealToPlan(plan) {
@@ -983,7 +1049,19 @@ function diagnosticCard(report) {
 }
 
 function coachDiagnostics() {
-  $('#clientWorkspaceBody').innerHTML = diagnosticsMarkup();
+  $('#clientWorkspaceBody').innerHTML = `<section class="panel diagnostic-import"><div class="panel-head"><div><span class="eyebrow">STRUCTURED IMPORT</span><h2>Add blood work or genetics report</h2><span class="sub">Paste validated JSON. Existing reports and history are preserved.</span></div></div><form id="diagnosticImportForm" class="checkin-form"><label class="field">Report JSON<textarea name="report_json" rows="8" placeholder='{"report_type":"blood_work","report_date":"2026-09-17","title":"Blood Work Review","summary":"...","data":{"markers":[],"action_nutrition":[],"action_training":[],"action_supplements":[],"action_recovery":[],"loom_url":null}}' required></textarea></label><button class="btn primary">Import report</button></form></section>${diagnosticsMarkup()}`;
+  $('#diagnosticImportForm').onsubmit=importDiagnosticReport;
+}
+
+async function importDiagnosticReport(event){
+  event.preventDefault(); let payload;
+  try{payload=JSON.parse(new FormData(event.target).get('report_json'));if(!payload||!payload.report_type||!payload.report_date||!payload.title||typeof payload.data!=='object'||Array.isArray(payload.data))throw new Error('report_type, report_date, title and a data object are required');if(payload.data.markers&&!Array.isArray(payload.data.markers))throw new Error('data.markers must be an array');}
+  catch(error){return toast(`Invalid diagnostic JSON: ${error.message}`,'error');}
+  const row={client_id:state.client.id,report_type:String(payload.report_type),report_date:payload.report_date,title:String(payload.title),summary:payload.summary?String(payload.summary):null,data:payload.data,storage_path:payload.storage_path||null};
+  if(state.preview){state.data.diagnostics.unshift({...row,id:`preview-report-${Date.now()}`});toast('Diagnostic imported in preview');return coachDiagnostics();}
+  setBusy(event.submitter,true,'Importing…');
+  try{const [saved]=await query('Diagnostic report',db.from('diagnostic_reports').insert(row).select());state.data.diagnostics.unshift(saved);toast('Diagnostic report imported');coachDiagnostics();}
+  catch(error){toast(error.message,'error');setBusy(event.submitter,false);}
 }
 
 function diagnosticsMarkup() {
@@ -1051,8 +1129,8 @@ function taskMarkup(session) {
 
 function clientPlanner() {
   const days = weekDays();
-  const scheduled = days.reduce((count, day) => count + day.sessions.length + 1, 0);
-  const completed = days.reduce((count, day) => count + day.sessions.filter((session) => session.status === 'completed').length + (Number(day.step?.actual_steps || day.step?.steps || 0) >= safeStepGoal() ? 1 : 0), 0);
+  const scheduled = days.reduce((count, day) => count + day.sessions.length + 1 + (day.nutrition ? 1 : 0), 0);
+  const completed = days.reduce((count, day) => count + day.sessions.filter((session) => session.status === 'completed').length + (Number(day.step?.actual_steps || day.step?.steps || 0) >= safeStepGoal() ? 1 : 0) + (day.nutrition?.adhered ? 1 : 0), 0);
   $('#clientMain').innerHTML = clientHeader('YOUR WEEK', 'Weekly planner', 'Training, steps, cardio, mobility and nutrition together.') + `<div class="planner-adherence"><strong>${completed}/${scheduled} completed</strong><span>${scheduled ? Math.round(completed / scheduled * 100) : 0}% adherence</span></div>${plannerCards({ interactive: true })}`;
   bindCompletionActions();
   bindOpenSessions();
@@ -1091,6 +1169,13 @@ function bindCompletionActions() {
       await query('Steps', db.from('step_entries').upsert(row, { onConflict: 'client_id,entry_date' }).select());
       toast('Steps updated');
     } catch (error) { if (old) old.actual_steps = old.steps = input.checked ? 0 : safeStepGoal(); input.checked = !input.checked; input.closest('.task')?.classList.toggle('done', input.checked); toast(error.message, 'error'); }
+  });
+  $$('[data-nutrition-complete]').forEach((input)=>input.onchange=async()=>{
+    const day=state.data.nutritionDays.find(item=>item.nutrition_date===input.dataset.nutritionComplete); if(!day)return;
+    const previous=day.adhered; day.adhered=input.checked; input.closest('.task')?.classList.toggle('done',input.checked);
+    if(state.preview)return toast('Preview updated');
+    try{await query('Nutrition completion',db.from('nutrition_days').update({adhered:input.checked}).eq('id',day.id).select());toast('Nutrition updated');}
+    catch(error){day.adhered=previous;input.checked=previous;input.closest('.task')?.classList.toggle('done',previous);toast(error.message,'error');}
   });
 }
 
@@ -1192,7 +1277,7 @@ function slider(name, label, value = 5, inverse = false) {
 
 function clientCheckin() {
   const unit = state.client.weight_unit === 'lbs' ? 'lb' : 'kg';
-  $('#clientMain').innerHTML = clientHeader('WEEKLY REVIEW', 'Check-in', `Your check-in day is ${DAYS[state.client.checkin_day ?? 5]}. Missed weeks can still be submitted.`) + `<form id="checkinForm" class="panel checkin-form quick-checkin"><div class="checkin-grid"><label class="field">Week number<input name="week_number" type="number" min="1" value="${currentWeek()?.week_number || ''}"></label><label class="field">Weight (${unit})<input name="weight_display" type="number" step="0.1"></label><label class="field">Average daily steps<input name="average_steps" type="number"></label><label class="field">Training completed %<input name="training_adherence" type="number" min="0" max="100"></label><label class="field">Nutrition adherence %<input name="nutrition_adherence" type="number" min="0" max="100"></label></div><div class="checkin-sliders">${slider('energy', 'Energy')}${slider('sleep', 'Sleep')}${slider('stress', 'Stress', 5, true)}${slider('hunger', 'Hunger', 5, true)}${slider('cravings', 'Cravings', 5, true)}</div><label class="field wide">Biggest win<textarea name="wins" rows="2"></textarea></label><label class="field wide">Main challenge or feedback<textarea name="challenges" rows="2"></textarea></label><label class="field wide">Support needed next week<textarea name="support_needed" rows="2"></textarea></label><button class="btn primary wide">Submit weekly check-in</button></form><section class="client-history"><div class="panel-head"><h2>Previous check-ins</h2><span class="pill">${state.data.checkins.length} WEEKS</span></div>${state.data.checkins.map((checkin) => checkinCard(checkin)).join('') || '<div class="empty">No previous check-ins.</div>'}</section>`;
+  $('#clientMain').innerHTML = clientHeader('WEEKLY REVIEW', 'Check-in', `Your check-in day is ${DAYS[state.client.checkin_day ?? 5]}. Missed weeks can still be submitted.`) + `<form id="checkinForm" class="panel checkin-form quick-checkin"><div class="checkin-grid"><label class="field">Week number<input name="week_number" type="number" min="1" value="${currentWeek()?.week_number || ''}"></label><label class="field">Weight (${unit})<input name="weight_display" type="number" step="0.1"></label><label class="field">Average daily steps<input name="average_steps" type="number"></label><label class="field">Training completed %<input name="training_adherence" type="number" min="0" max="100"></label><label class="field">Nutrition adherence %<input name="nutrition_adherence" type="number" min="0" max="100"></label></div><div class="checkin-sliders">${slider('energy', 'Energy')}${slider('sleep', 'Sleep')}${slider('stress', 'Stress', 5, true)}${slider('hunger', 'Hunger', 5, true)}${slider('cravings', 'Cravings', 5, true)}</div><label class="field wide">Biggest win<textarea name="wins" rows="2"></textarea></label><label class="field wide">Main challenge or feedback<textarea name="challenges" rows="2"></textarea></label><label class="field wide">Support needed next week<textarea name="support_needed" rows="2"></textarea></label><fieldset class="checkin-photos wide"><legend>Optional progress photos</legend><label>Front<input name="photo_front" type="file" accept="image/jpeg,image/png,image/webp"></label><label>Side<input name="photo_side" type="file" accept="image/jpeg,image/png,image/webp"></label><label>Back<input name="photo_back" type="file" accept="image/jpeg,image/png,image/webp"></label></fieldset><button class="btn primary wide">Submit weekly check-in</button></form><section class="client-history"><div class="panel-head"><h2>Previous check-ins</h2><span class="pill">${state.data.checkins.length} WEEKS</span></div>${state.data.checkins.map((checkin) => checkinCard(checkin)).join('') || '<div class="empty">No previous check-ins.</div>'}</section>`;
   $$('input[type="range"]').forEach((input) => input.oninput = () => $(`[data-slider-output="${input.name}"]`).textContent = input.value);
   $('#checkinForm').onsubmit = submitCheckin;
 }
@@ -1203,7 +1288,7 @@ async function submitCheckin(event) {
   const weightDisplay = Number(fd.get('weight_display') || 0);
   const row = { client_id: state.client.id, submitted_at: new Date().toISOString() };
   for (const [key, value] of fd) {
-    if (key === 'weight_display') continue;
+    if (key === 'weight_display' || key.startsWith('photo_')) continue;
     row[key] = ['week_number', 'average_steps', 'training_adherence', 'nutrition_adherence', 'energy', 'sleep', 'stress', 'hunger', 'cravings'].includes(key) ? (value === '' ? null : Number(value)) : (value || null);
   }
   if (weightDisplay) row.weight_kg = weightDisplay / (state.client.weight_unit === 'lbs' ? 2.20462 : 1);
@@ -1212,13 +1297,15 @@ async function submitCheckin(event) {
   try {
     const [saved] = await query('Check-in', db.from('checkins').insert(row).select());
     state.data.checkins.unshift(saved);
-    if (row.weight_kg) {
-      const progressRow = { client_id: state.client.id, entry_date: iso(new Date()), weight_kg: row.weight_kg, steps: row.average_steps || null, training_adherence: row.training_adherence, nutrition_adherence: row.nutrition_adherence, notes: row.wins || row.challenges || null };
+    if (row.weight_kg || row.average_steps != null || row.training_adherence != null || row.nutrition_adherence != null) {
+      const progressRow = { client_id: state.client.id, entry_date: iso(new Date()), weight_kg: row.weight_kg || null, steps: row.average_steps || null, training_adherence: row.training_adherence, nutrition_adherence: row.nutrition_adherence, notes: row.wins || row.challenges || null };
       const [progress] = await query('Progress', db.from('progress_entries').upsert(progressRow, { onConflict: 'client_id,entry_date' }).select());
       const index = state.data.progress.findIndex((entry) => entry.entry_date === progress.entry_date);
       if (index >= 0) state.data.progress[index] = progress; else state.data.progress.unshift(progress);
     }
-    toast('Check-in and progress saved');
+    const photoUploads=['front','side','back'].map(view=>({view,file:fd.get(`photo_${view}`)})).filter(item=>item.file instanceof File&&item.file.size);
+    for(const item of photoUploads) await storeProgressPhoto(item.file,item.view,row.week_number,saved.id);
+    toast(photoUploads.length ? 'Check-in, progress and photos saved' : 'Check-in and progress saved');
     clientCheckin();
   } catch (error) { toast(error.message, 'error'); }
   finally { setBusy(event.submitter, false); }
@@ -1247,14 +1334,20 @@ async function uploadProgressPhoto(event) {
   if (state.preview) return toast('Photo upload is available after sign in');
   const fd = new FormData(event.target), file = fd.get('photo'), view = fd.get('photo_view');
   const week = Number(fd.get('week_number')) || null;
-  const path = `${state.client.id}/${Date.now()}-${view}-${String(file.name).replace(/[^a-z0-9._-]/gi, '-')}`;
   setBusy(event.submitter, true, 'Uploading…');
   try {
-    const { error: uploadError } = await db.storage.from('client-files').upload(path, file, { contentType: file.type, upsert: false });
-    if (uploadError) throw uploadError;
-    const [saved] = await query('Photo record', db.from('client_files').insert({ client_id: state.client.id, uploaded_by: state.user.id, file_type: 'progress_photo', storage_path: path, original_name: file.name, mime_type: file.type, week_number: week, photo_view: view }).select());
-    state.data.files.unshift(saved); toast('Progress photo uploaded'); clientProgress();
+    await storeProgressPhoto(file,view,week); toast('Progress photo uploaded'); clientProgress();
   } catch (error) { toast(error.message, 'error'); setBusy(event.submitter, false); }
+}
+
+async function storeProgressPhoto(file,view,week,checkinId=null){
+  if(!file||!file.size) return null;
+  if(file.size>10*1024*1024) throw new Error(`${title(view)} photo is larger than 10 MB.`);
+  const path=`${state.client.id}/${Date.now()}-${view}-${String(file.name).replace(/[^a-z0-9._-]/gi,'-')}`;
+  const {error:uploadError}=await db.storage.from('client-files').upload(path,file,{contentType:file.type,upsert:false});
+  if(uploadError) throw uploadError;
+  const [saved]=await query('Photo record',db.from('client_files').insert({client_id:state.client.id,uploaded_by:state.user.id,file_type:'progress_photo',storage_path:path,original_name:file.name,mime_type:file.type,week_number:week||null,photo_view:view,notes:checkinId?`Weekly check-in ${checkinId}`:null}).select());
+  state.data.files.unshift(saved); return saved;
 }
 
 async function submitProgress(event) {

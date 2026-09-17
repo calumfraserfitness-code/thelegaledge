@@ -30,3 +30,18 @@
 .progress-photo span { color: var(--muted); font-size: 12px; }
 @media (max-width: 900px) { .week-editor { grid-template-columns: 1fr 1fr; } .week-editor .wide { grid-column: 1/-1; } }
 @media (max-width: 600px) { .week-editor { grid-template-columns: 1fr; } .week-editor .wide { grid-column: auto; } .meal-card-head { align-items: flex-start; } .meal-actions { justify-content: flex-start; } }
+.bank-panel { margin-top: 22px; }
+.bank-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(210px,1fr)); gap: 10px; }
+.bank-card { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 14px; border: 1px solid var(--line); border-radius: 12px; }
+.bank-card div { display: grid; gap: 4px; }
+.bank-card small { color: var(--muted); }
+.bank-assign { padding: 16px; margin-bottom: 18px; background: var(--soft); border-radius: 14px; }
+.meal-build-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 14px 0 20px; }
+.meal-build-actions form { display: flex; gap: 8px; flex: 1; min-width: 280px; }
+.meal-build-actions select { min-width: 0; flex: 1; }
+.checkin-photos { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+.checkin-photos legend { padding: 0 8px; font-weight: 700; }
+.checkin-photos label { display: grid; gap: 7px; font-size: 12px; font-weight: 700; color: var(--muted); }
+.planner-nutrition { display: grid; gap: 5px; margin-top: 9px; color: var(--muted); font-size: 11px; font-weight: 700; }
+.planner-nutrition select { width: 100%; padding: 8px; }
+@media (max-width: 650px) { .checkin-photos { grid-template-columns: 1fr; } .meal-build-actions form { flex-direction: column; min-width: 100%; } .bank-panel .panel-head { align-items: stretch; flex-direction: column; } }
