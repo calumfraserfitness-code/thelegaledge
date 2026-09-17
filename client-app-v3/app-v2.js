@@ -47,7 +47,7 @@ function emptyData() {
     weeks: [], sessions: [], exercises: [], programs: [], nutritionPlans: [],
     nutritionDays: [], meals: [], habits: [], habitLogs: [], steps: [],
     checkins: [], progress: [], onboarding: [], legal: [], diagnostics: [], files: [],
-    mealAssignments: [], exerciseLogs: [], exerciseBank: [], mealBank: [], healthConnections: [], healthDaily: [], healthWorkouts: []
+    mealAssignments: [], exerciseLogs: [], exerciseBank: [], mealBank: [], healthConnections: [], healthDaily: [], healthWorkouts: [], healthImports: []
   };
 }
 
@@ -139,11 +139,12 @@ async function loadClientData(clientId) {
     query('Health connections', db.from('client_health_connections').select('*').eq('client_id', clientId)),
     query('Health summaries', db.from('client_health_daily').select('*').eq('client_id', clientId).order('date', { ascending: false }).limit(90)),
     query('Imported workouts', db.from('client_health_workouts').select('*').eq('client_id', clientId).order('started_at', { ascending: false }).limit(100)),
+    query('Health imports', db.from('client_health_imports').select('*').eq('client_id', clientId).order('imported_at', { ascending: false }).limit(20)),
     state.role === 'coach' ? query('Exercise Bank', db.from('exercise_bank').select('*').order('name').limit(1000)) : Promise.resolve([]),
     state.role === 'coach' ? query('Meal Bank', db.from('meal_bank').select('*').order('name').limit(1000)) : Promise.resolve([])
   ]);
   if (state.client?.id !== clientAtStart) return;
-  const [weeks, programs, nutritionPlans, habits, steps, checkins, progress, onboarding, legal, diagnostics, files, mealAssignments, exerciseLogs, healthConnections, healthDaily, healthWorkouts, exerciseBank, mealBank] = requests;
+  const [weeks, programs, nutritionPlans, habits, steps, checkins, progress, onboarding, legal, diagnostics, files, mealAssignments, exerciseLogs, healthConnections, healthDaily, healthWorkouts, healthImports, exerciseBank, mealBank] = requests;
   let sessions = [];
   let exercises = [];
   let nutritionDays = [];
@@ -160,7 +161,7 @@ async function loadClientData(clientId) {
   if (state.client?.id !== clientAtStart) return;
   const recoveredExercises = programs.flatMap((program) => (program.days || []).flatMap((day) => day.exercises || []));
   const exerciseIndex = new Map([...recoveredExercises, ...exercises].map((exercise) => [exercise.id, exercise]));
-  state.data = { weeks, programs, nutritionPlans, habits, habitLogs: [], steps, checkins, progress, onboarding, legal, diagnostics, files, mealAssignments, exerciseLogs, exerciseBank, mealBank, healthConnections, healthDaily, healthWorkouts, sessions, exercises: [...exerciseIndex.values()], nutritionDays, meals };
+  state.data = { weeks, programs, nutritionPlans, habits, habitLogs: [], steps, checkins, progress, onboarding, legal, diagnostics, files, mealAssignments, exerciseLogs, exerciseBank, mealBank, healthConnections, healthDaily, healthWorkouts, healthImports, sessions, exercises: [...exerciseIndex.values()], nutritionDays, meals };
 }
 
 function demoData() {
@@ -382,7 +383,7 @@ function coachOverview() {
 }
 
 function preferredHealthDays() {
-  const rank = { apple_health: 1, google_health: 2, health_connect: 3, manual: 9 };
+  const rank = { apple_health: 1, health_connect: 2, fitbit: 3, google_health: 4, manual: 9 };
   const byDate = new Map();
   for (const row of state.data.healthDaily || []) {
     const current = byDate.get(row.date);
@@ -401,8 +402,55 @@ function healthSummaryMarkup() {
 }
 
 function clientHealth() {
-  const providers=[['apple_health','Apple Health','Requires the Legal Edge iOS app and HealthKit permission.'],['google_health','Google / Fitbit','Secure Google OAuth connection.'],['health_connect','Android Health Connect','Requires the Legal Edge Android app and device permission.']];
-  $('#clientMain').innerHTML=clientHeader('ACCOUNT','Connected health','Control wearable connections and see when data last synced.')+healthSummaryMarkup()+`<section class="panel connection-list">${providers.map(([id,name,help])=>{const item=(state.data.healthConnections||[]).find(c=>c.provider===id);const connected=item?.status==='connected';return `<article><div><h3>${name}</h3><p>${connected?`Connected · Last synced ${fmt(item.last_synced_at)}`:help}</p></div><span class="pill ${connected?'active':''}">${connected?'CONNECTED':'NOT CONNECTED'}</span></article>`;}).join('')}<p class="source-gap">Connections only appear as active after the provider OAuth or native HealthKit/Health Connect flow succeeds. Manual entry stays available.</p></section>`;
+  const providers=[['apple_health','Apple Health','Import an Apple Health export.xml or health CSV.'],['health_connect','Google Health Connect','Import a Health Connect CSV or JSON export.'],['fitbit','Fitbit / Pixel Watch','Import Fitbit CSV or JSON now; OAuth will activate when provider credentials are added.']];
+  const imports=state.data.healthImports||[];
+  $('#clientMain').innerHTML=clientHeader('ACCOUNT','Connected health','Bring steps, sleep, heart rate, weight and workouts into one private timeline.')+healthSummaryMarkup()+`<section class="panel health-import"><div class="panel-head"><div><span class="eyebrow">WEARABLE DATA</span><h3>Import health data</h3><span class="sub">Processed inside your signed-in account. The source file itself is not retained.</span></div></div><form id="healthImportForm" class="health-import-form"><label class="field">Source<select name="provider"><option value="apple_health">Apple Health</option><option value="health_connect">Google Health Connect</option><option value="fitbit">Fitbit / Pixel Watch</option></select></label><label class="field wide">Export file<input name="health_file" type="file" accept=".xml,.csv,.json,text/csv,application/json,text/xml" required></label><button class="btn primary wide">Import and sync</button><div id="healthImportStatus" class="form-msg wide"></div></form><details class="import-help"><summary>How to get the file</summary><p><b>Apple Health:</b> Health app → profile picture → Export All Health Data → upload <code>export.xml</code>.</p><p><b>Google Health Connect:</b> export or download your Health Connect data as CSV/JSON and upload it here.</p><p><b>Fitbit / Pixel Watch:</b> download the health data export from Fitbit/Google Takeout and upload a CSV/JSON file.</p></details></section><section class="panel connection-list"><div class="panel-head"><h3>Connections</h3></div>${providers.map(([id,name,help])=>{const item=(state.data.healthConnections||[]).find(c=>c.provider===id);const connected=item?.status==='connected';return `<article><div><h3>${name}</h3><p>${connected?`Data available · Last synced ${fmt(item.last_synced_at)}`:help}</p></div><span class="pill ${connected?'active':''}">${connected?'SYNCED':'READY TO IMPORT'}</span></article>`;}).join('')}</section><section class="panel"><div class="panel-head"><div><h3>Import history</h3><span class="sub">An audit trail without retaining the original export.</span></div></div>${imports.length?`<div class="health-import-history">${imports.map(item=>`<div><b>${esc(title(item.provider.replaceAll('_',' ')))}</b><span>${Number(item.imported_rows||0).toLocaleString()} daily records · ${fmt(item.imported_at)}</span><small>${esc(item.file_name||'Health export')} · ${item.date_from?`${fmt(item.date_from)} to ${fmt(item.date_to)}`:'No dated records'}</small></div>`).join('')}</div>`:'<div class="empty">No health files imported yet.</div>'}</section>`;
+  $('#healthImportForm').onsubmit=importHealthFile;
+}
+
+function csvRows(text) {
+  const rows=[]; let row=[], value='', quoted=false;
+  for(let i=0;i<text.length;i++){const char=text[i],next=text[i+1];if(char==='"'&&quoted&&next==='"'){value+='"';i++;}else if(char==='"'){quoted=!quoted;}else if(char===','&&!quoted){row.push(value);value='';}else if((char==='\n'||char==='\r')&&!quoted){if(char==='\r'&&next==='\n')i++;row.push(value);if(row.some(cell=>cell.trim()!==''))rows.push(row);row=[];value='';}else value+=char;}
+  row.push(value);if(row.some(cell=>cell.trim()!==''))rows.push(row);if(rows.length<2)return [];
+  const headers=rows[0].map(key=>key.trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,''));
+  return rows.slice(1).map(values=>Object.fromEntries(headers.map((key,index)=>[key,values[index]?.trim()||''])));
+}
+
+function parseHealthDate(value){if(!value)return null;const match=String(value).match(/\d{4}-\d{2}-\d{2}/);if(match)return match[0];const date=new Date(value);return Number.isNaN(date.valueOf())?null:iso(date);}
+function healthNumber(row, keys){for(const key of keys){const raw=row[key];if(raw!==undefined&&raw!==null&&raw!==''){const number=Number(String(raw).replace(/,/g,''));if(Number.isFinite(number))return number;}}return null;}
+function normalizedHealthRows(records, provider){
+  const daily=new Map();
+  for(const record of records){const date=parseHealthDate(record.date||record.day||record.start_date||record.startdate||record.start_time||record.datetime||record.date_time||record.timestamp);if(!date)continue;const current=daily.get(date)||{client_id:state.client.id,date,source:provider,source_priority:provider==='apple_health'?1:provider==='health_connect'?2:3,last_synced_at:new Date().toISOString()};
+    const steps=healthNumber(record,['steps','step_count','count']);if(steps!=null)current.steps=(current.steps||0)+Math.max(0,Math.round(steps));
+    let sleep=healthNumber(record,['sleep_minutes','minutes_asleep','asleep_minutes','sleep']);const sleepHours=healthNumber(record,['sleep_hours','hours_asleep']);if(sleep==null&&sleepHours!=null)sleep=sleepHours*60;if(sleep!=null)current.sleep_minutes=Math.max(current.sleep_minutes||0,Math.round(sleep));
+    let weight=healthNumber(record,['weight_kg','body_mass_kg','weight']);const pounds=healthNumber(record,['weight_lb','weight_lbs','body_weight_lb']);if(pounds!=null)weight=pounds/2.20462;if(weight!=null&&weight>20&&weight<400)current.weight_kg=Number(weight.toFixed(3));
+    const resting=healthNumber(record,['resting_heart_rate','resting_hr','rhr']);if(resting!=null)current.resting_heart_rate=resting;
+    const active=healthNumber(record,['active_calories','calories_out','activity_calories']);if(active!=null)current.active_calories=active;
+    let distance=healthNumber(record,['distance_km','distance']);const miles=healthNumber(record,['distance_miles','miles']);if(miles!=null)distance=miles*1.60934;if(distance!=null)current.distance_km=Number(distance.toFixed(3));
+    const hrv=healthNumber(record,['hrv_ms','heart_rate_variability','hrv']);if(hrv!=null)current.hrv_ms=hrv;daily.set(date,current);
+  }
+  return [...daily.values()];
+}
+
+function parseAppleHealthXml(text){
+  const documentNode=new DOMParser().parseFromString(text,'application/xml');if(documentNode.querySelector('parsererror'))throw new Error('That Apple Health XML file could not be read.');
+  const buckets=new Map(),get=date=>{const key=parseHealthDate(date);if(!key)return null;if(!buckets.has(key))buckets.set(key,{date:key});return buckets.get(key);};
+  documentNode.querySelectorAll('Record').forEach(node=>{const type=node.getAttribute('type')||'',value=Number(node.getAttribute('value')),unit=node.getAttribute('unit')||'',row=get(node.getAttribute('startDate'));if(!row)return;if(type.includes('SleepAnalysis')){const start=new Date(node.getAttribute('startDate')),end=new Date(node.getAttribute('endDate')),minutes=(end-start)/60000;if(Number.isFinite(minutes)&&minutes>0&&minutes<1440)row.sleep_minutes=(row.sleep_minutes||0)+minutes;return;}if(!Number.isFinite(value))return;if(type.includes('StepCount'))row.steps=(row.steps||0)+value;else if(type.includes('BodyMass'))row.weight_kg=unit.toLowerCase().includes('lb')?value/2.20462:value;else if(type.includes('RestingHeartRate'))row.resting_heart_rate=value;else if(type.includes('ActiveEnergyBurned'))row.active_calories=(row.active_calories||0)+(unit.toLowerCase().includes('kj')?value/4.184:value);else if(type.includes('DistanceWalkingRunning'))row.distance_km=(row.distance_km||0)+(unit.toLowerCase().includes('mi')?value*1.60934:value);else if(type.includes('HeartRateVariability'))row.hrv_ms=value;});
+  documentNode.querySelectorAll('Workout').forEach(()=>{});
+  return [...buckets.values()];
+}
+
+async function syncHealthProgress(rows){
+  for(const row of rows.filter(item=>item.weight_kg!=null)){const existing=state.data.progress.find(item=>item.entry_date===row.date);if(existing){await query('Health weight progress',db.from('progress_entries').update({weight_kg:row.weight_kg}).eq('id',existing.id).select());existing.weight_kg=row.weight_kg;}else{const [saved]=await query('Health weight progress',db.from('progress_entries').insert({client_id:state.client.id,entry_date:row.date,weight_kg:row.weight_kg,steps:row.steps||null,notes:`Synced from ${title(row.source.replaceAll('_',' '))}`}).select());state.data.progress.push(saved);}}
+}
+
+async function importHealthFile(event){
+  event.preventDefault();const button=event.submitter,file=event.target.health_file.files[0],provider=event.target.provider.value,status=$('#healthImportStatus');if(!file)return;setBusy(button,true);status.textContent='Reading and validating export…';
+  try{if(file.size>60*1024*1024)throw new Error('Health exports must be 60 MB or smaller.');const text=await file.text();let records=[];if(file.name.toLowerCase().endsWith('.xml')||text.trim().startsWith('<?xml'))records=parseAppleHealthXml(text);else if(file.name.toLowerCase().endsWith('.json')||['[','{'].includes(text.trim()[0])){const parsed=JSON.parse(text);records=Array.isArray(parsed)?parsed:(parsed.data||parsed.records||parsed.activities||parsed.daily||[]);}else records=csvRows(text);const rows=normalizedHealthRows(records,provider);if(!rows.length)throw new Error('No dated steps, sleep, heart-rate or weight records were found in that export.');status.textContent=`Syncing ${rows.length} daily records…`;
+    if(state.preview){state.data.healthDaily=rows;state.data.healthConnections=[{provider,status:'connected',last_synced_at:new Date().toISOString()}];toast(`${rows.length} health days imported in preview`);return clientHealth();}
+    for(let index=0;index<rows.length;index+=200)await query('Health daily import',db.from('client_health_daily').upsert(rows.slice(index,index+200),{onConflict:'client_id,date,source'}).select());await syncHealthProgress(rows);
+    const now=new Date().toISOString();const [connection]=await query('Health connection',db.from('client_health_connections').upsert({client_id:state.client.id,provider,status:'connected',scopes:['file_import'],last_synced_at:now,error_message:null,updated_at:now},{onConflict:'client_id,provider'}).select());const dates=rows.map(row=>row.date).sort();const [audit]=await query('Health import audit',db.from('client_health_imports').insert({client_id:state.client.id,provider,file_name:file.name,imported_rows:rows.length,date_from:dates[0],date_to:dates.at(-1),status:'completed'}).select());state.data.healthDaily=[...rows,...state.data.healthDaily.filter(old=>!rows.some(row=>row.date===old.date&&row.source===old.source))].sort((a,b)=>b.date.localeCompare(a.date));state.data.healthConnections=[connection,...state.data.healthConnections.filter(item=>item.provider!==provider)];state.data.healthImports=[audit,...state.data.healthImports];toast(`${rows.length} health days synced`);clientHealth();
+  }catch(error){console.error('[health-import]',error);status.textContent=error.message;toast(error.message,'error');}finally{setBusy(button,false);}
 }
 
 async function saveClientControls(event) {
@@ -1277,7 +1325,8 @@ function slider(name, label, value = 5, inverse = false) {
 
 function clientCheckin() {
   const unit = state.client.weight_unit === 'lbs' ? 'lb' : 'kg';
-  $('#clientMain').innerHTML = clientHeader('WEEKLY REVIEW', 'Check-in', `Your check-in day is ${DAYS[state.client.checkin_day ?? 5]}. Missed weeks can still be submitted.`) + `<form id="checkinForm" class="panel checkin-form quick-checkin"><div class="checkin-grid"><label class="field">Week number<input name="week_number" type="number" min="1" value="${currentWeek()?.week_number || ''}"></label><label class="field">Weight (${unit})<input name="weight_display" type="number" step="0.1"></label><label class="field">Average daily steps<input name="average_steps" type="number"></label><label class="field">Training completed %<input name="training_adherence" type="number" min="0" max="100"></label><label class="field">Nutrition adherence %<input name="nutrition_adherence" type="number" min="0" max="100"></label></div><div class="checkin-sliders">${slider('energy', 'Energy')}${slider('sleep', 'Sleep')}${slider('stress', 'Stress', 5, true)}${slider('hunger', 'Hunger', 5, true)}${slider('cravings', 'Cravings', 5, true)}</div><label class="field wide">Biggest win<textarea name="wins" rows="2"></textarea></label><label class="field wide">Main challenge or feedback<textarea name="challenges" rows="2"></textarea></label><label class="field wide">Support needed next week<textarea name="support_needed" rows="2"></textarea></label><fieldset class="checkin-photos wide"><legend>Optional progress photos</legend><label>Front<input name="photo_front" type="file" accept="image/jpeg,image/png,image/webp"></label><label>Side<input name="photo_side" type="file" accept="image/jpeg,image/png,image/webp"></label><label>Back<input name="photo_back" type="file" accept="image/jpeg,image/png,image/webp"></label></fieldset><button class="btn primary wide">Submit weekly check-in</button></form><section class="client-history"><div class="panel-head"><h2>Previous check-ins</h2><span class="pill">${state.data.checkins.length} WEEKS</span></div>${state.data.checkins.map((checkin) => checkinCard(checkin)).join('') || '<div class="empty">No previous check-ins.</div>'}</section>`;
+  const wearable=preferredHealthDays().slice(0,7), wearableSteps=wearable.map(row=>Number(row.steps)).filter(Number.isFinite), autoSteps=wearableSteps.length?Math.round(wearableSteps.reduce((sum,value)=>sum+value,0)/wearableSteps.length):'';const autoWeight=wearable.find(row=>row.weight_kg!=null)?.weight_kg;const displayAutoWeight=autoWeight?(Number(autoWeight)*(unit==='lb'?2.20462:1)).toFixed(1):'';
+  $('#clientMain').innerHTML = clientHeader('WEEKLY REVIEW', 'Check-in', `Your check-in day is ${DAYS[state.client.checkin_day ?? 5]}. Missed weeks can still be submitted.`) + `<form id="checkinForm" class="panel checkin-form quick-checkin">${wearable.length?`<div class="wearable-prefill wide"><b>Wearable data added</b><span>${wearable.length} recent days were used to prefill weight and average steps. You can edit them before submitting.</span></div>`:''}<div class="checkin-grid"><label class="field">Week number<input name="week_number" type="number" min="1" value="${currentWeek()?.week_number || ''}"></label><label class="field">Weight (${unit})<input name="weight_display" type="number" step="0.1" value="${displayAutoWeight}"></label><label class="field">Average daily steps<input name="average_steps" type="number" value="${autoSteps}"></label><label class="field">Training completed %<input name="training_adherence" type="number" min="0" max="100"></label><label class="field">Nutrition adherence %<input name="nutrition_adherence" type="number" min="0" max="100"></label></div><div class="checkin-sliders">${slider('energy', 'Energy')}${slider('sleep', 'Sleep')}${slider('stress', 'Stress', 5, true)}${slider('hunger', 'Hunger', 5, true)}${slider('cravings', 'Cravings', 5, true)}</div><label class="field wide">Biggest win<textarea name="wins" rows="2"></textarea></label><label class="field wide">Main challenge or feedback<textarea name="challenges" rows="2"></textarea></label><label class="field wide">Support needed next week<textarea name="support_needed" rows="2"></textarea></label><fieldset class="checkin-photos wide"><legend>Optional progress photos</legend><label>Front<input name="photo_front" type="file" accept="image/jpeg,image/png,image/webp"></label><label>Side<input name="photo_side" type="file" accept="image/jpeg,image/png,image/webp"></label><label>Back<input name="photo_back" type="file" accept="image/jpeg,image/png,image/webp"></label></fieldset><button class="btn primary wide">Submit weekly check-in</button></form><section class="client-history"><div class="panel-head"><h2>Previous check-ins</h2><span class="pill">${state.data.checkins.length} WEEKS</span></div>${state.data.checkins.map((checkin) => checkinCard(checkin)).join('') || '<div class="empty">No previous check-ins.</div>'}</section>`;
   $$('input[type="range"]').forEach((input) => input.oninput = () => $(`[data-slider-output="${input.name}"]`).textContent = input.value);
   $('#checkinForm').onsubmit = submitCheckin;
 }

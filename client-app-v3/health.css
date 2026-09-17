@@ -45,3 +45,16 @@
 .planner-nutrition { display: grid; gap: 5px; margin-top: 9px; color: var(--muted); font-size: 11px; font-weight: 700; }
 .planner-nutrition select { width: 100%; padding: 8px; }
 @media (max-width: 650px) { .checkin-photos { grid-template-columns: 1fr; } .meal-build-actions form { flex-direction: column; min-width: 100%; } .bank-panel .panel-head { align-items: stretch; flex-direction: column; } }
+.health-import { margin: 18px 0; }
+.health-import-form { display: grid; grid-template-columns: minmax(180px,.7fr) minmax(260px,1.5fr); gap: 14px; align-items: end; }
+.health-import-form .wide { grid-column: 1/-1; }
+.health-import-form input[type="file"] { background: var(--soft); padding: 12px; border: 1px dashed var(--line); border-radius: 10px; }
+.import-help { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--muted); }
+.import-help summary { color: var(--ink); font-weight: 700; cursor: pointer; }
+.import-help code { font-size: 12px; }
+.health-import-history { display: grid; }
+.health-import-history > div { display: grid; grid-template-columns: .7fr 1fr 1.2fr; gap: 14px; padding: 14px 0; border-bottom: 1px solid var(--line); align-items: center; }
+.health-import-history span, .health-import-history small { color: var(--muted); }
+.wearable-prefill { display: flex; flex-direction: column; gap: 4px; padding: 13px 15px; border-left: 3px solid var(--gold); background: var(--soft); }
+.wearable-prefill span { color: var(--muted); font-size: 12px; }
+@media (max-width: 650px) { .health-import-form { grid-template-columns: 1fr; } .health-import-form .wide { grid-column: auto; } .health-import-history > div { grid-template-columns: 1fr; gap: 4px; } }
