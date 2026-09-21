@@ -517,7 +517,7 @@ function plannerCards({ interactive = false, coachEdit = false } = {}) {
 
 function coachPlanner() {
   const week = currentWeek();
-  $('#clientWorkspaceBody').innerHTML = `<div class="panel-head"><div><h3>${week ? esc(week.title || `Week ${week.week_number}`) : 'Current week'}</h3><span class="sub">${week?.published ? 'Published to client' : 'Draft — client cannot see it yet'}</span></div><div class="editor-actions">${week ? `<button class="btn ghost small" id="duplicateWeek">Duplicate to next week</button><button class="btn primary small" id="publishWeek">${week.published ? 'Unpublish' : 'Publish week'}</button>` : ''}</div></div>${week ? `<form id="weekEditor" class="week-editor panel"><label>Week title<input name="title" value="${esc(week.title || `Week ${week.week_number}`)}"></label><label>Goal weight (${state.client.weight_unit === 'lbs' ? 'lb' : 'kg'})<input name="goal_weight_display" type="number" step="0.1" value="${week.goal_weight_kg ? (Number(week.goal_weight_kg) * (state.client.weight_unit === 'lbs' ? 2.20462 : 1)).toFixed(1) : ''}"></label><label class="wide">Coach note<textarea name="coach_note" rows="2">${esc(week.coach_note || '')}</textarea></label><button class="btn primary small">Save week</button></form>` : '<div class="empty">No programme week exists yet.</div>'}${plannerCards({coachEdit:true})}${state.data.sessions.length ? `<section class="panel"><div class="panel-head"><div><h3>Schedule editor</h3><span class="sub">Change a date to move an activity. Changes save without leaving the page.</span></div></div>${state.data.sessions.filter((session) => !week || session.week_id === week.id).map(sessionEditorMarkup).join('')}</section>` : ''}`;
+  $('#clientWorkspaceBody').innerHTML = `<div class="panel-head"><div><h3>${week ? esc(week.title || `Week ${week.week_number}`) : 'Current week'}</h3><span class="sub">${week?.published ? 'Published to client' : 'Draft — client cannot see it yet'}</span></div><div class="editor-actions">${week ? `<button class="btn ghost small" id="autofillNutrition">Auto-fill nutrition</button><button class="btn ghost small" id="duplicateWeek">Duplicate to next week</button><button class="btn primary small" id="publishWeek">${week.published ? 'Unpublish' : 'Publish week'}</button>` : ''}</div></div>${week ? `<form id="weekEditor" class="week-editor panel"><label>Week title<input name="title" value="${esc(week.title || `Week ${week.week_number}`)}"></label><label>Goal weight (${state.client.weight_unit === 'lbs' ? 'lb' : 'kg'})<input name="goal_weight_display" type="number" step="0.1" value="${week.goal_weight_kg ? (Number(week.goal_weight_kg) * (state.client.weight_unit === 'lbs' ? 2.20462 : 1)).toFixed(1) : ''}"></label><label class="wide">Coach note<textarea name="coach_note" rows="2">${esc(week.coach_note || '')}</textarea></label><button class="btn primary small">Save week</button></form>` : '<div class="empty">No programme week exists yet.</div>'}${plannerCards({coachEdit:true})}${state.data.sessions.length ? `<section class="panel"><div class="panel-head"><div><h3>Schedule editor</h3><span class="sub">Change a date to move an activity. Changes save without leaving the page.</span></div></div>${state.data.sessions.filter((session) => !week || session.week_id === week.id).map(sessionEditorMarkup).join('')}</section>` : ''}`;
   $('#publishWeek')?.addEventListener('click', async (event) => {
     const published = !week.published;
     week.published = published;
@@ -530,10 +530,46 @@ function coachPlanner() {
     } catch (error) { week.published = !published; toast(error.message, 'error'); setBusy(event.currentTarget, false); }
   });
   $('#weekEditor')?.addEventListener('submit', saveWeekDetails);
+  $('#autofillNutrition')?.addEventListener('click', autofillNutritionWeek);
   $('#duplicateWeek')?.addEventListener('click', duplicateCurrentWeek);
   $$('[data-session-editor]').forEach((form) => { form.training_type.value = state.data.sessions.find((session) => session.id === form.dataset.sessionEditor)?.training_type || 'weights'; form.onsubmit = savePlannerSession; });
   $$('[data-delete-session]').forEach((button) => button.onclick = () => deletePlannerSession(button.dataset.deleteSession));
   $$('[data-nutrition-date]').forEach(select=>select.onchange=()=>savePlannerNutrition(select));
+}
+
+function planForDay(day) {
+  const active = state.data.nutritionPlans.filter((plan) => plan.is_active !== false);
+  const training = active.find((plan) => /training/i.test(plan.day_type || plan.name || '') && !/non|rest/i.test(plan.day_type || plan.name || ''));
+  const rest = active.find((plan) => /rest|non[- ]?training/i.test(plan.day_type || plan.name || ''));
+  const hasGym = day.sessions.some((session) => ['weights', 'resistance'].includes(session.training_type));
+  return (hasGym ? training : rest) || training || rest || active[0] || null;
+}
+
+async function autofillNutritionWeek(event) {
+  const week = currentWeek();
+  if (!week) return toast('Create a programme week first', 'error');
+  const days = weekDays();
+  // Only fill gaps. A coach may have deliberately assigned a Busy Day (or any
+  // other plan) to an individual date, and auto-fill must never overwrite that.
+  const rows = days.map((day) => {
+    if (day.nutrition) return null;
+    const plan = planForDay(day);
+    if (!plan) return null;
+    return { week_id: week.id, nutrition_date: day.date, nutrition_plan_id: plan.id, calorie_target: plan.calories, protein_target_g: plan.protein_g, carbs_target_g: plan.carbs_g, fat_target_g: plan.fat_g, adhered: day.nutrition?.adhered || false };
+  }).filter(Boolean);
+  if (!rows.length) return toast('Add an active nutrition plan first', 'error');
+  if (state.preview) {
+    rows.forEach((row) => { state.data.nutritionDays.push({ ...row, id: `preview-nutrition-${row.nutrition_date}` }); });
+    toast('Training and rest-day nutrition assigned');
+    return coachPlanner();
+  }
+  setBusy(event.currentTarget, true, 'Assigning…');
+  try {
+    const saved = await query('Nutrition week', db.from('nutrition_days').upsert(rows, { onConflict: 'week_id,nutrition_date' }).select());
+    state.data.nutritionDays = [...state.data.nutritionDays.filter((day) => day.week_id !== week.id), ...saved];
+    toast('Training and rest-day nutrition assigned');
+    coachPlanner();
+  } catch (error) { toast(error.message, 'error'); setBusy(event.currentTarget, false); }
 }
 
 async function savePlannerNutrition(select){
@@ -1019,7 +1055,8 @@ function checkinCard(checkin, coach = false) {
 }
 
 function coachCheckins() {
-  $('#clientWorkspaceBody').innerHTML = `<div class="performance-hero"><div><span class="eyebrow">CHECK-IN HISTORY</span><h2>${state.data.checkins.length} weekly reviews</h2><span class="sub">Original answers remain attached to their submitted week.</span></div></div>${state.data.checkins.map((checkin) => checkinCard(checkin, true)).join('') || '<div class="empty">No check-ins yet.</div>'}`;
+  $('#clientWorkspaceBody').innerHTML = `<section class="panel data-entry-panel"><div class="panel-head"><div><span class="eyebrow">ADD HISTORY</span><h2>Add a weekly check-in</h2><span class="sub">Use the original date. Written answers stay attached to this exact week.</span></div></div><form id="coachCheckinForm" class="editor-grid"><label>Date<input name="submitted_date" type="date" required></label><label>Week<input name="week_number" type="number" min="1"></label><label>Weight (${state.client.weight_unit === 'lbs' ? 'lb' : 'kg'})<input name="weight_display" type="number" step="0.1"></label><label>Week score<input name="week_score" type="number" min="1" max="10"></label><label>Energy<input name="energy" type="number" min="1" max="10"></label><label>Sleep<input name="sleep" type="number" min="1" max="10"></label><label>Stress<input name="stress" type="number" min="1" max="10"></label><label>Average steps<input name="average_steps" type="number" min="0"></label><label>Training %<input name="training_adherence" type="number" min="0" max="100"></label><label>Nutrition %<input name="nutrition_adherence" type="number" min="0" max="100"></label><label class="wide">Biggest win<textarea name="wins" rows="2"></textarea></label><label class="wide">Challenge / client comments<textarea name="challenges" rows="2"></textarea></label><label class="wide">Support needed<textarea name="support_needed" rows="2"></textarea></label><label class="wide">Additional original Q&A — one per line: Question | Answer<textarea name="original_answers" rows="5" placeholder="How did training feel? | Stronger this week"></textarea></label><label class="wide">Coach response<textarea name="coach_response" rows="3"></textarea></label><label class="wide">Weekly Loom/video URL<input name="voice_note_url" type="url"></label><button class="btn primary wide">Save historical check-in</button></form></section><div class="performance-hero"><div><span class="eyebrow">CHECK-IN HISTORY</span><h2>${state.data.checkins.length} weekly reviews</h2><span class="sub">Original answers remain attached to their submitted week.</span></div></div>${state.data.checkins.map((checkin) => checkinCard(checkin, true)).join('') || '<div class="empty">No check-ins yet.</div>'}`;
+  $('#coachCheckinForm').onsubmit = addCoachCheckin;
   $$('[data-checkin-response],[data-checkin-video]').forEach((field) => field.addEventListener('change', async () => {
     if (state.preview) return toast('Preview saved');
     const id = field.dataset.checkinResponse || field.dataset.checkinVideo;
@@ -1027,6 +1064,27 @@ function coachCheckins() {
     try { await query('Check-in update', db.from('checkins').update(patch).eq('id', id).select()); toast('Check-in review saved'); }
     catch (error) { toast(error.message, 'error'); }
   }));
+}
+
+function parsedQaLines(text) {
+  return Object.fromEntries(String(text || '').split(/\n+/).map((line) => line.trim()).filter(Boolean).map((line) => {
+    const split = line.indexOf('|');
+    return split < 0 ? [line, ''] : [line.slice(0, split).trim(), line.slice(split + 1).trim()];
+  }).filter(([question]) => question));
+}
+
+async function addCoachCheckin(event) {
+  event.preventDefault(); const fd = new FormData(event.target), display = Number(fd.get('weight_display') || 0);
+  const row = { client_id: state.client.id, submitted_at: `${fd.get('submitted_date')}T12:00:00.000Z`, original_date_text: fd.get('submitted_date'), original_answers: parsedQaLines(fd.get('original_answers')) };
+  for (const key of ['week_number','week_score','energy','sleep','stress','average_steps','training_adherence','nutrition_adherence']) row[key] = fd.get(key) === '' ? null : Number(fd.get(key));
+  for (const key of ['wins','challenges','support_needed','coach_response','voice_note_url']) row[key] = String(fd.get(key) || '').trim() || null;
+  row.weight_kg = display ? display / (state.client.weight_unit === 'lbs' ? 2.20462 : 1) : null;
+  setBusy(event.submitter, true, 'Saving…');
+  try {
+    const saved = state.preview ? { ...row, id: `preview-checkin-${Date.now()}` } : (await query('Historical check-in', db.from('checkins').insert(row).select()))[0];
+    state.data.checkins.push(saved); state.data.checkins.sort((a,b)=>String(b.submitted_at).localeCompare(String(a.submitted_at)));
+    toast('Historical check-in saved to the correct week'); coachCheckins();
+  } catch (error) { toast(error.message, 'error'); setBusy(event.submitter, false); }
 }
 
 function chart(values, colour = '#b99853') {
@@ -1039,9 +1097,23 @@ function chart(values, colour = '#b99853') {
 
 function coachProgress() {
   const photos = state.data.files.filter((file) => file.file_type === 'progress_photo');
-  $('#clientWorkspaceBody').innerHTML = progressDashboardMarkup() + `<section class="panel"><div class="panel-head"><div><h3>Progress photos</h3><span class="sub">Private client uploads</span></div><span class="pill">${photos.length} PHOTOS</span></div><div class="photo-grid">${photos.map((photo) => `<article class="progress-photo" data-photo-path="${esc(photo.storage_path)}"><div class="photo-placeholder">Loading private photo…</div><b>Week ${photo.week_number || '—'} · ${title(photo.photo_view || 'photo')}</b><span>${fmt(photo.created_at)}</span></article>`).join('') || '<div class="empty">No progress photos uploaded.</div>'}</div></section>`;
+  $('#clientWorkspaceBody').innerHTML = `<section class="panel data-entry-panel"><div class="panel-head"><div><span class="eyebrow">ADD HISTORY</span><h2>Add progress entry</h2><span class="sub">Backdate weigh-ins, measurements, steps and adherence.</span></div></div><form id="coachProgressForm" class="editor-grid"><label>Date<input name="entry_date" type="date" required></label><label>Weight (${state.client.weight_unit === 'lbs' ? 'lb' : 'kg'})<input name="weight_display" type="number" step="0.1"></label><label>Waist (cm)<input name="waist_cm" type="number" step="0.1"></label><label>Chest (cm)<input name="chest_cm" type="number" step="0.1"></label><label>Hips (cm)<input name="hips_cm" type="number" step="0.1"></label><label>Arm (cm)<input name="arm_cm" type="number" step="0.1"></label><label>Thigh (cm)<input name="thigh_cm" type="number" step="0.1"></label><label>Average steps<input name="steps" type="number" min="0"></label><label>Training %<input name="training_adherence" type="number" min="0" max="100"></label><label>Nutrition %<input name="nutrition_adherence" type="number" min="0" max="100"></label><label class="wide">Notes<textarea name="notes" rows="2"></textarea></label><button class="btn primary wide">Save progress entry</button></form></section>` + progressDashboardMarkup() + `<section class="panel"><div class="panel-head"><div><h3>Progress photos</h3><span class="sub">Private client uploads</span></div><span class="pill">${photos.length} PHOTOS</span></div><div class="photo-grid">${photos.map((photo) => `<article class="progress-photo" data-photo-path="${esc(photo.storage_path)}"><div class="photo-placeholder">Loading private photo…</div><b>Week ${photo.week_number || '—'} · ${title(photo.photo_view || 'photo')}</b><span>${fmt(photo.created_at)}</span></article>`).join('') || '<div class="empty">No progress photos uploaded.</div>'}</div></section>`;
+  $('#coachProgressForm').onsubmit = addCoachProgress;
   bindProgressRange(coachProgress);
   hydrateProgressPhotos();
+}
+
+async function addCoachProgress(event) {
+  event.preventDefault(); const fd = new FormData(event.target), display = Number(fd.get('weight_display') || 0);
+  const row = { client_id: state.client.id, entry_date: fd.get('entry_date'), weight_kg: display ? display / (state.client.weight_unit === 'lbs' ? 2.20462 : 1) : null };
+  for (const key of ['waist_cm','chest_cm','hips_cm','arm_cm','thigh_cm','steps','training_adherence','nutrition_adherence']) row[key] = fd.get(key) === '' ? null : Number(fd.get(key));
+  row.notes = String(fd.get('notes') || '').trim() || null;
+  setBusy(event.submitter, true, 'Saving…');
+  try {
+    const saved = state.preview ? { ...row, id: `preview-progress-${Date.now()}` } : (await query('Progress history', db.from('progress_entries').upsert(row,{onConflict:'client_id,entry_date'}).select()))[0];
+    const old = state.data.progress.findIndex((item) => item.entry_date === saved.entry_date); if (old >= 0) state.data.progress[old] = saved; else state.data.progress.push(saved);
+    toast('Progress history saved'); coachProgress();
+  } catch (error) { toast(error.message, 'error'); setBusy(event.submitter, false); }
 }
 
 function progressData() {
@@ -1081,11 +1153,32 @@ function responseTree(value) {
 
 function coachOnboarding() {
   const record = state.data.onboarding[0];
-  $('#clientWorkspaceBody').innerHTML = record ? `<section class="panel"><div class="panel-head"><div><h2>Onboarding responses</h2><span class="sub">Submitted ${fmt(record.submitted_at || record.created_at)}</span></div></div>${responseTree(record.responses)}</section>` : '<div class="empty">No onboarding record is available.</div>';
+  const value = JSON.stringify(record?.responses || { sections: { training: {}, nutrition: {}, lifestyle: {} } }, null, 2);
+  $('#clientWorkspaceBody').innerHTML = `<section class="panel data-entry-panel"><div class="panel-head"><div><span class="eyebrow">STRUCTURED RECORD</span><h2>${record ? 'Edit' : 'Add'} onboarding</h2><span class="sub">Preserve the original question and answer structure. Do not invent missing answers.</span></div></div><form id="onboardingEditor"><label class="field">Onboarding JSON<textarea name="responses" rows="18" required>${esc(value)}</textarea></label><button class="btn primary">Save onboarding record</button></form></section>${record ? `<section class="panel"><div class="panel-head"><div><h2>Onboarding responses</h2><span class="sub">Submitted ${fmt(record.submitted_at || record.created_at)}</span></div></div>${responseTree(record.responses)}</section>` : '<div class="empty">No onboarding record is available yet.</div>'}`;
+  $('#onboardingEditor').onsubmit = saveCoachOnboarding;
+}
+
+async function saveCoachOnboarding(event) {
+  event.preventDefault(); let responses; try { responses = JSON.parse(new FormData(event.target).get('responses')); } catch (error) { return toast(`Invalid onboarding JSON: ${error.message}`, 'error'); }
+  const existing = state.data.onboarding[0], row = { client_id: state.client.id, version: existing?.version || 2, submitted_at: existing?.submitted_at || new Date().toISOString(), completed_at: new Date().toISOString(), responses };
+  setBusy(event.submitter, true, 'Saving…');
+  try {
+    const saved = state.preview ? { ...row, id: existing?.id || `preview-onboarding-${Date.now()}` } : (await query('Onboarding record', existing ? db.from('onboarding_responses').update(row).eq('id', existing.id).select() : db.from('onboarding_responses').insert(row).select()))[0];
+    state.data.onboarding = [saved]; toast('Onboarding record saved'); coachOnboarding();
+  } catch (error) { toast(error.message, 'error'); setBusy(event.submitter, false); }
 }
 
 function coachLegal() {
-  $('#clientWorkspaceBody').innerHTML = state.data.legal.length ? state.data.legal.map((record) => `<section class="panel"><div class="panel-head"><div><h2>Consent record</h2><span class="sub">${fmt(record.signed_at || record.accepted_at || record.created_at)}</span></div><span class="pill">RECORDED</span></div><div class="detail-list">${Object.entries(record).filter(([key, value]) => !['id', 'client_id', 'created_at'].includes(key) && value != null && value !== '').map(([key, value]) => `<div class="detail"><label>${esc(title(key.replaceAll('_', ' ')))}</label>${esc(humanValue(value))}</div>`).join('')}</div></section>`).join('') : '<div class="empty">No legal or consent record is available.</div>';
+  $('#clientWorkspaceBody').innerHTML = `<section class="panel data-entry-panel"><div class="panel-head"><div><span class="eyebrow">LEGAL HISTORY</span><h2>Add consent or agreement record</h2><span class="sub">Keep legal records separate from coaching notes.</span></div></div><form id="legalRecordForm" class="editor-grid"><label>Document name<input name="document_name" required></label><label>Consent type<input name="consent_type" value="coaching_agreement" required></label><label>Version<input name="document_version" value="legacy" required></label><label>Accepted date<input name="accepted_date" type="date" required></label><label class="wide">Signature / accepted by<input name="signature_name"></label><label class="wide">Visible details JSON<textarea name="details" rows="6" placeholder='{"status":"accepted","source":"legacy app"}'>{}</textarea></label><button class="btn primary wide">Save legal record</button></form></section>${state.data.legal.length ? state.data.legal.map((record) => `<section class="panel"><div class="panel-head"><div><h2>${esc(record.document_name || 'Consent record')}</h2><span class="sub">${fmt(record.signed_at || record.accepted_at || record.created_at)}</span></div><span class="pill">RECORDED</span></div><div class="detail-list">${Object.entries(record).filter(([key, value]) => !['id', 'client_id', 'created_at'].includes(key) && value != null && value !== '').map(([key, value]) => `<div class="detail"><label>${esc(title(key.replaceAll('_', ' ')))}</label>${esc(humanValue(value))}</div>`).join('')}</div></section>`).join('') : '<div class="empty">No legal or consent record is available.</div>'}`;
+  $('#legalRecordForm').onsubmit = addCoachLegalRecord;
+}
+
+async function addCoachLegalRecord(event) {
+  event.preventDefault(); const fd = new FormData(event.target); let details; try { details = JSON.parse(fd.get('details') || '{}'); } catch (error) { return toast(`Invalid details JSON: ${error.message}`, 'error'); }
+  const accepted = `${fd.get('accepted_date')}T12:00:00.000Z`, row = { client_id: state.client.id, document_name: String(fd.get('document_name')).trim(), consent_type: String(fd.get('consent_type')).trim(), document_version: String(fd.get('document_version')).trim(), accepted_at: accepted, signed_at: accepted, signature_name: String(fd.get('signature_name') || '').trim() || null, details };
+  setBusy(event.submitter, true, 'Saving…');
+  try { const saved = state.preview ? { ...row, id: `preview-legal-${Date.now()}` } : (await query('Legal record', db.from('legal_consents').insert(row).select()))[0]; state.data.legal.unshift(saved); toast('Legal record saved'); coachLegal(); }
+  catch (error) { toast(error.message, 'error'); setBusy(event.submitter, false); }
 }
 
 function diagnosticCard(report) {
