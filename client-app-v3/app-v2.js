@@ -102,7 +102,8 @@ function currentWeek() {
 }
 
 function safeStepGoal(client = state.client) {
-  return Math.max(8000, Number(client?.daily_steps_goal || 0));
+  const goal = Number(client?.daily_steps_goal);
+  return Number.isFinite(goal) && goal > 0 ? goal : 8000;
 }
 function normalizeClient(client){return {...client,display_name:client.display_name||client.profile?.full_name||'Unnamed client',daily_steps_goal:safeStepGoal(client)};}
 
@@ -310,7 +311,7 @@ function bindAddClient() { $$('[data-add-client]').forEach((button) => button.on
 
 function showAddClient() {
   const modal = document.createElement('div'); modal.className='modal-backdrop';
-  modal.innerHTML=`<section class="modal-card"><div class="panel-head"><div><span class="eyebrow">5-MINUTE SETUP</span><h2>Add a client</h2></div><button class="icon-btn" data-close-modal>✕</button></div><form id="addClientForm" class="editor-grid"><label>Full name<input name="full_name" required></label><label>Email<input name="email" type="email" required></label><label>Phone<input name="phone" type="tel"></label><label>Temporary password<input name="password" type="password" minlength="8" required></label><label>Region<select name="market_region"><option value="us">United States · lb/oz</option><option value="ireland">Ireland · kg/g</option><option value="uk">United Kingdom</option><option value="other">Other</option></select></label><label>Check-in day<select name="checkin_day">${DAYS.map((day,index)=>`<option value="${index}" ${index===5?'selected':''}>${day}</option>`).join('')}</select></label><label>Daily steps<input name="daily_steps_goal" type="number" min="8000" step="500" value="8000"></label><label class="wide">Goals<textarea name="goal_summary" rows="3" required></textarea></label><label class="toggle-field"><input name="cardio_enabled" type="checkbox"> Cardio required</label><label class="toggle-field"><input name="mobility_enabled" type="checkbox" checked> Mobility required</label><p class="wide muted">The client must accept legal/privacy terms and complete onboarding before their plan unlocks.</p><button class="btn primary wide">Create secure client login</button></form></section>`;
+  modal.innerHTML=`<section class="modal-card"><div class="panel-head"><div><span class="eyebrow">5-MINUTE SETUP</span><h2>Add a client</h2></div><button class="icon-btn" data-close-modal>✕</button></div><form id="addClientForm" class="editor-grid"><label>Full name<input name="full_name" required></label><label>Email<input name="email" type="email" required></label><label>Phone<input name="phone" type="tel"></label><label>Temporary password<input name="password" type="password" minlength="8" required></label><label>Region<select name="market_region"><option value="us">United States · lb/oz</option><option value="ireland">Ireland · kg/g</option><option value="uk">United Kingdom</option><option value="other">Other</option></select></label><label>Check-in day<select name="checkin_day">${DAYS.map((day,index)=>`<option value="${index}" ${index===5?'selected':''}>${day}</option>`).join('')}</select></label><label>Daily steps<input name="daily_steps_goal" type="number" min="1" step="1" value="8000"></label><label class="wide">Goals<textarea name="goal_summary" rows="3" required></textarea></label><label class="toggle-field"><input name="cardio_enabled" type="checkbox"> Cardio required</label><label class="toggle-field"><input name="mobility_enabled" type="checkbox" checked> Mobility required</label><p class="wide muted">The client must accept legal/privacy terms and complete onboarding before their plan unlocks.</p><button class="btn primary wide">Create secure client login</button></form></section>`;
   document.body.append(modal); modal.querySelector('[data-close-modal]').onclick=()=>modal.remove(); modal.onclick=(e)=>{if(e.target===modal)modal.remove();}; modal.querySelector('form').onsubmit=createClientAccount;
 }
 
@@ -370,7 +371,7 @@ function coachOverview() {
     <form id="clientSettings" class="checkin-form">
       <label class="field">Status<select name="status"><option value="active">Active</option><option value="inactive">Past client</option><option value="archived">Archived</option></select></label>
       <label class="field">Check-in day<select name="checkin_day">${DAYS.map((day, index) => `<option value="${index}">${day}</option>`).join('')}</select></label>
-      <label class="field">Daily steps<input name="daily_steps_goal" type="number" min="8000" step="500" value="${safeStepGoal()}"></label>
+      <label class="field">Daily steps<input name="daily_steps_goal" type="number" min="1" step="1" value="${safeStepGoal()}"></label>
       <label class="field">Goal weight (${client.weight_unit === 'lbs' ? 'lb' : 'kg'})<input name="goal_weight_display" type="number" step="0.1" value="${client.goal_weight_kg ? (Number(client.goal_weight_kg) * (client.weight_unit === 'lbs' ? 2.20462 : 1)).toFixed(1) : ''}"></label>
       <label class="field"><input name="track_weight" type="checkbox" ${client.track_weight !== false ? 'checked' : ''}> Track weight</label>
       <label class="field"><input name="cardio_enabled" type="checkbox" ${client.cardio_enabled !== false ? 'checked' : ''}> Cardio enabled</label>
@@ -468,7 +469,7 @@ async function saveClientControls(event) {
   const changes = {
     status: fd.get('status'),
     checkin_day: Number(fd.get('checkin_day')),
-    daily_steps_goal: Math.max(8000, Number(fd.get('daily_steps_goal') || 8000)),
+    daily_steps_goal: Number(fd.get('daily_steps_goal')) > 0 ? Number(fd.get('daily_steps_goal')) : 8000,
     goal_weight_kg: displayGoal ? displayGoal / (state.client.weight_unit === 'lbs' ? 2.20462 : 1) : null,
     track_weight: fd.has('track_weight'),
     cardio_enabled: fd.has('cardio_enabled'),
@@ -673,9 +674,45 @@ function trainingPrompt() {
   return `Build a scientific, practical training programme for ${state.client.display_name}, a busy legal professional. Use only the onboarding below. Do not invent injuries, equipment or availability. Return JSON only using this schema:\n{"programme_name":"12 Week Programme","days":[{"title":"Upper 1","training_type":"weights","coach_notes":"","exercises":[{"name":"Incline dumbbell press","sets":3,"reps":"6-10","rest_seconds":120,"tempo":"3-0-1","rpe":8,"rir":2,"superset_group":null,"video_url":null,"coach_instructions":""}]}]}\nValid training_type values: weights, resistance, cardio, mobility, recovery. Include mobility/cardio only when appropriate.\n\nONBOARDING:\n${onboarding}`;
 }
 
+function parsePastedPlanJson(value) {
+  let input = String(value ?? '').replace(/^\uFEFF/, '').trim();
+  if (input.length > 1024 * 1024) throw new Error('The plan is too large. Paste JSON under 1 MB.');
+  const fenced = input.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  if (fenced) input = fenced[1].trim();
+  if (!input.startsWith('{')) throw new Error('Paste the complete JSON object. Remove any explanation before or after it.');
+  try { return JSON.parse(input); }
+  catch (error) { throw new Error(`The JSON has a formatting error: ${error.message}`); }
+}
+
+function validateTrainingPlan(plan) {
+  if (!plan || typeof plan !== 'object' || Array.isArray(plan) || !String(plan.programme_name || '').trim() || !Array.isArray(plan.days) || !plan.days.length)
+    throw new Error('Add a programme_name and at least one day.');
+  if (plan.days.length > 14) throw new Error('A programme can have at most 14 days.');
+  plan.days.forEach((day, dayIndex) => {
+    const label = `Day ${dayIndex + 1}`;
+    if (!day || typeof day !== 'object' || !String(day.title || '').trim()) throw new Error(`${label} needs a title.`);
+    if (!['weights', 'resistance', 'cardio', 'mobility', 'recovery'].includes(day.training_type || 'weights'))
+      throw new Error(`${label} has an invalid training_type.`);
+    if (day.exercises != null && !Array.isArray(day.exercises)) throw new Error(`${label}: exercises must be a list.`);
+    if (['weights', 'resistance'].includes(day.training_type || 'weights') && !day.exercises?.length)
+      throw new Error(`${label}: add at least one prescribed exercise.`);
+    (day.exercises || []).forEach((exercise, index) => {
+      const location = `${label}, exercise ${index + 1}`;
+      if (!exercise || !String(exercise.name || '').trim()) throw new Error(`${location} needs a name.`);
+      if (exercise.sets != null && (!Number.isInteger(Number(exercise.sets)) || Number(exercise.sets) < 1))
+        throw new Error(`${location}: sets must be a positive whole number.`);
+      if (exercise.rest_seconds != null && (!Number.isFinite(Number(exercise.rest_seconds)) || Number(exercise.rest_seconds) < 0))
+        throw new Error(`${location}: rest_seconds must be zero or more.`);
+      if (exercise.video_url && !/^https:\/\//i.test(String(exercise.video_url)))
+        throw new Error(`${location}: video_url must be an HTTPS link.`);
+    });
+  });
+  return plan;
+}
+
 function trainingSetupTools(){
   const week=currentWeek(), programs=state.data.programs.filter(program=>program.status!=='archived');
-  return `<section class="panel fast-builder"><div class="panel-head"><div><span class="eyebrow">FAST BUILD</span><h2>Programme setup</h2><p class="muted">Import once, edit every field, then place the programme into the current week.</p></div><button class="btn ghost small" id="copyTrainingPrompt">Copy AI prompt</button></div><form id="trainingJsonForm"><label class="field">Programme JSON<textarea name="training_json" rows="7" placeholder='{"programme_name":"...","days":[...]}' required></textarea></label><button class="btn primary">Import programme</button></form>${week&&programs.length?`<hr><form id="scheduleProgrammeForm" class="editor-grid"><label class="wide">Programme<select name="program_id">${programs.map(program=>`<option value="${program.id}">${esc(program.name)}</option>`).join('')}</select></label><p class="wide muted">Creates one scheduled session per programme day, starting Monday. Existing linked sessions are not duplicated.</p><button class="btn gold wide">Build current week from programme</button></form>`:''}<hr><form id="activityForm" class="editor-grid"><label>Activity<select name="training_type"><option value="cardio">Cardio</option><option value="mobility">Mobility</option><option value="recovery">Recovery</option><option value="weights">Weights</option></select></label><label>Date<input name="session_date" type="date" value="${iso(new Date())}" required></label><label>Title<input name="title" placeholder="e.g. Zone 2 bike" required></label><label>Duration (min)<input name="duration_minutes" type="number" min="0"></label><label class="wide">Instructions<textarea name="notes" rows="2"></textarea></label><button class="btn primary wide" ${week?'':'disabled'}>Add to current week</button></form>${state.data.sessions.map(sessionEditorMarkup).join('')}</section>${exerciseBankMarkup()}`;
+  return `<section class="panel fast-builder"><div class="panel-head"><div><span class="eyebrow">FAST BUILD</span><h2>Programme setup</h2><p class="muted">Import once, edit every field, then place the programme into the current week.</p></div><button class="btn ghost small" id="copyTrainingPrompt">Copy AI prompt</button></div><form id="trainingJsonForm"><label class="field">Programme JSON<textarea name="training_json" rows="7" placeholder='{"programme_name":"...","days":[...]}' required></textarea></label><p id="trainingImportError" class="form-msg" role="alert" hidden></p><button class="btn primary">Import programme</button></form>${week&&programs.length?`<hr><form id="scheduleProgrammeForm" class="editor-grid"><label class="wide">Programme<select name="program_id">${programs.map(program=>`<option value="${program.id}">${esc(program.name)}</option>`).join('')}</select></label><p class="wide muted">Creates one scheduled session per programme day, starting Monday. Existing linked sessions are not duplicated.</p><button class="btn gold wide">Build current week from programme</button></form>`:''}<hr><form id="activityForm" class="editor-grid"><label>Activity<select name="training_type"><option value="cardio">Cardio</option><option value="mobility">Mobility</option><option value="recovery">Recovery</option><option value="weights">Weights</option></select></label><label>Date<input name="session_date" type="date" value="${iso(new Date())}" required></label><label>Title<input name="title" placeholder="e.g. Zone 2 bike" required></label><label>Duration (min)<input name="duration_minutes" type="number" min="0"></label><label class="wide">Instructions<textarea name="notes" rows="2"></textarea></label><button class="btn primary wide" ${week?'':'disabled'}>Add to current week</button></form>${state.data.sessions.map(sessionEditorMarkup).join('')}</section>${exerciseBankMarkup()}`;
 }
 
 function exerciseBankMarkup(){
@@ -723,7 +760,7 @@ async function scheduleProgrammeWeek(event){
   }catch(error){toast(error.message,'error');setBusy(event.submitter,false);}
 }
 
-async function importTrainingJson(event){event.preventDefault();let parsed;try{parsed=JSON.parse(new FormData(event.target).get('training_json'));if(!parsed.programme_name||!Array.isArray(parsed.days)||!parsed.days.length)throw new Error('Programme name and days are required');for(const day of parsed.days){if(!day.title)throw new Error('Every day needs a title');if(!['weights','resistance','cardio','mobility','recovery'].includes(day.training_type||'weights'))throw new Error(`Invalid category: ${day.training_type}`);}}catch(error){return toast(`Invalid JSON: ${error.message}`,'error');}if(state.preview){state.data.programs.unshift({id:`preview-program-${Date.now()}`,name:parsed.programme_name,status:'draft',days:parsed.days.map((day,i)=>({...day,id:`preview-day-${i}`,day_index:i,exercises:(day.exercises||[]).map((ex,j)=>({...ex,id:`preview-ex-${i}-${j}`,sort_order:j}))}))});toast('Programme imported in preview');return coachTraining();}setBusy(event.submitter,true);try{const [program]=await query('Programme',db.from('training_programs').insert({client_id:state.client.id,name:parsed.programme_name,status:'draft',created_by:state.user.id}).select());program.days=[];for(let i=0;i<parsed.days.length;i++){const day=parsed.days[i];const [savedDay]=await query('Training day',db.from('training_program_days').insert({program_id:program.id,title:day.title,training_type:day.training_type||'weights',day_index:i,coach_notes:day.coach_notes||null}).select());savedDay.exercises=[];for(let j=0;j<(day.exercises||[]).length;j++){const ex=day.exercises[j];const allowed=Object.fromEntries(['name','sets','reps','load','rest_seconds','tempo','rpe','rir','superset_group','video_url','coach_instructions'].filter(key=>ex[key]!=null).map(key=>[key,ex[key]]));const [saved]=await query('Exercise',db.from('program_exercises').insert({...allowed,program_day_id:savedDay.id,sort_order:j}).select());savedDay.exercises.push(saved);state.data.exercises.push(saved);}program.days.push(savedDay);}state.data.programs.unshift(program);toast('Programme imported');coachTraining();}catch(error){console.error('[training-import]',error);toast(error.message,'error');setBusy(event.submitter,false);}}
+async function importTrainingJson(event){event.preventDefault();let parsed;try{parsed=validateTrainingPlan(parsePastedPlanJson(new FormData(event.target).get('training_json')));}catch(error){const message=`Invalid programme: ${error.message}`;const panel=$('#trainingImportError');if(panel){panel.textContent=message;panel.hidden=false;}return toast(message,'error');}$('#trainingImportError').hidden=true;if(state.preview){state.data.programs.unshift({id:`preview-program-${Date.now()}`,name:parsed.programme_name,status:'draft',days:parsed.days.map((day,i)=>({...day,id:`preview-day-${i}`,day_index:i,exercises:(day.exercises||[]).map((ex,j)=>({...ex,id:`preview-ex-${i}-${j}`,sort_order:j}))}))});toast('Programme imported in preview');return coachTraining();}setBusy(event.submitter,true);try{const [program]=await query('Programme',db.from('training_programs').insert({client_id:state.client.id,name:parsed.programme_name,status:'draft',created_by:state.user.id}).select());program.days=[];for(let i=0;i<parsed.days.length;i++){const day=parsed.days[i];const [savedDay]=await query('Training day',db.from('training_program_days').insert({program_id:program.id,title:day.title,training_type:day.training_type||'weights',day_index:i,coach_notes:day.coach_notes||null}).select());savedDay.exercises=[];for(let j=0;j<(day.exercises||[]).length;j++){const ex=day.exercises[j];const allowed=Object.fromEntries(['name','sets','reps','load','rest_seconds','tempo','rpe','rir','superset_group','video_url','coach_instructions'].filter(key=>ex[key]!=null).map(key=>[key,ex[key]]));const [saved]=await query('Exercise',db.from('program_exercises').insert({...allowed,program_day_id:savedDay.id,sort_order:j}).select());savedDay.exercises.push(saved);state.data.exercises.push(saved);}program.days.push(savedDay);}state.data.programs.unshift(program);toast('Programme imported');coachTraining();}catch(error){console.error('[training-import]',error);toast(error.message,'error');setBusy(event.submitter,false);}}
 
 async function addActivitySession(event){event.preventDefault();const week=currentWeek(),fd=new FormData(event.target);if(!week)return toast('Create a programme week first','error');const row={week_id:week.id,training_type:fd.get('training_type'),session_date:fd.get('session_date'),title:String(fd.get('title')).trim(),duration_minutes:Number(fd.get('duration_minutes'))||null,notes:String(fd.get('notes')||'').trim()||null};if(state.preview){state.data.sessions.push({...row,id:`preview-session-${Date.now()}`,status:'planned'});toast('Activity added in preview');return coachTraining();}try{const [saved]=await query('Activity',db.from('training_sessions').insert(row).select());state.data.sessions.push(saved);toast('Activity added');coachTraining();}catch(error){console.error('[activity-add]',error);toast(error.message,'error');}}
 async function saveActivitySession(event){event.preventDefault();const fd=new FormData(event.target),id=event.target.dataset.sessionEditor;const patch={training_type:fd.get('training_type'),session_date:fd.get('session_date'),title:String(fd.get('title')).trim(),duration_minutes:Number(fd.get('duration_minutes'))||null};if(state.preview){Object.assign(state.data.sessions.find(s=>s.id===id),patch);toast('Activity saved in preview');return;}try{await query('Activity',db.from('training_sessions').update(patch).eq('id',id).select());Object.assign(state.data.sessions.find(s=>s.id===id),patch);toast('Activity saved');}catch(error){console.error('[activity-save]',error);toast(error.message,'error');}}
@@ -911,7 +948,7 @@ function nutritionImportPreview(payload) {
 async function importNutritionJson(event) {
   event.preventDefault();
   let payload;
-  try { payload = validateNutritionImport(JSON.parse(new FormData(event.target).get('nutrition_json'))); }
+  try { payload = validateNutritionImport(parsePastedPlanJson(new FormData(event.target).get('nutrition_json'))); }
   catch (error) { return toast(error.message || 'Invalid JSON', 'error'); }
   state.pendingNutritionImport = payload;
   $('#nutritionImportPreview')?.remove();

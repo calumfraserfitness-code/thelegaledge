@@ -1,6 +1,57 @@
 # The Legal Edge Client App — Persistent Project State
 
-Last updated: 21 September 2026
+Last updated: 28 September 2026
+
+## 28 September recovery checkpoint
+
+- Repository `main` was clean at `c3f2901` before this checkpoint. No local
+  uncommitted work existed in the fresh checkout. Its source build marker was
+  `2026.09.19.1`.
+- The existing Supabase project is `ACTIVE_HEALTHY` on Postgres 17. Public
+  tables reported RLS enabled and policies present. This is a schema inspection,
+  not an authenticated cross-client access test. Applied migration history runs
+  through `20260918161526_combine_historical_insert_policies`; four Edge
+  Functions (`provision-client`, `fitbit-connect`, `fitbit-callback`, `fitbit-sync`)
+  are active. No migration or database write was performed in this checkpoint.
+- Read-only counts on 28 September: 13 clients (6 active, 1 ending, 1 inactive,
+  5 past); 113 check-ins; 76 progress entries; 13 onboarding responses;
+  13 legal consents; 13 training programmes, 63 programme days and 217
+  prescription exercises; 3 exercise set logs; 33 nutrition plans,
+  111 Meal Bank entries and 141 meal assignments; 11 diagnostic reports.
+  All clients have a programme and onboarding record; two have no nutrition
+  plan. These counts do not establish completeness against the old app.
+- First reversible UI fix: respect a saved positive `daily_steps_goal` below
+  8,000 throughout planner/completion displays and coach controls. 8,000 is a
+  fallback for a missing/invalid target. Removed the coach's prefilled sign-in
+  email. Source build marker and script cache key are now `2026.09.28.1`.
+- Local checks: `node --check client-app-v3/app-v2.js` and `git diff --check`
+  passed. No authenticated UI → database → reload test was possible here.
+- The signed-in Vercel dashboard shows `legal-edge-client-app` ready in
+  production, deployed 18 September 2026 via `vercel deploy`. The deployment's
+  `index.html` shows build `2026.09.18.1`. Vercel says `Connect Git`; this
+  project currently has no Git repository link. The Vercel connector separately
+  returned 403 for scope `calumfraser13cf-5687`, and the production URL
+  redirects unauthenticated requests to Vercel SSO. Production coach/client
+  flows and mobile views remain unverified. Reauthorize the connector for this
+  workspace or establish the approved deployment path, then obtain safe coach
+  and test-client sessions for role-appropriate end-to-end checks.
+- Priority next checkpoint: verify live source/build and authenticated writes,
+  then produce a per-client source-completeness matrix for nutrition, training
+  and check-ins before changing import or corporate features. Preserve old
+  source records and do not fill gaps with generated historical data.
+
+### Local follow-up: plan import parsing
+
+- Build marker `2026.09.28.2` is local only. Training and Nutrition import now
+  accept a complete JSON object wrapped in a Markdown `json` code fence,
+  reject unrelated prose and over-1-MB input with specific messages, and
+  training validates day categories and exercise prescriptions before writes.
+  The training import form keeps an error visible rather than relying only on
+  a brief toast. Existing import writes remain non-atomic and have not passed
+  an authenticated persistence test; do not describe this as a completed
+  publish/versioning workflow.
+- `node --check`, `git diff --check` and five focused parser/validator cases
+  passed locally. No production deployment or database write occurred.
 
 ## Project identity
 
