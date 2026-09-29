@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="./health.css">
   <link rel="stylesheet" href="./firm-pilots.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4" defer></script>
-  <script src="./app-v2.js?v=20260929-3" defer></script>
+  <script src="./app-v2.js?v=20260929-4" defer></script>
   <script src="./firm-pilots.js?v=20260929-2" defer></script>
 </head>
 <body>
@@ -30,6 +30,17 @@
       <div class="preview-separator"><span>INTERACTIVE APP PREVIEW · BUILD 2026.09.29.3</span></div>
       <button class="btn ghost" id="coachPreviewBtn" type="button">Open coach preview</button>
       <button class="btn ghost" id="clientPreviewBtn" type="button">Open client preview</button>
+    </form>
+  </section>
+  <section id="recovery" class="auth-page hidden">
+    <div class="auth-brand"><img class="brand-logo auth-logo" src="./assets/legal-edge-logo.svg" alt="The Legal Edge"><h1>Secure your<br><em>account.</em></h1><p>Choose a new password for your Legal Edge account.</p></div>
+    <form id="recoveryForm" class="auth-card">
+      <div><span class="eyebrow">ACCOUNT RECOVERY</span><h2>Set a new password</h2></div>
+      <label>New password<input name="new_password" type="password" autocomplete="new-password" minlength="12" required></label>
+      <label>Confirm password<input name="confirm_password" type="password" autocomplete="new-password" minlength="12" required></label>
+      <button class="btn primary" type="submit">Save new password</button>
+      <button class="text-btn" id="recoveryBack" type="button">Back to sign in</button>
+      <div id="recoveryMsg" class="form-msg" role="status"></div>
     </form>
   </section>
   <div id="coachApp" class="app-shell hidden"><aside class="sidebar"><div class="side-brand"><img class="brand-logo shell-logo" src="./assets/legal-edge-logo.svg" alt=""><div><strong>THE LEGAL EDGE</strong><span>Coach workspace</span></div></div><nav id="coachNav"><button class="side-link active" data-coach-view="dashboard"><span>⌂</span>Dashboard</button><button class="side-link" data-coach-view="clients"><span>◉</span>Clients</button><button class="side-link" data-coach-view="firms"><span>▤</span>Firm pilots</button></nav><div class="side-foot"><div class="avatar">CF</div><div><strong id="coachName">Calum Fraser</strong><span>Coach</span></div><button class="icon-btn logout" title="Sign out">↗</button></div></aside><header class="mobile-head"><div class="side-brand"><img class="brand-logo shell-logo" src="./assets/legal-edge-logo.svg" alt=""><strong>THE LEGAL EDGE</strong></div><button id="mobileMenu" class="icon-btn">☰</button></header><main id="coachMain" class="main"></main></div>
