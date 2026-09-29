@@ -9,7 +9,7 @@ Last updated: 29 September 2026
   `client-app-v3`. The initial Git build served the repository root and returned
   404; correcting Root Directory and redeploying fixed the production URL.
 - The verified production URL is **https://legal-edge-client-app.vercel.app/**.
-  Build `2026.09.29.3` loads on the production URL. Vercel marked commit `50c27c6` Ready in
+  Build `2026.09.29.4` loads on the production URL. Vercel marked commit `d5c3358` Ready in
   Production. Coach and client previews were opened; the coach Firm pilots area,
   roster preview, client Firm pilot account view and five-respondent suppression
   were visually verified. Preview records are local examples, not database data.
@@ -31,6 +31,12 @@ Last updated: 29 September 2026
   invent missing restrictions. A focused prompt-context test passed. GitHub
   commit `0377035` publishes build `2026.09.29.3`; its live marker was verified.
   The authenticated prompt-copy action remains untested.
+- Authenticated coach/client UI → database → reload tests remain **unverified**;
+  Secure coach sign-in was attempted but the site returned `Invalid login credentials`.
+  The Supabase project has one confirmed coach account with email/password provider,
+  `calumfraserfitness@gmail.com`; GitHub credentials are separate. Password reset
+  now has a recovery form that calls `auth.updateUser`, signs out, and returns to
+  sign-in. The reset email/link and authenticated session are not yet tested.
 - Authenticated coach/client UI → database → reload tests remain **unverified**;
   preview interactions and schema checks do not prove them. The old app remains
   reference-only and the separate CRM was untouched. Do not share sponsor reports
