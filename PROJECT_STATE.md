@@ -33,8 +33,8 @@ Last updated: 29 September 2026
   The authenticated prompt-copy action remains untested.
 - Authenticated coach/client UI → database → reload tests remain **unverified**;
   Secure coach sign-in was attempted but the site returned `Invalid login credentials`.
-  The Supabase project has one confirmed coach account with email/password provider,
-  `calumfraserfitness@gmail.com`; GitHub credentials are separate. Password reset
+  The Supabase project has one confirmed coach account with email/password provider;
+  GitHub credentials are separate. Password reset
   now has a recovery form that calls `auth.updateUser`, signs out, and returns to
   sign-in. The reset email/link and authenticated session are not yet tested.
 - Authenticated coach/client UI → database → reload tests remain **unverified**;
