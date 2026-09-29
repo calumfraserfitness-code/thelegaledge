@@ -2,6 +2,26 @@
 
 Last updated: 29 September 2026
 
+## 29 September incident: client access is not migrated
+
+- The Vercel deployment is an independent replacement, as `client-app-v3/README.md`
+  states. It must not be presented as a live replacement for existing clients.
+- Read-only database check: 13 imported clients (6 active), 113 check-ins,
+  76 progress entries, 13 onboarding records, 13 training programmes and
+  33 nutrition plans remain in `baxvhilvrhshlfizakak`.
+- All 13 clients have source `legacy_clientmangmentsystem_v2`; **zero** have
+  `profile_id`. The project has one auth user and one coach profile, with zero
+  client auth/profile records. Thus none of the prior client logins can work
+  against this replacement's Supabase Auth, regardless of the preview UI.
+- The original `clientmangmentsystem-v2` host, identity store and current state
+  have not been located from connected GitHub (no matching repo), this Vercel
+  workspace (one replacement project), or Sites inventory. Do not infer that
+  original accounts were deleted. Obtain the exact original client URL/source
+  from Calum, inspect it read-only, reconcile identities and history before
+  issuing invitations, changing access, or calling the replacement client-ready.
+- The firm pilot foundation remains isolated in the replacement. Pause new
+  corporate rollout until direct-client authentication and persistence pass.
+
 ## 29 September live and firm pilot checkpoint
 
 - The existing Vercel project `legal-edge-client-app` is connected to GitHub
