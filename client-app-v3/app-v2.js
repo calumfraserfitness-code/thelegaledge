@@ -280,6 +280,7 @@ function renderCoach() {
   $$('#coachNav button').forEach((button) => button.classList.toggle('active', button.dataset.coachView === state.coachView));
   $('.sidebar')?.classList.remove('open');
   if (state.client) return renderClientWorkspace();
+  if (state.coachView === 'firms') return renderFirmPilots();
   return state.coachView === 'clients' ? renderRoster() : renderDashboard();
 }
 
@@ -1265,7 +1266,7 @@ function renderClient() {
   const views = {
     planner: clientPlanner, training: clientTraining,
     nutrition: clientNutrition, checkin: clientCheckin, progress: clientProgress,
-    onboarding: clientOnboarding, legal: clientLegal, diagnostics: clientDiagnostics, health: clientHealth
+    onboarding: clientOnboarding, legal: clientLegal, diagnostics: clientDiagnostics, health: clientHealth, pilot: renderParticipantPilot
   };
   try { (views[state.clientView] || clientPlanner)(); }
   catch (error) { renderError($('#clientMain'), error, renderClient); }

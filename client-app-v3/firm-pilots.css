@@ -1,0 +1,21 @@
+.firm-intro { display:flex; justify-content:space-between; gap:1rem; align-items:center; padding:1.4rem 1.6rem; margin:1rem 0; border-radius:18px; background:#172b34; color:#fff; }
+.firm-intro p { color:#d4e0dc; margin:.4rem 0 0; }
+.firm-intro > span { flex:none; font-size:.75rem; text-transform:uppercase; letter-spacing:.1em; }
+.firm-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; }
+.firm-form { display:grid; gap:.75rem; margin:1rem 0; }
+.firm-form label, .firm-member-form label, .firm-score-grid label { display:grid; gap:.35rem; font-size:.85rem; font-weight:600; }
+.firm-form input, .firm-form select, .firm-member-form select, .firm-score-grid input { width:100%; padding:.7rem; border:1px solid #cad3cf; border-radius:9px; background:#fff; color:#172b34; font:inherit; }
+.firm-dates, .firm-member-form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.75rem; align-items:end; }
+.firm-member-form { margin:1rem 0; }
+.firm-list { display:grid; gap:.5rem; margin-top:1rem; }
+.firm-list > div, .firm-pilot-choice { display:flex; justify-content:space-between; gap:1rem; align-items:center; width:100%; padding:.8rem 1rem; border:1px solid #e0e6e2; border-radius:10px; background:#fff; text-align:left; }
+.firm-list small { color:#667873; }
+.firm-pilot-choice { cursor:pointer; color:inherit; font:inherit; }
+.firm-pilot-choice.active { border-color:#559977; background:#f1f8f2; }
+.firm-report { overflow-x:auto; }
+.firm-report-head, .firm-report-row { display:grid; grid-template-columns:1.5fr repeat(6,minmax(4.4rem,1fr)); gap:.5rem; min-width:650px; padding:.7rem .4rem; border-bottom:1px solid #e5eae7; }
+.firm-report-head { font-size:.72rem; text-transform:uppercase; color:#667873; }
+.firm-suppressed { grid-column:span 6; }
+.firm-assessment { border-top:1px solid #e5eae7; padding:1rem 0; }
+.firm-score-grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:.7rem; margin:1rem 0; }
+@media(max-width:760px) { .firm-grid, .firm-dates, .firm-member-form { grid-template-columns:1fr; } .firm-intro { align-items:flex-start; flex-direction:column; } .firm-score-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .firm-list > div, .firm-pilot-choice { flex-direction:column; align-items:flex-start; } }
