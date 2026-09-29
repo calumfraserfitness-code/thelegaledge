@@ -243,7 +243,7 @@ function preview(role) {
 }
 
 function pageHead(kicker, heading, tools = '') {
-  return `<div class="page-head"><div><span class="eyebrow">${esc(kicker)}</span><h1>${esc(heading)}</h1></div><div class="head-tools">${tools}</div></div>`;
+  return `${state.preview ? '<section class="panel" role="status"><strong>Example preview</strong><p>Real client records appear after coach sign-in. Changes here are not saved.</p></section>' : ''}<div class="page-head"><div><span class="eyebrow">${esc(kicker)}</span><h1>${esc(heading)}</h1></div><div class="head-tools">${tools}</div></div>`;
 }
 
 function clientHeader(kicker, heading, copy) {
