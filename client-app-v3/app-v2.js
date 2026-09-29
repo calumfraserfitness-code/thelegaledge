@@ -1,6 +1,7 @@
 const SUPABASE_URL = 'https://baxvhilvrhshlfizakak.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_DRoPSo_3TPlU8mMeLQNruw_82hanHNi';
 const db = window.supabase?.createClient?.(SUPABASE_URL, SUPABASE_KEY) ?? null;
+let recoveryMode = new URLSearchParams(location.hash.slice(1)).get('type') === 'recovery';
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
@@ -62,7 +63,7 @@ function toast(message, tone = '') {
 }
 
 function show(selector) {
-  ['#auth', '#coachApp', '#clientApp'].forEach((id) => $(id)?.classList.add('hidden'));
+  ['#auth', '#recovery', '#coachApp', '#clientApp'].forEach((id) => $(id)?.classList.add('hidden'));
   $(selector)?.classList.remove('hidden');
 }
 
@@ -189,7 +190,9 @@ function demoData() {
 async function boot() {
   try {
     if (!db) throw new Error('The secure connection did not load. Refresh the page.');
+    if (recoveryMode) return show('#recovery');
     const { data: { user } } = await db.auth.getUser();
+    if (recoveryMode) return show('#recovery');
     if (!user) return show('#auth');
     state.user = user;
     state.profile = await query('Profile', db.from('profiles').select('*').eq('id', user.id).single());
@@ -1575,6 +1578,34 @@ function bindShell() {
     const { error } = await db.auth.resetPasswordForEmail(email, { redirectTo: location.origin });
     $('#authMsg').textContent = error ? error.message : 'Password reset email sent.';
   };
+  $('#recoveryForm').onsubmit = async (event) => {
+    event.preventDefault();
+    const form = event.target;
+    const password = form.elements.new_password.value;
+    const message = $('#recoveryMsg');
+    if (password !== form.elements.confirm_password.value) return message.textContent = 'Passwords do not match.';
+    if (!db) return message.textContent = 'Secure connection failed to load. Refresh the page.';
+    const button = event.submitter;
+    setBusy(button, true);
+    try {
+      const { data: { session }, error: sessionError } = await db.auth.getSession();
+      if (sessionError || !session) throw new Error('This reset link has expired. Request a new one from the sign-in screen.');
+      const { error } = await db.auth.updateUser({ password });
+      if (error) throw error;
+      await db.auth.signOut();
+      recoveryMode = false;
+      history.replaceState({}, '', location.pathname);
+      form.reset();
+      show('#auth');
+      $('#authMsg').textContent = 'Password updated. Sign in with your new password.';
+    } catch (error) { message.textContent = error.message || 'Password could not be updated.'; }
+    finally { setBusy(button, false); }
+  };
+  $('#recoveryBack').onclick = () => {
+    recoveryMode = false;
+    history.replaceState({}, '', location.pathname);
+    show('#auth');
+  };
   $('#ownerSetupBtn').onclick = () => $('#authMsg').textContent = 'Coach account setup is disabled on the public client app. Use the authorised account.';
   $('#coachPreviewBtn').onclick = () => preview('coach');
   $('#clientPreviewBtn').onclick = () => preview('client');
@@ -1606,4 +1637,10 @@ function bindShell() {
 }
 
 bindShell();
+db?.auth.onAuthStateChange((event) => {
+  if (event === 'PASSWORD_RECOVERY') {
+    recoveryMode = true;
+    show('#recovery');
+  }
+});
 boot();
