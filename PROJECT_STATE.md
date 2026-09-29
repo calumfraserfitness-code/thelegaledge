@@ -1,6 +1,40 @@
 # The Legal Edge Client App — Persistent Project State
 
-Last updated: 28 September 2026
+Last updated: 29 September 2026
+
+## 29 September live and firm pilot checkpoint
+
+- The existing Vercel project `legal-edge-client-app` is connected to GitHub
+  `calumfraserfitness-code/thelegaledge`, branch `main`. Its Root Directory is
+  `client-app-v3`. The initial Git build served the repository root and returned
+  404; correcting Root Directory and redeploying fixed the production URL.
+- The verified production URL is **https://legal-edge-client-app.vercel.app/**.
+  Build `2026.09.29.2` loads there. Vercel marked commit `50c27c6` Ready in
+  Production. Coach and client previews were opened; the coach Firm pilots area,
+  roster preview, client Firm pilot account view and five-respondent suppression
+  were visually verified. Preview records are local examples, not database data.
+- GitHub commit `a9843bf` adds the additive firm pilot foundation; `50c27c6`
+  refreshes the script cache key. Supabase migrations `firm_pilot_foundation`
+  and `firm_report_invoker` were applied to the **client app project only**.
+  They add coach-managed firms, pilots, rosters, client-authored consent and
+  baseline/midpoint/endline assessments. The report function returns only
+  aggregate phase averages when at least five consenting participants respond;
+  there is no employer login or individual employer data path. The five new
+  public tables all have RLS and no `anon` SELECT grant. No firms, pilots or
+  participant records were created in the production database by this work.
+- `node --check` passed on both JavaScript files, and `git diff --check` passed.
+  The Supabase security advisor no longer reports a new function warning after
+  switching the report to security invoker. Existing leaked-password-protection
+  advice remains a separate auth configuration item.
+- Authenticated coach/client UI → database → reload tests remain **unverified**;
+  preview interactions and schema checks do not prove them. The old app remains
+  reference-only and the separate CRM was untouched. Do not share sponsor reports
+  until a real pilot has consent and at least five valid responses per phase.
+- Continue the one-to-one regression gate with safe coach and test-client
+  sessions; verify persisted training, nutrition, planner, check-in, progress,
+  onboarding, legal and diagnostic flows. Next firm work: real invitation
+  delivery, cohort scheduling, sponsor export review and Health Connect/Apple
+  Health integration architecture. Do not promise those as shipped.
 
 ## 28 September recovery checkpoint
 
@@ -42,7 +76,7 @@ Last updated: 28 September 2026
 
 ### Local follow-up: plan import parsing
 
-- Build marker `2026.09.28.2` is local only. Training and Nutrition import now
+- Build marker `2026.09.28.2` was published before the live checkpoint. Training and Nutrition import now
   accept a complete JSON object wrapped in a Markdown `json` code fence,
   reject unrelated prose and over-1-MB input with specific messages, and
   training validates day categories and exercise prescriptions before writes.
@@ -138,7 +172,7 @@ URLs. The new data model and UI support entering these records now.
 - Frontend entry: `client-app-v3/index.html`
 - Main application: `client-app-v3/app-v2.js`
 - Styles: `client-app-v3/app.css` and `client-app-v3/health.css`
-- Visible build marker in source: `2026.09.19.1`
+- Visible build marker in source: `2026.09.29.2`
 - GitHub functional checkpoint: `d9e7915` (manual nutrition assignments protected)
 - A follow-up local fix makes Auto-fill nutrition gap-only: it assigns Training Day
   to weights/resistance days and Rest Day to unassigned remaining days, while never
@@ -146,16 +180,13 @@ URLs. The new data model and UI support entering these records now.
 
 ## Immediate next verification
 
-1. Commit and deploy build `2026.09.19.1` to the existing production Vercel project.
-   The 21 September execution environment has no authenticated Vercel CLI session;
-   authenticate to the existing `calumfraser13cf-5687` workspace before deploying.
-2. Verify the production page displays build `2026.09.19.1` and the Auto-fill
-   nutrition button in Coach → Planner.
-3. Verify the coach can save a historical check-in, progress entry, onboarding edit
+1. Verify the coach can save a historical check-in, progress entry, onboarding edit
    and legal record against Supabase.
-4. Verify training and nutrition edits persist after reload.
-5. Verify the client mobile experience and all published-plan completion controls.
-6. Continue entering genuine recovered/client-supplied data; never invent missing data.
+2. Verify training and nutrition edits persist after reload.
+3. Verify the client mobile experience and all published-plan completion controls.
+4. Verify Firm pilots with a safe coach and test-client session, including
+   participant-authored consent, one assessment and suppression under five.
+5. Continue entering genuine recovered/client-supplied data; never invent missing data.
 
 ## Resume instruction for a future session
 
