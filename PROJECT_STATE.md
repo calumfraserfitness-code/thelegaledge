@@ -13,12 +13,17 @@ Last updated: 29 September 2026
   `profile_id`. The project has one auth user and one coach profile, with zero
   client auth/profile records. Thus none of the prior client logins can work
   against this replacement's Supabase Auth, regardless of the preview UI.
-- The original `clientmangmentsystem-v2` host, identity store and current state
-  have not been located from connected GitHub (no matching repo), this Vercel
-  workspace (one replacement project), or Sites inventory. Do not infer that
-  original accounts were deleted. Obtain the exact original client URL/source
-  from Calum, inspect it read-only, reconcile identities and history before
-  issuing invitations, changing access, or calling the replacement client-ready.
+- The original `https://clientmangmentsystem-v2.vercel.app/` remains reachable
+  and redirects to its own login. It was the source of the imported records,
+  not the current deployment. Its identity store has not been inspected; do not
+  infer original accounts were deleted. Original login is unnecessary to show
+  already imported records to the new app's signed-in coach.
+- All 13 imported rows are assigned to the new coach profile, but all 13 have
+  null email and profile_id. The preview intentionally uses one synthetic client;
+  build `2026.09.29.5` labels this plainly. Do not provision duplicate clients
+  through `provision-client` (it creates a new client row) or invite existing
+  clients until addresses/identities are reconciled. Coach authenticated roster
+  and client session persistence are still unverified.
 - The firm pilot foundation remains isolated in the replacement. Pause new
   corporate rollout until direct-client authentication and persistence pass.
 
