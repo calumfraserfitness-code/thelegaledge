@@ -2,6 +2,31 @@
 
 Last updated: 29 September 2026
 
+## 29 September client activation and firm resource update
+
+- Build `2026.09.29.7` removes public sample preview controls. The real coach
+  roster remains behind coach sign-in; the client account menu no longer has
+  legal/onboarding navigation. New clients see consent then a more detailed
+  training, nutrition and work-pattern questionnaire before coach review.
+- Coach new-client setup now accepts starting weight and a 12+ character
+  temporary password. `provision-client` Edge Function v3 can also link a new
+  auth account to an existing imported client row using `client_id`, without
+  duplicating the client or resetting saved onboarding/history. The coach must
+  supply and verify each existing client's email and share the new temporary
+  password privately; no existing password can be recovered from this project.
+  No imported client was linked by this update. The new and linked login paths
+  have not been exercised with an authenticated coach/client browser session.
+- The coach pilot workspace now captures firm employee count and pilot capacity,
+  and has a resource library. Coach can draft, tailor and publish a resource to
+  one pilot; its members see only published resources under Firm resources.
+  Four practical topic ideas are draft starters, not automatically published
+  or sent. Migration `firm_resources` has RLS for assigned coach and members;
+  `firm_size` adds optional employee_count. No real firm or pilot was created.
+- The live sign-in page was reloaded and visibly showed only Sign in and Forgot
+  password. Syntax and diff checks passed. Authenticated one-to-one and firm
+  flows, invitation delivery and external employer access are still unverified
+  or unimplemented; do not call this a completed firm rollout.
+
 ## 29 September weekly planner repair
 
 - The existing 13 programme weeks were all dated 7 September, so the UI was
