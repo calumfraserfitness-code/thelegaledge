@@ -9,7 +9,7 @@ Last updated: 29 September 2026
   `client-app-v3`. The initial Git build served the repository root and returned
   404; correcting Root Directory and redeploying fixed the production URL.
 - The verified production URL is **https://legal-edge-client-app.vercel.app/**.
-  Build `2026.09.29.2` loads there. Vercel marked commit `50c27c6` Ready in
+  Build `2026.09.29.3` loads on the production URL. Vercel marked commit `50c27c6` Ready in
   Production. Coach and client previews were opened; the coach Firm pilots area,
   roster preview, client Firm pilot account view and five-respondent suppression
   were visually verified. Preview records are local examples, not database data.
@@ -26,6 +26,11 @@ Last updated: 29 September 2026
   The Supabase security advisor no longer reports a new function warning after
   switching the report to security invoker. Existing leaked-password-protection
   advice remains a separate auth configuration item.
+- The nutrition import prompt now includes the actual onboarding answers and
+  available calorie/macronutrient goals, and instructs the generator not to
+  invent missing restrictions. A focused prompt-context test passed. GitHub
+  commit `0377035` publishes build `2026.09.29.3`; its live marker was verified.
+  The authenticated prompt-copy action remains untested.
 - Authenticated coach/client UI → database → reload tests remain **unverified**;
   preview interactions and schema checks do not prove them. The old app remains
   reference-only and the separate CRM was untouched. Do not share sponsor reports
@@ -172,7 +177,7 @@ URLs. The new data model and UI support entering these records now.
 - Frontend entry: `client-app-v3/index.html`
 - Main application: `client-app-v3/app-v2.js`
 - Styles: `client-app-v3/app.css` and `client-app-v3/health.css`
-- Visible build marker in source: `2026.09.29.2`
+- Visible build marker in source: `2026.09.29.3`
 - GitHub functional checkpoint: `d9e7915` (manual nutrition assignments protected)
 - A follow-up local fix makes Auto-fill nutrition gap-only: it assigns Training Day
   to weights/resistance days and Rest Day to unassigned remaining days, while never
