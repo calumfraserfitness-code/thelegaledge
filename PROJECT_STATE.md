@@ -2,6 +2,27 @@
 
 Last updated: 29 September 2026
 
+## 29 September weekly planner repair
+
+- The existing 13 programme weeks were all dated 7 September, so the UI was
+  treating a stale plan as current. Six active clients now each have one
+  28 September draft copied from their latest saved schedule, for 40 scheduled
+  sessions total. The original weeks and source records remain intact.
+- Migration `automatic_weekly_drafts` installs `prepare_client_week(uuid)` and
+  an active `legal-edge-weekly-drafts` pg_cron job for 00:05 UTC each Monday.
+  The operation is idempotent, creates only the current week and copies
+  training/nutrition day assignments as drafts. It does not publish a copied
+  week or invent skipped historical weeks. A second manual call returned the
+  existing week ID. The first future scheduled run has not yet occurred.
+- Build `2026.09.29.6` selects the actual Monday week, limits planner rows to
+  that week, offers a coach recovery button when a week is missing, and hides
+  unpublished current drafts from the client planner. The live page displayed
+  the new build marker at `https://legal-edge-client-app.vercel.app/`.
+- Authenticated coach roster, publication, client sign-in and persistence
+  remain unverified. Imported client records still lack auth/profile links;
+  do not mistake the labelled preview for the 13 saved clients. The corporate
+  pilot remains a foundation, not a completed employer integration.
+
 ## 29 September incident: client access is not migrated
 
 - The Vercel deployment is an independent replacement, as `client-app-v3/README.md`
