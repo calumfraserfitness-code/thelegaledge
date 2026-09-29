@@ -95,11 +95,8 @@ function displayWeight(kg, signed = false) {
 }
 
 function currentWeek() {
-  return state.data.weeks.find((week) => {
-    const start = new Date(`${week.week_start}T12:00:00`);
-    const end = new Date(+start + 7 * 864e5);
-    return new Date() >= start && new Date() < end;
-  }) || state.data.weeks[0] || null;
+  const start = iso(monday());
+  return state.data.weeks.find((week) => week.week_start === start) || null;
 }
 
 function safeStepGoal(client = state.client) {
@@ -495,16 +492,16 @@ async function saveClientControls(event) {
 
 function weekDays() {
   const week = currentWeek();
-  const start = monday(week?.week_start || new Date());
+  const start = monday();
   return Array.from({ length: 7 }, (_, index) => {
     const dateObject = new Date(+start + index * 864e5);
     const date = iso(dateObject);
     return {
       dateObject,
       date,
-      sessions: state.data.sessions.filter((session) => session.session_date === date),
+      sessions: state.data.sessions.filter((session) => week && session.week_id === week.id && session.session_date === date),
       step: state.data.steps.find((entry) => entry.entry_date === date),
-      nutrition: state.data.nutritionDays.find((entry) => entry.nutrition_date === date)
+      nutrition: state.data.nutritionDays.find((entry) => week && entry.week_id === week.id && entry.nutrition_date === date)
     };
   });
 }
@@ -522,7 +519,7 @@ function plannerCards({ interactive = false, coachEdit = false } = {}) {
 
 function coachPlanner() {
   const week = currentWeek();
-  $('#clientWorkspaceBody').innerHTML = `<div class="panel-head"><div><h3>${week ? esc(week.title || `Week ${week.week_number}`) : 'Current week'}</h3><span class="sub">${week?.published ? 'Published to client' : 'Draft — client cannot see it yet'}</span></div><div class="editor-actions">${week ? `<button class="btn ghost small" id="autofillNutrition">Auto-fill nutrition</button><button class="btn ghost small" id="duplicateWeek">Duplicate to next week</button><button class="btn primary small" id="publishWeek">${week.published ? 'Unpublish' : 'Publish week'}</button>` : ''}</div></div>${week ? `<form id="weekEditor" class="week-editor panel"><label>Week title<input name="title" value="${esc(week.title || `Week ${week.week_number}`)}"></label><label>Goal weight (${state.client.weight_unit === 'lbs' ? 'lb' : 'kg'})<input name="goal_weight_display" type="number" step="0.1" value="${week.goal_weight_kg ? (Number(week.goal_weight_kg) * (state.client.weight_unit === 'lbs' ? 2.20462 : 1)).toFixed(1) : ''}"></label><label class="wide">Coach note<textarea name="coach_note" rows="2">${esc(week.coach_note || '')}</textarea></label><button class="btn primary small">Save week</button></form>` : '<div class="empty">No programme week exists yet.</div>'}${plannerCards({coachEdit:true})}${state.data.sessions.length ? `<section class="panel"><div class="panel-head"><div><h3>Schedule editor</h3><span class="sub">Change a date to move an activity. Changes save without leaving the page.</span></div></div>${state.data.sessions.filter((session) => !week || session.week_id === week.id).map(sessionEditorMarkup).join('')}</section>` : ''}`;
+  $('#clientWorkspaceBody').innerHTML = `<div class="panel-head"><div><h3>${week ? esc(week.title || `Week ${week.week_number}`) : 'Current week'}</h3><span class="sub">${week?.published ? 'Published to client' : 'Draft — review and publish for client'}</span></div><div class="editor-actions">${week ? `<button class="btn ghost small" id="autofillNutrition">Auto-fill nutrition</button><button class="btn primary small" id="publishWeek">${week.published ? 'Unpublish' : 'Publish week'}</button>` : '<button class="btn primary small" id="prepareWeek">Prepare current week</button>'}</div></div>${week ? `<form id="weekEditor" class="week-editor panel"><label>Week title<input name="title" value="${esc(week.title || `Week ${week.week_number}`)}"></label><label>Goal weight (${state.client.weight_unit === 'lbs' ? 'lb' : 'kg'})<input name="goal_weight_display" type="number" step="0.1" value="${week.goal_weight_kg ? (Number(week.goal_weight_kg) * (state.client.weight_unit === 'lbs' ? 2.20462 : 1)).toFixed(1) : ''}"></label><label class="wide">Coach note<textarea name="coach_note" rows="2">${esc(week.coach_note || '')}</textarea></label><button class="btn primary small">Save week</button></form>` : '<div class="empty">The current week has not been prepared. Prepare it to review the schedule.</div>'}${plannerCards({coachEdit:!!week})}${week && state.data.sessions.some((session) => session.week_id === week.id) ? `<section class="panel"><div class="panel-head"><div><h3>Schedule editor</h3><span class="sub">Change a date to move an activity. Changes save without leaving the page.</span></div></div>${state.data.sessions.filter((session) => session.week_id === week.id).map(sessionEditorMarkup).join('')}</section>` : ''}`;
   $('#publishWeek')?.addEventListener('click', async (event) => {
     const published = !week.published;
     week.published = published;
@@ -536,7 +533,7 @@ function coachPlanner() {
   });
   $('#weekEditor')?.addEventListener('submit', saveWeekDetails);
   $('#autofillNutrition')?.addEventListener('click', autofillNutritionWeek);
-  $('#duplicateWeek')?.addEventListener('click', duplicateCurrentWeek);
+  $('#prepareWeek')?.addEventListener('click', prepareCurrentWeek);
   $$('[data-session-editor]').forEach((form) => { form.training_type.value = state.data.sessions.find((session) => session.id === form.dataset.sessionEditor)?.training_type || 'weights'; form.onsubmit = savePlannerSession; });
   $$('[data-delete-session]').forEach((button) => button.onclick = () => deletePlannerSession(button.dataset.deleteSession));
   $$('[data-nutrition-date]').forEach(select=>select.onchange=()=>savePlannerNutrition(select));
@@ -613,6 +610,18 @@ async function deletePlannerSession(id) {
   if (!confirm('Remove this activity from the week? The programme prescription is kept.')) return;
   if (!state.preview) { try { await query('Schedule delete', db.from('training_sessions').delete().eq('id', id).select()); } catch (error) { return toast(error.message, 'error'); } }
   state.data.sessions = state.data.sessions.filter((session) => session.id !== id); toast('Activity removed from this week'); coachPlanner();
+}
+
+async function prepareCurrentWeek(event) {
+  if (state.preview) return toast('Current week prepared in preview');
+  setBusy(event.currentTarget, true, 'Preparing…');
+  try {
+    const { error } = await db.rpc('prepare_client_week', { p_client_id: state.client.id });
+    if (error) throw error;
+    await loadClientData(state.client.id);
+    toast('Current week prepared as a draft. Review before publishing.');
+    coachPlanner();
+  } catch (error) { toast(error.message, 'error'); setBusy(event.currentTarget, false); }
 }
 
 async function duplicateCurrentWeek(event) {
@@ -1319,6 +1328,11 @@ function taskMarkup(session) {
 }
 
 function clientPlanner() {
+  const week = currentWeek();
+  if (!week?.published && !state.preview) {
+    $('#clientMain').innerHTML = clientHeader('YOUR WEEK', 'Weekly planner', 'Your coach is preparing this week.') + '<section class="panel empty">The current plan is being reviewed. Check back after your coach publishes it.</section>';
+    return;
+  }
   const days = weekDays();
   const scheduled = days.reduce((count, day) => count + day.sessions.length + 1 + (day.nutrition ? 1 : 0), 0);
   const completed = days.reduce((count, day) => count + day.sessions.filter((session) => session.status === 'completed').length + (Number(day.step?.actual_steps || day.step?.steps || 0) >= safeStepGoal() ? 1 : 0) + (day.nutrition?.adhered ? 1 : 0), 0);
@@ -1372,7 +1386,7 @@ function bindCompletionActions() {
 
 function clientTraining() {
   const week = currentWeek();
-  const allSessions = state.data.sessions.filter((session) => !week || session.week_id === week.id);
+  const allSessions = state.data.sessions.filter((session) => week?.published && session.week_id === week.id);
   const categories = [
     ['weights', 'Weights', allSessions.filter((session) => ['weights', 'resistance'].includes(session.training_type)).length],
     ['cardio', 'Cardio', allSessions.filter((session) => session.training_type === 'cardio').length],
