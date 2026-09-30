@@ -2,6 +2,18 @@
 
 Last updated: 30 September 2026
 
+## 30 September weekly meals and activity presentation
+
+- Build `20260930-3` adds `plan-experience.js/css` and an accessible demonstration at https://legal-edge-client-app.vercel.app/?pilot=demo . The live demonstration was opened and exercised: seven named days, ingredient quantities, numbered preparation, grams/ounces switching, batch scaling, planner-to-cardio navigation, firm resources, and suppressed sponsor output below five responses. It is explicitly synthetic, local-only and creates no account, firm or pilot.
+- Nutrition import now accepts 1–7 complete variants (frequencies total 7), or seven distinct weekday menus (Monday=0). Null targets are rejected. New security-invoker RPC `import_client_nutrition` validates and saves the whole menu atomically, deactivates earlier menus without deleting history and assigns uncompleted current/future dates in the current week. Completed/past assignments remain intact. The coach still publishes the week.
+- Added `assign_client_week_nutrition` to the existing Monday draft scheduler. It fills gaps, preserves active manual assignments and completed records, and selects explicit weekdays before training/rest categories. Applied to six active current drafts: 42 saved-plan assignments. Repetition made zero changes. These are draft assignments, not seven unique generated menus or published plans.
+- The client meal view has dated week selection, preparation steps, per-portion targets, optional batch quantities, a regional measurement switch and a measured weekly shopping list. Source menu/navigation scraps are not presented as cooking instructions. Planner includes links to each date's meals.
+- Cardio and mobility screens now render linked programme exercises and day notes. Planner Open chooses the session's actual category. Exercise cards distinguish tempo/RPE/RIR and supersets; image_url support added to program_exercises/exercise_bank, coach editor and imports. Client prescription queries include bank video/image fallback.
+- JS syntax and tests in `client-app-v3/tests/plan-experience.cjs` passed. Database tests under authenticated coach role passed for successful one/seven-day imports, explicit weekday alignment, preservation of old plans, atomic rollback on invalid ingredients, unassigned caller rejection and assignment idempotency. All synthetic database test writes were rolled back.
+- Source audit (unique named meals / explicit cooking methods / meals with missing quantities or units): Emmet 6/0/6; Garrett 12/12/0; Joshua 6/6/4; Katerine 6/6/0; Kevin 6/0/0; Zach 4/4/0. Some original meals lack measurements or contain ingredient alternatives, so exact complete recipes are NOT finished for everyone. Emmet and Kevin have zero program_exercises and null programme source_json. Do not invent prescriptions or historical portions.
+- Real coach/client browser sign-ins, production client persistence, wearable ingestion, employer accounts and firm invitation/enrolment delivery remain unfinished or unverified. No client identities were linked or external invitations sent. Existing leaked-password-protection advisor warning remains: https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection .
+- Functional deployment commit `28fc1f28e7e1a1a0e5a42819bebeff707d94a5b5` was browser-verified; follow-up polish fixes date-labelled training-day descriptions, live completion counts and sample mobility/lower-body navigation.
+
 ## 30 September account error handling and deployment verification
 
 - Live app: https://legal-edge-client-app.vercel.app/ ; browser verified deployed script `app-v2.js?v=20260930-1` and real sign-in page.

@@ -124,7 +124,7 @@ async function loadClientData(clientId) {
   const clientAtStart = clientId;
   const requests = await Promise.all([
     query('Weeks', db.from('program_weeks').select('*').eq('client_id', clientId).order('week_start', { ascending: false }).limit(104)),
-    query('Programmes', db.from('training_programs').select('*,days:training_program_days(*,exercises:program_exercises(*))').eq('client_id', clientId).order('created_at', { ascending: false })),
+    query('Programmes', db.from('training_programs').select('*,days:training_program_days(*,exercises:program_exercises(*,bank:exercise_bank(video_url,image_url,instructions)))').eq('client_id', clientId).order('created_at', { ascending: false })),
     query('Nutrition plans', db.from('nutrition_plans').select('*,meals:meal_plan_meals(*,items:meal_plan_items(*))').eq('client_id', clientId).order('created_at', { ascending: false })),
     query('Habits', db.from('habits').select('*').eq('client_id', clientId).eq('active', true).order('sort_order')),
     query('Steps', db.from('step_entries').select('*').eq('client_id', clientId).order('entry_date', { ascending: false }).limit(370)),
@@ -681,6 +681,7 @@ async function duplicateCurrentWeek(event) {
 }
 
 function exerciseCard(exercise, loggable = false) {
+  exercise = {...exercise, video_url: exercise.video_url || exercise.bank?.video_url, image_url: exercise.image_url || exercise.bank?.image_url};
   const previousLogs = (state.data.exerciseLogs || []).filter((log) => log.program_exercise_id === exercise.id || (exercise.exercise_bank_id && log.exercise_bank_id === exercise.exercise_bank_id));
   const latestBySet = new Map();
   previousLogs.forEach((log) => { if (!latestBySet.has(log.set_number)) latestBySet.set(log.set_number, log); });
@@ -947,7 +948,7 @@ function assignedMealsForPlan(plan) {
 function assignedMealPlan(plan, editable = false) {
   const assignments = assignedMealsForPlan(plan);
   const total = assignments.reduce((sum, { meal }) => ({ calories: sum.calories + Number(meal.calories || 0), protein: sum.protein + Number(meal.protein_g || 0), carbs: sum.carbs + Number(meal.carbs_g || 0), fat: sum.fat + Number(meal.fat_g || 0) }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
-  return `<article class="panel nutrition-plan"><div class="panel-head"><div><span class="eyebrow">${esc(nutritionDayLabel(plan))}</span><h2>${esc(nutritionDayLabel(plan))}</h2><p class="muted">${nutritionDayLabel(plan) === 'Busy Day' ? 'Prepare ahead, pack it, and keep the day simple.' : nutritionDayLabel(plan) === 'Training Day' ? 'Fuel training and recovery.' : 'Your lower-activity day structure.'}</p></div><span class="pill">${plan.days_per_week ?? '—'} DAYS / WEEK</span></div>${macroStrip(plan)}<div class="meal-grid">${assignments.map(({ meal }) => mealCardMarkup(meal, editable)).join('') || '<div class="empty">No assigned meals are available for this plan.</div>'}</div><div class="day-totals"><b>Meals shown</b><span>${Math.round(total.calories)} kcal</span><span>P ${Math.round(total.protein)}g</span><span>C ${Math.round(total.carbs)}g</span><span>F ${Math.round(total.fat)}g</span></div>${plan.coach_notes ? `<div class="coach-note"><b>Coach notes</b><p>${esc(plan.coach_notes)}</p></div>` : ''}</article>`;
+  return `<article class="panel nutrition-plan"><div class="panel-head"><div><span class="eyebrow">${esc(nutritionDayLabel(plan))}</span><h2>${esc(nutritionDayLabel(plan))}</h2><p class="muted">${plan.day_type === 'Busy Day' ? 'Prepare ahead, pack it, and keep the day simple.' : plan.day_type === 'Training Day' ? 'Fuel training and recovery.' : 'Your lower-activity day structure.'}</p></div><span class="pill">${plan.days_per_week ?? '—'} DAYS / WEEK</span></div>${macroStrip(plan)}<div class="meal-grid">${assignments.map(({ meal }) => mealCardMarkup(meal, editable)).join('') || '<div class="empty">No assigned meals are available for this plan.</div>'}</div><div class="day-totals"><b>Meals shown</b><span>${Math.round(total.calories)} kcal</span><span>P ${Math.round(total.protein)}g</span><span>C ${Math.round(total.carbs)}g</span><span>F ${Math.round(total.fat)}g</span></div>${plan.coach_notes ? `<div class="coach-note"><b>Coach notes</b><p>${esc(plan.coach_notes)}</p></div>` : ''}</article>`;
 }
 
 function nutritionPlanMarkup(plan) {
@@ -1038,7 +1039,7 @@ async function persistNutritionImport(payload, button) {
 
 function coachNutrition() {
   const plans = state.data.nutritionPlans.filter((plan) => plan.is_active !== false);
-  const selected = plans.find((plan) => plan.id === state.selectedNutritionPlanId) || plans.find((plan) => nutritionDayLabel(plan) === 'Training Day') || plans[0];
+  const selected = plans.find((plan) => plan.id === state.selectedNutritionPlanId) || plans.find((plan) => plan.day_type === 'Training Day') || plans[0];
   state.selectedNutritionPlanId = selected?.id || null;
   $('#clientWorkspaceBody').innerHTML = `<section class="nutrition-tools"><div><h2>Nutrition plan</h2><p class="muted">Edit targets, foods, quantities and preparation without leaving this page.</p></div><button class="btn gold" type="button" id="toggleNutritionImport">Import meal-plan JSON</button></section>${nutritionImportPanel()}${plans.length ? `<div class="nutrition-day-tabs">${plans.map((plan) => `<button type="button" data-coach-nutrition-plan="${plan.id}" class="${plan.id === selected.id ? 'active' : ''}">${esc(nutritionDayLabel(plan))}</button>`).join('')}</div><form class="nutrition-editor" data-plan-editor="${selected.id}"><div class="editor-grid"><label>Plan name<input name="name" value="${esc(selected.name)}"></label><label>Day type<select name="day_type"><option${selected.day_type === 'Training Day' ? ' selected' : ''}>Training Day</option><option${selected.day_type === 'Rest Day' || selected.day_type === 'Non-Training Day' ? ' selected' : ''}>Rest Day</option><option${selected.day_type === 'Busy Day' ? ' selected' : ''}>Busy Day</option></select></label><label>Calories<input name="calories" type="number" min="0" value="${selected.calories ?? ''}"></label><label>Protein (g)<input name="protein_g" type="number" min="0" value="${selected.protein_g ?? ''}"></label><label>Carbs (g)<input name="carbs_g" type="number" min="0" value="${selected.carbs_g ?? ''}"></label><label>Fat (g)<input name="fat_g" type="number" min="0" value="${selected.fat_g ?? ''}"></label><label>Days/week<input name="days_per_week" type="number" min="0" max="7" value="${selected.days_per_week ?? 1}"></label><button class="btn primary small">Save targets</button></div></form><div class="meal-build-actions"><button class="btn ghost add-meal-button" type="button" id="addMeal">+ Create new meal</button>${(state.data.mealBank||[]).length?`<form id="assignMealBank"><select name="meal_id">${state.data.mealBank.map(meal=>`<option value="${meal.id}">${esc(meal.name)}</option>`).join('')}</select><button class="btn ghost">Assign from Meal Bank</button></form>`:''}</div>${assignedMealsForPlan(selected).length ? assignedMealPlan(selected, true) : mealPlan(selected)}` : '<div class="empty">No active nutrition plan is available for this client. Use Import meal-plan JSON to add it.</div>'}`;
   $('#toggleNutritionImport').onclick = () => $('#nutritionImportPanel').classList.toggle('hidden');
@@ -1400,12 +1401,12 @@ function bindCompletionActions() {
     if (!session) return;
     const previous = session.status;
     session.status = input.checked ? 'completed' : 'planned';
-    input.closest('.task')?.classList.toggle('done', input.checked);
+    input.closest('.task')?.classList.toggle('done', input.checked); updatePlannerAdherence();
     if (state.preview) return toast('Preview updated');
     try {
       await query('Session completion', db.from('training_sessions').update({ status: session.status, completed_at: input.checked ? new Date().toISOString() : null }).eq('id', session.id).select());
       toast('Weekly plan updated');
-    } catch (error) { session.status = previous; input.checked = previous === 'completed'; input.closest('.task')?.classList.toggle('done', input.checked); toast(error.message, 'error'); }
+    } catch (error) { session.status = previous; input.checked = previous === 'completed'; input.closest('.task')?.classList.toggle('done', input.checked); updatePlannerAdherence(); toast(error.message, 'error'); }
   });
   $$('[data-step-date]').forEach((input) => input.onchange = async () => {
     const date = input.dataset.stepDate;
@@ -1413,19 +1414,19 @@ function bindCompletionActions() {
     const actual = input.checked ? safeStepGoal() : 0;
     const row = { client_id: state.client.id, entry_date: date, target_steps: safeStepGoal(), actual_steps: actual };
     if (old) Object.assign(old, row); else state.data.steps.push(row);
-    input.closest('.task')?.classList.toggle('done', input.checked);
+    input.closest('.task')?.classList.toggle('done', input.checked); updatePlannerAdherence();
     if (state.preview) return toast('Preview updated');
     try {
       await query('Steps', db.from('step_entries').upsert(row, { onConflict: 'client_id,entry_date' }).select());
       toast('Steps updated');
-    } catch (error) { if (old) old.actual_steps = old.steps = input.checked ? 0 : safeStepGoal(); input.checked = !input.checked; input.closest('.task')?.classList.toggle('done', input.checked); toast(error.message, 'error'); }
+    } catch (error) { if (old) old.actual_steps = old.steps = input.checked ? 0 : safeStepGoal(); input.checked = !input.checked; input.closest('.task')?.classList.toggle('done', input.checked); updatePlannerAdherence(); toast(error.message, 'error'); }
   });
   $$('[data-nutrition-complete]').forEach((input)=>input.onchange=async()=>{
     const day=state.data.nutritionDays.find(item=>item.nutrition_date===input.dataset.nutritionComplete); if(!day)return;
-    const previous=day.adhered; day.adhered=input.checked; input.closest('.task')?.classList.toggle('done',input.checked);
+    const previous=day.adhered; day.adhered=input.checked; input.closest('.task')?.classList.toggle('done',input.checked); updatePlannerAdherence();
     if(state.preview)return toast('Preview updated');
     try{await query('Nutrition completion',db.from('nutrition_days').update({adhered:input.checked}).eq('id',day.id).select());toast('Nutrition updated');}
-    catch(error){day.adhered=previous;input.checked=previous;input.closest('.task')?.classList.toggle('done',previous);toast(error.message,'error');}
+    catch(error){day.adhered=previous;input.checked=previous;input.closest('.task')?.classList.toggle('done',previous); updatePlannerAdherence();toast(error.message,'error');}
   });
 }
 
