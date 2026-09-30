@@ -187,6 +187,7 @@ function demoData() {
 
 async function boot() {
   try {
+    if (new URLSearchParams(location.search).get('pilot') === 'demo') return;
     if (!db) throw new Error('The secure connection did not load. Refresh the page.');
     if (recoveryMode) return show('#recovery');
     const { data: { user } } = await db.auth.getUser();
@@ -543,7 +544,7 @@ function plannerCards({ interactive = false, coachEdit = false } = {}) {
     ${day.sessions.map((session) => `<div class="task-row ${session.status === 'completed' ? 'done' : ''}"><label class="task"><input type="checkbox" data-session-complete="${session.id}" ${session.status === 'completed' ? 'checked' : ''} ${interactive ? '' : 'disabled'}><span><b>${esc(session.title)}</b><small>${title(session.training_type)}${session.moved_from_date ? ` · Moved from ${fmt(session.moved_from_date, { weekday: 'long' })}` : ''}</small></span></label>${interactive ? `<button class="open-session" data-open-session="${session.id}" type="button">Open</button>` : ''}</div>`).join('')}
     <label class="task ${Number(day.step?.actual_steps || day.step?.steps || 0) >= safeStepGoal() ? 'done' : ''}"><input type="checkbox" data-step-date="${day.date}" ${Number(day.step?.actual_steps || day.step?.steps || 0) >= safeStepGoal() ? 'checked' : ''} ${interactive ? '' : 'disabled'}><span><b>${safeStepGoal().toLocaleString()} steps</b><small>Daily movement</small></span></label>
     ${coachEdit ? `<label class="planner-nutrition">Nutrition<select data-nutrition-date="${day.date}"><option value="">Not assigned</option>${state.data.nutritionPlans.filter(plan=>plan.is_active!==false).map(plan=>`<option value="${plan.id}" ${day.nutrition?.nutrition_plan_id===plan.id?'selected':''}>${esc(nutritionDayLabel(plan))}</option>`).join('')}</select></label>` : (day.nutrition ? `<label class="task ${day.nutrition.adhered?'done':''}"><input type="checkbox" data-nutrition-complete="${day.date}" ${day.nutrition.adhered?'checked':''} ${interactive?'':'disabled'}><span><b>${esc(nutritionDayLabel(state.data.nutritionPlans.find(plan=>plan.id===day.nutrition.nutrition_plan_id)||{day_type:'Nutrition'}))}</b><small>${day.nutrition.calorie_target || state.client.calorie_goal || 'Target'} kcal</small></span></label>` : '<div class="plan-item nutrition"><b>Nutrition</b><span>Not assigned</span></div>')}
-    ${!day.sessions.length ? '<p class="source-gap">No training scheduled</p>' : ''}
+    ${interactive && day.nutrition?.nutrition_plan_id ? `<button type="button" class="btn ghost small" data-open-meal-plan="${day.nutrition.nutrition_plan_id}" data-meal-date="${day.date}">View meals & ingredients</button>` : ''}${!day.sessions.length ? '<p class="source-gap">Rest from scheduled training</p>' : ''}
   </article>`).join('')}</div>`;
 }
 
@@ -571,9 +572,12 @@ function coachPlanner() {
 
 function planForDay(day) {
   const active = state.data.nutritionPlans.filter((plan) => plan.is_active !== false);
+  const weekday = (day.dateObject.getDay() + 6) % 7;
+  const exact = active.find(plan => plan.source_json?.weekday === weekday);
+  if (exact) return exact;
   const training = active.find((plan) => /training/i.test(plan.day_type || plan.name || '') && !/non|rest/i.test(plan.day_type || plan.name || ''));
   const rest = active.find((plan) => /rest|non[- ]?training/i.test(plan.day_type || plan.name || ''));
-  const hasGym = day.sessions.some((session) => ['weights', 'resistance'].includes(session.training_type));
+  const hasGym = day.sessions.some((session) => ['weights', 'resistance', 'cardio'].includes(session.training_type));
   return (hasGym ? training : rest) || training || rest || active[0] || null;
 }
 
@@ -589,7 +593,7 @@ async function autofillNutritionWeek(event) {
     if (!plan) return null;
     return { week_id: week.id, nutrition_date: day.date, nutrition_plan_id: plan.id, calorie_target: plan.calories, protein_target_g: plan.protein_g, carbs_target_g: plan.carbs_g, fat_target_g: plan.fat_g, adhered: day.nutrition?.adhered || false };
   }).filter(Boolean);
-  if (!rows.length) return toast('Add an active nutrition plan first', 'error');
+  if (!rows.length) return toast(days.every(day => day.nutrition) ? 'Every day already has a meal plan' : 'Add an active nutrition plan first');
   if (state.preview) {
     rows.forEach((row) => { state.data.nutritionDays.push({ ...row, id: `preview-nutrition-${row.nutrition_date}` }); });
     toast('Training and rest-day nutrition assigned');
@@ -598,7 +602,8 @@ async function autofillNutritionWeek(event) {
   setBusy(event.currentTarget, true, 'Assigning…');
   try {
     const saved = await query('Nutrition week', db.from('nutrition_days').upsert(rows, { onConflict: 'week_id,nutrition_date' }).select());
-    state.data.nutritionDays = [...state.data.nutritionDays.filter((day) => day.week_id !== week.id), ...saved];
+    const savedIds = new Set(saved.map(day => day.id));
+    state.data.nutritionDays = [...state.data.nutritionDays.filter(day => !savedIds.has(day.id)), ...saved];
     toast('Training and rest-day nutrition assigned');
     coachPlanner();
   } catch (error) { toast(error.message, 'error'); setBusy(event.currentTarget, false); }
@@ -682,9 +687,9 @@ function exerciseCard(exercise, loggable = false) {
   const previous = previousLogs.length
     ? [...latestBySet.values()].sort((a, b) => a.set_number - b.set_number).map((log) => `${log.load ?? '—'} ${log.load_unit || ''} × ${log.reps ?? '—'}`).join(' · ')
     : exercise.previous_performance;
-  return `<article class="exercise-card"><div class="exercise-title"><div><span class="eyebrow">${exercise.sort_order != null ? `EXERCISE ${Number(exercise.sort_order) + 1}` : 'EXERCISE'}</span><h3>${esc(exercise.name)}</h3></div>${exercise.video_url ? `<a class="btn ghost small" href="${esc(exercise.video_url)}" target="_blank" rel="noopener">Watch video</a>` : '<span class="pill">NO VIDEO</span>'}</div>
-    <div class="prescription-grid"><div><span>SETS</span><strong>${exercise.sets ?? '—'}</strong></div><div><span>REPS</span><strong>${esc(exercise.reps || '—')}</strong></div><div><span>REST</span><strong>${exercise.rest_seconds ? `${exercise.rest_seconds}s` : '—'}</strong></div><div><span>TEMPO / INTENSITY</span><strong>${esc(exercise.tempo || exercise.rpe || exercise.rir || '—')}</strong></div></div>
-    ${previous ? `<p class="previous"><b>Previous:</b> ${esc(previous)}</p><details class="exercise-history"><summary>Exercise history</summary>${previousLogs.slice(0, 12).map((log) => `<div class="note-row"><b>${fmt(log.performed_at)}</b><span>Set ${log.set_number}: ${log.load ?? '—'} ${esc(log.load_unit || '')} × ${log.reps ?? '—'}</span></div>`).join('')}</details>` : ''}
+  return `<article class="exercise-card"><div class="exercise-title"><div><span class="eyebrow">${exercise.sort_order != null ? `EXERCISE ${Number(exercise.sort_order) + 1}` : 'EXERCISE'}</span><h3>${esc(exercise.name)}</h3></div>${safeMediaUrl(exercise.video_url) ? `<a class="btn ghost small" href="${esc(exercise.video_url)}" target="_blank" rel="noopener">Watch video</a>` : '<span class="pill">NO VIDEO</span>'}</div>
+    <div class="prescription-grid"><div><span>SETS</span><strong>${exercise.sets ?? '—'}</strong></div><div><span>REPS</span><strong>${esc(exercise.reps || '—')}</strong></div><div><span>REST</span><strong>${exercise.rest_seconds ? `${exercise.rest_seconds}s` : '—'}</strong></div><div><span>TEMPO / INTENSITY</span><strong>${esc([exercise.tempo ? `Tempo ${exercise.tempo}` : '', exercise.rpe != null ? `RPE ${exercise.rpe}` : '', exercise.rir != null ? `${exercise.rir} RIR` : ''].filter(Boolean).join(' · ') || '—')}</strong></div></div>
+    ${exercise.superset_group ? `<p class="pill">Superset ${esc(exercise.superset_group)}</p>` : ''}${safeMediaUrl(exercise.image_url) ? `<img class="exercise-photo" src="${esc(exercise.image_url)}" alt="${esc(exercise.name)} demonstration" loading="lazy">` : ''}${previous ? `<p class="previous"><b>Previous:</b> ${esc(previous)}</p><details class="exercise-history"><summary>Exercise history</summary>${previousLogs.slice(0, 12).map((log) => `<div class="note-row"><b>${fmt(log.performed_at)}</b><span>Set ${log.set_number}: ${log.load ?? '—'} ${esc(log.load_unit || '')} × ${log.reps ?? '—'}</span></div>`).join('')}</details>` : ''}
     ${(exercise.coach_instructions || exercise.notes) ? `<p>${esc(exercise.coach_instructions || exercise.notes)}</p>` : ''}
     ${loggable ? `<form class="set-log" data-exercise-log="${exercise.id}">${Array.from({ length: Math.max(1, Number(exercise.sets || 1)) }, (_, index) => { const set = index + 1; const old = latestBySet.get(set); return `<div class="set-log-row"><b>Set ${set}</b><label>Reps<input name="reps_${set}" type="number" min="0" step="1" value="${old?.reps ?? ''}"></label><label>Load<input name="load_${set}" type="number" min="0" step="0.1" value="${old?.load ?? ''}"></label><label>RIR<input name="rir_${set}" type="number" min="0" max="10" step="0.5" value="${old?.rir ?? ''}"></label></div>`; }).join('')}<button class="btn primary small">Save workout sets</button></form>` : ''}
   </article>`;
@@ -696,7 +701,7 @@ function programDayExercises(day) {
 
 function exercisesForSession(session) {
   const programmeDay = state.data.programs.flatMap((program) => program.days || []).find((day) => day.id === session.programme_day_id);
-  if (programmeDay) return programDayExercises(programmeDay);
+  if (programmeDay) return programDayExercises(programmeDay).map(exercise => ({...exercise, video_url: exercise.video_url || state.data.exerciseBank.find(bank => bank.id === exercise.exercise_bank_id)?.video_url}));
   return state.data.exercises.filter((exercise) => exercise.session_id === session.id);
 }
 
@@ -748,6 +753,7 @@ function validateTrainingPlan(plan) {
         throw new Error(`${location}: rest_seconds must be zero or more.`);
       if (exercise.video_url && !/^https:\/\//i.test(String(exercise.video_url)))
         throw new Error(`${location}: video_url must be an HTTPS link.`);
+      if (exercise.image_url && !/^https:\/\//i.test(String(exercise.image_url))) throw new Error(`${location}: image_url must be an HTTPS link.`);
     });
   });
   return plan;
@@ -778,7 +784,7 @@ function bindTrainingSetupTools(){
 async function addExerciseFromBank(event){
   event.preventDefault(); const fd=new FormData(event.target), day=state.data.programs.flatMap(program=>program.days||[]).find(item=>item.id===fd.get('program_day_id')), bank=state.data.exerciseBank.find(item=>item.id===fd.get('exercise_bank_id'));
   if(!day||!bank) return toast('Choose an exercise and training day','error');
-  const row={program_day_id:day.id,exercise_bank_id:bank.id,name:bank.name,sets:Number(fd.get('sets'))||null,reps:String(fd.get('reps')||'').trim()||null,rest_seconds:Number(fd.get('rest_seconds'))||null,video_url:bank.video_url||null,coach_instructions:bank.instructions||bank.coaching_cues||null,sort_order:(day.exercises||[]).length};
+  const row={program_day_id:day.id,exercise_bank_id:bank.id,name:bank.name,sets:Number(fd.get('sets'))||null,reps:String(fd.get('reps')||'').trim()||null,rest_seconds:Number(fd.get('rest_seconds'))||null,video_url:bank.video_url||null,image_url:bank.image_url||null,coach_instructions:bank.instructions||bank.coaching_cues||null,sort_order:(day.exercises||[]).length};
   if(state.preview){const saved={...row,id:`preview-bank-${Date.now()}`};day.exercises.push(saved);state.data.exercises.push(saved);toast('Exercise added in preview');return coachTraining();}
   setBusy(event.submitter,true);
   try{const [saved]=await query('Bank exercise',db.from('program_exercises').insert(row).select());day.exercises.push(saved);state.data.exercises.push(saved);toast(`${bank.name} added to ${day.title}`);coachTraining();}
@@ -803,7 +809,7 @@ async function scheduleProgrammeWeek(event){
   }catch(error){toast(error.message,'error');setBusy(event.submitter,false);}
 }
 
-async function importTrainingJson(event){event.preventDefault();let parsed;try{parsed=validateTrainingPlan(parsePastedPlanJson(new FormData(event.target).get('training_json')));}catch(error){const message=`Invalid programme: ${error.message}`;const panel=$('#trainingImportError');if(panel){panel.textContent=message;panel.hidden=false;}return toast(message,'error');}$('#trainingImportError').hidden=true;if(state.preview){state.data.programs.unshift({id:`preview-program-${Date.now()}`,name:parsed.programme_name,status:'draft',days:parsed.days.map((day,i)=>({...day,id:`preview-day-${i}`,day_index:i,exercises:(day.exercises||[]).map((ex,j)=>({...ex,id:`preview-ex-${i}-${j}`,sort_order:j}))}))});toast('Programme imported in preview');return coachTraining();}setBusy(event.submitter,true);try{const [program]=await query('Programme',db.from('training_programs').insert({client_id:state.client.id,name:parsed.programme_name,status:'draft',created_by:state.user.id}).select());program.days=[];for(let i=0;i<parsed.days.length;i++){const day=parsed.days[i];const [savedDay]=await query('Training day',db.from('training_program_days').insert({program_id:program.id,title:day.title,training_type:day.training_type||'weights',day_index:i,coach_notes:day.coach_notes||null}).select());savedDay.exercises=[];for(let j=0;j<(day.exercises||[]).length;j++){const ex=day.exercises[j];const allowed=Object.fromEntries(['name','sets','reps','load','rest_seconds','tempo','rpe','rir','superset_group','video_url','coach_instructions'].filter(key=>ex[key]!=null).map(key=>[key,ex[key]]));const [saved]=await query('Exercise',db.from('program_exercises').insert({...allowed,program_day_id:savedDay.id,sort_order:j}).select());savedDay.exercises.push(saved);state.data.exercises.push(saved);}program.days.push(savedDay);}state.data.programs.unshift(program);toast('Programme imported');coachTraining();}catch(error){console.error('[training-import]',error);toast(error.message,'error');setBusy(event.submitter,false);}}
+async function importTrainingJson(event){event.preventDefault();let parsed;try{parsed=validateTrainingPlan(parsePastedPlanJson(new FormData(event.target).get('training_json')));}catch(error){const message=`Invalid programme: ${error.message}`;const panel=$('#trainingImportError');if(panel){panel.textContent=message;panel.hidden=false;}return toast(message,'error');}$('#trainingImportError').hidden=true;if(state.preview){state.data.programs.unshift({id:`preview-program-${Date.now()}`,name:parsed.programme_name,status:'draft',days:parsed.days.map((day,i)=>({...day,id:`preview-day-${i}`,day_index:i,exercises:(day.exercises||[]).map((ex,j)=>({...ex,id:`preview-ex-${i}-${j}`,sort_order:j}))}))});toast('Programme imported in preview');return coachTraining();}setBusy(event.submitter,true);try{const [program]=await query('Programme',db.from('training_programs').insert({client_id:state.client.id,name:parsed.programme_name,status:'draft',created_by:state.user.id}).select());program.days=[];for(let i=0;i<parsed.days.length;i++){const day=parsed.days[i];const [savedDay]=await query('Training day',db.from('training_program_days').insert({program_id:program.id,title:day.title,training_type:day.training_type||'weights',day_index:i,coach_notes:day.coach_notes||null}).select());savedDay.exercises=[];for(let j=0;j<(day.exercises||[]).length;j++){const ex=day.exercises[j];const allowed=Object.fromEntries(['name','sets','reps','load','rest_seconds','tempo','rpe','rir','superset_group','video_url','image_url','coach_instructions'].filter(key=>ex[key]!=null).map(key=>[key,ex[key]]));const [saved]=await query('Exercise',db.from('program_exercises').insert({...allowed,program_day_id:savedDay.id,sort_order:j}).select());savedDay.exercises.push(saved);state.data.exercises.push(saved);}program.days.push(savedDay);}state.data.programs.unshift(program);toast('Programme imported');coachTraining();}catch(error){console.error('[training-import]',error);toast(error.message,'error');setBusy(event.submitter,false);}}
 
 async function addActivitySession(event){event.preventDefault();const week=currentWeek(),fd=new FormData(event.target);if(!week)return toast('Create a programme week first','error');const row={week_id:week.id,training_type:fd.get('training_type'),session_date:fd.get('session_date'),title:String(fd.get('title')).trim(),duration_minutes:Number(fd.get('duration_minutes'))||null,notes:String(fd.get('notes')||'').trim()||null};if(state.preview){state.data.sessions.push({...row,id:`preview-session-${Date.now()}`,status:'planned'});toast('Activity added in preview');return coachTraining();}try{const [saved]=await query('Activity',db.from('training_sessions').insert(row).select());state.data.sessions.push(saved);toast('Activity added');coachTraining();}catch(error){console.error('[activity-add]',error);toast(error.message,'error');}}
 async function saveActivitySession(event){event.preventDefault();const fd=new FormData(event.target),id=event.target.dataset.sessionEditor;const patch={training_type:fd.get('training_type'),session_date:fd.get('session_date'),title:String(fd.get('title')).trim(),duration_minutes:Number(fd.get('duration_minutes'))||null};if(state.preview){Object.assign(state.data.sessions.find(s=>s.id===id),patch);toast('Activity saved in preview');return;}try{await query('Activity',db.from('training_sessions').update(patch).eq('id',id).select());Object.assign(state.data.sessions.find(s=>s.id===id),patch);toast('Activity saved');}catch(error){console.error('[activity-save]',error);toast(error.message,'error');}}
@@ -821,7 +827,7 @@ function programDayBuilderMarkup(day) {
 }
 
 function exerciseEditorMarkup(exercise) {
-  return `${exerciseCard(exercise)}<form class="exercise-editor" data-exercise-editor="${exercise.id}"><div class="editor-grid"><label>Name<input name="name" value="${esc(exercise.name)}" required></label><label>Sets<input name="sets" type="number" min="1" value="${exercise.sets ?? ''}"></label><label>Reps<input name="reps" value="${esc(exercise.reps || '')}"></label><label>Rest (sec)<input name="rest_seconds" type="number" min="0" value="${exercise.rest_seconds ?? ''}"></label><label>Tempo<input name="tempo" value="${esc(exercise.tempo || '')}"></label><label>RPE<input name="rpe" type="number" min="1" max="10" step="0.5" value="${exercise.rpe ?? ''}"></label><label>RIR<input name="rir" type="number" min="0" max="10" step="0.5" value="${exercise.rir ?? ''}"></label><label>Superset<input name="superset_group" value="${esc(exercise.superset_group || '')}"></label><label class="wide">Video URL<input name="video_url" type="url" value="${esc(exercise.video_url || '')}"></label><label class="wide">Instructions<textarea name="coach_instructions" rows="2">${esc(exercise.coach_instructions || exercise.notes || '')}</textarea></label></div><div class="editor-actions"><button class="btn primary small">Save exercise</button><button class="btn ghost small danger" type="button" data-delete-exercise="${exercise.id}">Delete exercise</button></div></form>`;
+  return `${exerciseCard(exercise)}<form class="exercise-editor" data-exercise-editor="${exercise.id}"><div class="editor-grid"><label>Name<input name="name" value="${esc(exercise.name)}" required></label><label>Sets<input name="sets" type="number" min="1" value="${exercise.sets ?? ''}"></label><label>Reps<input name="reps" value="${esc(exercise.reps || '')}"></label><label>Rest (sec)<input name="rest_seconds" type="number" min="0" value="${exercise.rest_seconds ?? ''}"></label><label>Tempo<input name="tempo" value="${esc(exercise.tempo || '')}"></label><label>RPE<input name="rpe" type="number" min="1" max="10" step="0.5" value="${exercise.rpe ?? ''}"></label><label>RIR<input name="rir" type="number" min="0" max="10" step="0.5" value="${exercise.rir ?? ''}"></label><label class="wide">Image URL<input name="image_url" type="url" value="${esc(exercise.image_url || '')}"></label><label>Superset<input name="superset_group" value="${esc(exercise.superset_group || '')}"></label><label class="wide">Video URL<input name="video_url" type="url" value="${esc(exercise.video_url || '')}"></label><label class="wide">Instructions<textarea name="coach_instructions" rows="2">${esc(exercise.coach_instructions || exercise.notes || '')}</textarea></label></div><div class="editor-actions"><button class="btn primary small">Save exercise</button><button class="btn ghost small danger" type="button" data-delete-exercise="${exercise.id}">Delete exercise</button></div></form>`;
 }
 
 async function addProgramDay(event) {
@@ -849,7 +855,7 @@ async function saveExercisePrescription(event) {
   const exercise = state.data.exercises.find((item) => item.id === event.target.dataset.exerciseEditor);
   if (!exercise) return toast('Exercise not found', 'error');
   const fd = new FormData(event.target);
-  const patch = Object.fromEntries(['name', 'reps', 'tempo', 'video_url', 'coach_instructions', 'superset_group'].map((key) => [key, String(fd.get(key) || '').trim() || null]));
+  const patch = Object.fromEntries(['name', 'reps', 'tempo', 'video_url', 'image_url', 'coach_instructions', 'superset_group'].map((key) => [key, String(fd.get(key) || '').trim() || null]));
   for (const key of ['sets', 'rest_seconds', 'rpe', 'rir']) patch[key] = fd.get(key) === '' ? null : Number(fd.get(key));
   Object.assign(exercise, patch);
   if (state.preview) { toast('Exercise updated in preview'); return coachTraining(); }
@@ -864,7 +870,7 @@ function macroStrip(plan) {
 
 function mealPlan(plan) {
   return `<article class="panel nutrition-plan"><div class="panel-head"><div><span class="eyebrow">${esc(plan.day_type || 'PLAN')}</span><h2>${esc(plan.name)}</h2></div><span class="pill">${plan.days_per_week ?? '—'} DAYS / WEEK</span></div>${macroStrip(plan)}
-    <div class="meal-grid">${(plan.meals || []).sort((a, b) => a.sort_order - b.sort_order).map((meal) => `<section class="meal-card"><span class="eyebrow">${esc(meal.timing || 'MEAL')}</span><h3>${esc(meal.name)}</h3>${(meal.items || []).sort((a, b) => a.sort_order - b.sort_order).map((item) => `<div class="ingredient-row"><div><b>${esc(item.name)}</b>${item.description ? `<p>${esc(item.description)}</p>` : ''}</div><span>${esc([item.quantity, item.unit].filter((value) => value != null && value !== '').join(' ') || 'As directed')}</span></div>`).join('') || '<div class="empty">No ingredients were recovered for this meal.</div>'}</section>`).join('') || '<div class="empty">No meals have been added to this plan.</div>'}</div>
+    <div class="meal-grid">${(plan.meals || []).sort((a, b) => a.sort_order - b.sort_order).map((meal) => `<section class="meal-card"><span class="eyebrow">${esc(meal.timing || 'MEAL')}</span><h3>${esc(meal.name)}</h3>${(meal.items || []).sort((a, b) => a.sort_order - b.sort_order).map((item) => `<div class="ingredient-row"><div><b>${esc(item.name)}</b>${item.description ? `<p>${esc(item.description)}</p>` : ''}</div><span>${esc(nutritionUnit(item.quantity, item.unit) || 'Amount not specified')}</span></div>`).join('') || '<div class="empty">No ingredients were recovered for this meal.</div>'}</section>`).join('') || '<div class="empty">No meals have been added to this plan.</div>'}</div>
     ${plan.coach_notes ? `<div class="coach-note"><b>Coach notes</b><p>${esc(plan.coach_notes)}</p></div>` : ''}</article>`;
 }
 
@@ -875,12 +881,21 @@ function ingredientAmount(ingredient) {
 
 function nutritionUnit(amount, unit) {
   if (amount == null || amount === '') return '';
-  const n = Number(amount);
+  const n = Number(amount), u = String(unit || '').trim().toLowerCase();
   const raw = `${amount}${unit ? ` ${unit}` : ''}`;
-  if (state.client?.weight_unit !== 'lbs' || !Number.isFinite(n)) return raw;
-  if (String(unit).toLowerCase() === 'g') return `${(n / 28.3495).toFixed(n < 30 ? 1 : 2).replace(/\.00$/, '')} oz`;
-  if (String(unit).toLowerCase() === 'kg') return `${(n * 2.20462).toFixed(1)} lb`;
-  if (String(unit).toLowerCase() === 'ml') return n >= 60 ? `${(n / 236.588).toFixed(2).replace(/0$/, '')} cups` : `${(n / 14.7868).toFixed(1)} tbsp`;
+  if (!Number.isFinite(n)) return raw;
+  const us = (state.foodUnits || (state.client?.weight_unit === 'lbs' ? 'us' : 'metric')) === 'us';
+  const rounded = value => Number(value.toFixed(2));
+  if (us) {
+    if (u === 'g') return `${rounded(n / 28.349523125)} oz`;
+    if (u === 'kg') return `${rounded(n * 35.27396195)} oz`;
+    if (u === 'ml') return `${rounded(n / 29.57352956)} fl oz`;
+    if (u === 'l') return `${rounded(n * 33.8140227)} fl oz`;
+  } else {
+    if (u === 'oz') return `${rounded(n * 28.349523125)} g`;
+    if (['lb','lbs'].includes(u)) return `${rounded(n * 453.59237)} g`;
+    if (u === 'fl oz') return `${rounded(n * 29.57352956)} ml`;
+  }
   return raw;
 }
 
@@ -901,10 +916,9 @@ function cleanIngredient(ingredient) {
 }
 
 function recoveredMealDescription(meal) {
-  const lines = String(meal?.preparation || '').split(/\n+/).map((line) => line.trim()).filter(Boolean);
-  return lines.find((line) => ![
-    meal?.meal_type, meal?.name
-  ].includes(line) && !/^(import with ai|save meal plan|add meal|add day type|total:|days\/week|[1-7]|delete day type)$/i.test(line) && !/^\d+\s*kcal/i.test(line) && !/^[pcf]\s*\d+/i.test(line)) || '';
+  const text = String(meal?.preparation || '').trim();
+  if (/import with ai|save meal plan|add meal|days\/week|delete day type|add day type|\d+\s*kcal/i.test(text)) return '';
+  return text;
 }
 
 function inferredAmount(ingredient, meal) {
@@ -918,8 +932,8 @@ function inferredAmount(ingredient, meal) {
 
 function mealCardMarkup(meal, editable = false) {
   const ingredients = usableIngredients(meal).map(cleanIngredient);
-  const description = recoveredMealDescription(meal);
-  return `<section class="meal-card"><div class="meal-card-head"><div><span class="eyebrow">${esc(meal.meal_type || 'MEAL')}</span><h3>${esc(meal.name)}</h3></div><div><strong>${meal.calories ?? '—'} kcal</strong>${editable ? `<div class="meal-actions"><button class="text-btn" type="button" data-edit-meal="${meal.id}">Edit</button><button class="text-btn" type="button" data-duplicate-meal="${meal.id}">Duplicate</button><button class="text-btn danger" type="button" data-delete-meal="${meal.id}">Remove</button></div>` : ''}</div></div><div class="meal-macro-strip"><span><b>Protein</b> ${meal.protein_g ?? '—'}g</span><span><b>Carbs</b> ${meal.carbs_g ?? '—'}g</span><span><b>Fat</b> ${meal.fat_g ?? '—'}g</span></div>${ingredients.length ? `<h4 class="food-heading">Ingredients</h4><div class="ingredient-list">${ingredients.map((ingredient) => `<div><b>${esc(ingredient.name)}</b><span>${esc(inferredAmount(ingredient, meal) || 'Amount unavailable in source')}</span></div>`).join('')}</div>` : '<div class="source-gap">No ingredient list was present in the recovered source.</div>'}${meal.cooking_instructions || description ? `<details class="meal-method" open><summary>Preparation</summary><p>${esc(meal.cooking_instructions || description)}</p></details>` : ''}${editable ? `<form class="meal-editor hidden" data-meal-editor="${meal.id}"><div class="editor-grid"><label>Name<input name="name" value="${esc(meal.name)}" required></label><label>Meal type<input name="meal_type" value="${esc(meal.meal_type || '')}" required></label><label>Calories<input name="calories" type="number" min="0" value="${meal.calories ?? ''}"></label><label>Protein (g)<input name="protein_g" type="number" min="0" value="${meal.protein_g ?? ''}"></label><label>Carbs (g)<input name="carbs_g" type="number" min="0" value="${meal.carbs_g ?? ''}"></label><label>Fat (g)<input name="fat_g" type="number" min="0" value="${meal.fat_g ?? ''}"></label><label class="wide">Ingredients — one per line: quantity | unit | food<textarea name="ingredients" rows="7" placeholder="5 | oz | chicken breast">${esc(ingredients.map((item) => `${item.quantity || ''} | ${item.unit || ''} | ${item.name}`).join('\n'))}</textarea></label><label class="wide">Preparation<textarea name="cooking_instructions" rows="5">${esc(meal.cooking_instructions || description)}</textarea></label></div><button class="btn primary small">Save meal</button></form>` : ''}</section>`;
+  const description = meal.cooking_instructions ? '' : recoveredMealDescription(meal);
+  return `<section class="meal-card"><div class="meal-card-head"><div><span class="eyebrow">${esc(meal.meal_type || 'MEAL')}</span><h3>${esc(meal.name)}</h3></div><div><strong>${meal.calories ?? '—'} kcal</strong>${editable ? `<div class="meal-actions"><button class="text-btn" type="button" data-edit-meal="${meal.id}">Edit</button><button class="text-btn" type="button" data-duplicate-meal="${meal.id}">Duplicate</button><button class="text-btn danger" type="button" data-delete-meal="${meal.id}">Remove</button></div>` : ''}</div></div><div class="meal-macro-strip"><span><b>Protein</b> ${meal.protein_g ?? '—'}g</span><span><b>Carbs</b> ${meal.carbs_g ?? '—'}g</span><span><b>Fat</b> ${meal.fat_g ?? '—'}g</span></div>${ingredients.length ? `<h4 class="food-heading">Ingredients</h4><div class="ingredient-list">${ingredients.map((ingredient) => `<div><b>${esc(ingredient.name)}</b><span>${esc(scaledIngredientAmount(ingredient, meal) || 'Ask your coach for the amount')}</span></div>`).join('')}</div>` : '<div class="source-gap">No ingredient list was present in the recovered source.</div>'}${meal.cooking_instructions || description ? `<details class="meal-method" open><summary>How to prepare</summary>${cookingStepsMarkup(meal.cooking_instructions || description)}</details>` : ''}${meal.swaps?.length ? `<details class="meal-method"><summary>Alternatives</summary><ul>${meal.swaps.map(swap=>`<li>${esc(humanValue(swap))}</li>`).join('')}</ul></details>` : ''}${editable ? `<form class="meal-editor hidden" data-meal-editor="${meal.id}"><div class="editor-grid"><label>Name<input name="name" value="${esc(meal.name)}" required></label><label>Meal type<input name="meal_type" value="${esc(meal.meal_type || '')}" required></label><label>Calories<input name="calories" type="number" min="0" value="${meal.calories ?? ''}"></label><label>Protein (g)<input name="protein_g" type="number" min="0" value="${meal.protein_g ?? ''}"></label><label>Carbs (g)<input name="carbs_g" type="number" min="0" value="${meal.carbs_g ?? ''}"></label><label>Fat (g)<input name="fat_g" type="number" min="0" value="${meal.fat_g ?? ''}"></label><label class="wide">Ingredients — one per line: quantity | unit | food<textarea name="ingredients" rows="7" placeholder="5 | oz | chicken breast">${esc(ingredients.map((item) => `${item.quantity || ''} | ${item.unit || ''} | ${item.name}`).join('\n'))}</textarea></label><label class="wide">Preparation<textarea name="cooking_instructions" rows="5">${esc(meal.cooking_instructions || description)}</textarea></label></div><button class="btn primary small">Save meal</button></form>` : ''}</section>`;
 }
 
 function assignedMealsForPlan(plan) {
@@ -941,18 +955,20 @@ function nutritionPlanMarkup(plan) {
 }
 
 function nutritionDayLabel(plan) {
-  return /non[- ]?training|rest/i.test(plan?.day_type || plan?.name || '') ? 'Rest Day' : (plan?.day_type || plan?.name || 'Plan');
+  const category = /non[- ]?training|rest/i.test(plan?.day_type || '') ? 'Rest Day' : (plan?.day_type || 'Plan');
+  const name = plan?.name;
+  return name && !['Training Day','Rest Day','Non-Training Day','Busy Day'].includes(name) ? `${name} · ${category}` : category;
 }
 
 function nutritionImportPrompt() {
   const units = state.client?.weight_unit === 'lbs' ? 'US-friendly ounces, cups, tablespoons and counts' : 'grams, millilitres and counts';
   const onboarding = state.data.onboarding[0]?.responses || {};
   const goals = { calories: state.client?.calorie_goal ?? null, protein_g: state.client?.protein_goal_g ?? null, carbs_g: state.client?.carbs_goal_g ?? null, fat_g: state.client?.fat_goal_g ?? null };
-  return `Create a practical 3-day nutrition plan for ${state.client?.display_name || 'this client'}, a busy legal professional, using ${units}. Return JSON only. Use the onboarding answers and stated goals below. Treat missing details as unknown: do not invent allergies, restrictions or targets. Keep meals measured and suitable for unpredictable workdays. Use exactly three day types: Training Day, Rest Day, Busy Day. Busy Day meals must be portable, batch-prepared or genuinely quick.\n\nCLIENT GOALS:\n${JSON.stringify(goals)}\n\nONBOARDING:\n${JSON.stringify(onboarding)}\n\nSchema:\n{"days":[{"day_type":"Training Day","name":"Training Day","days_per_week":3,"calories":2200,"protein_g":180,"carbs_g":230,"fat_g":60,"coach_notes":"","meals":[{"name":"Meal name","meal_type":"Breakfast","calories":500,"protein_g":40,"carbs_g":55,"fat_g":12,"ingredients":[{"quantity":2,"unit":"oz","name":"oats"}],"cooking_instructions":"Clear numbered preparation steps","swaps":["Alternative"]}]}]}`;
+  return `Create a practical nutrition plan with 1–7 complete day variants for ${state.client?.display_name || 'this client'}, a busy legal professional, using ${units}. Return JSON only. Use the onboarding answers and stated goals below. Treat missing details as unknown: do not invent allergies, restrictions or targets. Keep meals measured and suitable for unpredictable workdays. Use Training Day, Rest Day or Busy Day categories. For a distinct seven-day menu, include weekday 0–6 (Monday–Sunday), unique names and days_per_week:1. Otherwise use repeatable day variants with days_per_week totaling 7. Include raw/cooked/drained weight basis when known, numbered cooking steps and optional batch-prep guidance; do not invent missing restrictions. Busy Day meals must be portable, batch-prepared or genuinely quick.\n\nCLIENT GOALS:\n${JSON.stringify(goals)}\n\nONBOARDING:\n${JSON.stringify(onboarding)}\n\nSchema:\n{"days":[{"day_type":"Training Day","name":"Training Day","days_per_week":3,"calories":2200,"protein_g":180,"carbs_g":230,"fat_g":60,"coach_notes":"","meals":[{"name":"Meal name","meal_type":"Breakfast","calories":500,"protein_g":40,"carbs_g":55,"fat_g":12,"ingredients":[{"quantity":2,"unit":"oz","name":"oats"}],"cooking_instructions":"Clear numbered preparation steps","swaps":["Alternative"]}]}]}`;
 }
 
 function nutritionImportPanel() {
-  return `<section id="nutritionImportPanel" class="panel import-prompt hidden"><div class="panel-head"><div><span class="eyebrow">FAST BUILD</span><h3>Import a complete 3-day plan</h3></div><button class="btn ghost small" type="button" id="copyNutritionPrompt">Copy AI prompt</button></div><p class="muted">Paste JSON with Training Day, Rest Day and Busy Day. The importer validates every meal before saving.</p><form id="nutritionJsonForm"><label class="field">Nutrition JSON<textarea name="nutrition_json" rows="12" placeholder='{"days":[...]}' required></textarea></label><button class="btn primary" type="submit">Validate & import plan</button></form></section>`;
+  return `<section id="nutritionImportPanel" class="panel import-prompt hidden"><div class="panel-head"><div><span class="eyebrow">FAST BUILD</span><h3>Import a complete meal plan</h3></div><button class="btn ghost small" type="button" id="copyNutritionPrompt">Copy AI prompt</button></div><p class="muted">Import 1–7 complete days. Use repeatable Training/Rest/Busy days, or seven named weekdays. Every meal needs measured ingredients and cooking instructions.</p><form id="nutritionJsonForm"><label class="field">Nutrition JSON<textarea name="nutrition_json" rows="12" placeholder='{"days":[...]}' required></textarea></label><button class="btn primary" type="submit">Validate & import plan</button></form></section>`;
 }
 
 async function copyNutritionPrompt() {
@@ -961,17 +977,21 @@ async function copyNutritionPrompt() {
 }
 
 function validateNutritionImport(payload) {
-  if (!payload || !Array.isArray(payload.days) || payload.days.length !== 3) throw new Error('JSON must contain exactly three days.');
-  const required = ['Training Day', 'Rest Day', 'Busy Day'];
-  required.forEach((type) => { if (!payload.days.some((day) => day.day_type === type)) throw new Error(`${type} is missing.`); });
+  if (!payload || !Array.isArray(payload.days) || payload.days.length < 1 || payload.days.length > 7) throw new Error('JSON must contain between one and seven meal-plan days.');
+  const weekdays = payload.days.map(day => day.weekday).filter(value => value != null);
+  if (weekdays.length && (weekdays.length !== 7 || new Set(weekdays).size !== 7 || weekdays.some(value => !Number.isInteger(value) || value < 0 || value > 6))) throw new Error('A weekly plan needs each weekday exactly once (Monday = 0, Sunday = 6).');
+  payload.days.forEach(day => {
+    if (!['Training Day','Rest Day','Busy Day','Non-Training Day'].includes(day.day_type)) throw new Error('Each day needs a Training Day, Rest Day or Busy Day category.');
+    if (!Number.isInteger(day.days_per_week) || day.days_per_week < 1 || day.days_per_week > 7) throw new Error('Days per week must be a whole number from 1 to 7.');
+  });
   const scheduledDays = payload.days.reduce((sum, day) => sum + Number(day.days_per_week || 0), 0);
   if (scheduledDays !== 7) throw new Error('Days per week must total exactly 7.');
   payload.days.forEach((day) => {
-    if (!Array.isArray(day.meals) || day.meals.length < 3) throw new Error(`${day.day_type} needs at least three complete meals.`);
-    ['calories', 'protein_g', 'carbs_g', 'fat_g'].forEach((key) => { if (!Number.isFinite(Number(day[key]))) throw new Error(`${day.day_type}: ${key} is required.`); });
+    if (!Array.isArray(day.meals) || day.meals.length < 1) throw new Error(`${day.day_type} needs at least one complete meal.`);
+    ['calories', 'protein_g', 'carbs_g', 'fat_g'].forEach((key) => { if (day[key] == null || day[key] === '' || !Number.isFinite(Number(day[key])) || Number(day[key]) < 0) throw new Error(`${day.day_type}: ${key} is required.`); });
     day.meals.forEach((meal) => {
       if (!meal.name || !Array.isArray(meal.ingredients) || !meal.ingredients.length) throw new Error(`${day.day_type}: every meal needs a name and ingredients.`);
-      ['calories', 'protein_g', 'carbs_g', 'fat_g'].forEach((key) => { if (!Number.isFinite(Number(meal[key]))) throw new Error(`${meal.name}: ${key} is required.`); });
+      ['calories', 'protein_g', 'carbs_g', 'fat_g'].forEach((key) => { if (meal[key] == null || meal[key] === '' || !Number.isFinite(Number(meal[key])) || Number(meal[key]) < 0) throw new Error(`${meal.name}: ${key} is required.`); });
       meal.ingredients.forEach((ingredient) => {
         if (!String(ingredient?.name || '').trim() || !Number.isFinite(Number(ingredient?.quantity)) || Number(ingredient.quantity) <= 0 || !String(ingredient?.unit || '').trim()) throw new Error(`${meal.name}: every ingredient needs a food, positive quantity and unit.`);
       });
@@ -987,7 +1007,7 @@ function validateNutritionImport(payload) {
 }
 
 function nutritionImportPreview(payload) {
-  return `<section class="panel import-preview"><div class="panel-head"><div><span class="eyebrow">VALIDATED</span><h3>Review before import</h3></div><button class="btn primary" type="button" id="confirmNutritionImport">Import plan</button></div>${payload.days.map((day) => `<article class="qa-day"><div><b>${esc(day.day_type)}</b><span>${day.days_per_week}× weekly · ${day.calories} kcal · P ${day.protein_g}g · C ${day.carbs_g}g · F ${day.fat_g}g</span></div><ol>${day.meals.map((meal) => `<li><b>${esc(meal.name)}</b> — ${meal.calories} kcal · ${meal.ingredients.length} measured ingredients</li>`).join('')}</ol></article>`).join('')}</section>`;
+  return `<section class="panel import-preview"><div class="panel-head"><div><span class="eyebrow">VALIDATED</span><h3>Review before import</h3><p class="muted">This replaces the active menu and assigns this week. Previous plans and completed days remain saved. Your coach still publishes the weekly planner.</p></div><button class="btn primary" type="button" id="confirmNutritionImport">Import plan</button></div>${payload.days.map((day) => `<article class="qa-day"><div><b>${esc(day.day_type)}</b><span>${day.days_per_week}× weekly · ${day.calories} kcal · P ${day.protein_g}g · C ${day.carbs_g}g · F ${day.fat_g}g</span></div><ol>${day.meals.map((meal) => `<li><b>${esc(meal.name)}</b> — ${meal.calories} kcal · ${meal.ingredients.length} measured ingredients</li>`).join('')}</ol></article>`).join('')}</section>`;
 }
 
 async function importNutritionJson(event) {
@@ -1006,25 +1026,11 @@ async function persistNutritionImport(payload, button) {
   if (state.preview) return toast('Plan validated. Sign in to import it.');
   setBusy(button, true, 'Importing…');
   try {
-    for (const day of payload.days) {
-      const existing = state.data.nutritionPlans.find((plan) => plan.day_type === day.day_type || (day.day_type === 'Rest Day' && plan.day_type === 'Non-Training Day'));
-      const planPatch = { client_id: state.client.id, name: day.name || day.day_type, day_type: day.day_type, days_per_week: Number(day.days_per_week || 1), calories: Number(day.calories), protein_g: Number(day.protein_g), carbs_g: Number(day.carbs_g), fat_g: Number(day.fat_g), coach_notes: day.coach_notes || null, is_active: true, source_system: 'coach_json', source_json: day };
-      let plan;
-      if (existing) {
-        [plan] = await query('Nutrition plan import', db.from('nutrition_plans').update(planPatch).eq('id', existing.id).select());
-        await query('Meal assignment reset', db.from('meal_assignments').delete().eq('nutrition_plan_id', existing.id).select());
-      } else [plan] = await query('Nutrition plan import', db.from('nutrition_plans').insert(planPatch).select());
-      for (let index = 0; index < day.meals.length; index += 1) {
-        const meal = day.meals[index];
-        const mealRow = { name: meal.name, meal_type: meal.meal_type || 'Meal', calories: Number(meal.calories), protein_g: Number(meal.protein_g), carbs_g: Number(meal.carbs_g), fat_g: Number(meal.fat_g), ingredients: meal.ingredients, cooking_instructions: meal.cooking_instructions || null, swaps: Array.isArray(meal.swaps) ? meal.swaps : [], tags: Array.isArray(meal.tags) ? meal.tags : [], source_system: 'coach_json' };
-        const [savedMeal] = await query('Meal import', db.from('meal_bank').insert(mealRow).select());
-        await query('Meal assignment', db.from('meal_assignments').insert({ meal_id: savedMeal.id, client_id: state.client.id, nutrition_plan_id: plan.id, historical: false, sort_order: index }).select());
-      }
-    }
-    toast('Three-day nutrition plan imported');
+    await query('Complete nutrition import', db.rpc('import_client_nutrition', {target_client_id: state.client.id, payload}));
     await loadClientData(state.client.id);
-    state.selectedNutritionPlanId = state.data.nutritionPlans.find((plan) => plan.day_type === 'Training Day')?.id;
+    state.selectedNutritionPlanId = state.data.nutritionPlans.find(plan => plan.is_active !== false)?.id;
     state.pendingNutritionImport = null;
+    toast(`${payload.days.length}-day meal plan saved and this week assigned`);
     coachNutrition();
   } catch (error) { toast(error.message || 'Import failed', 'error'); }
   finally { setBusy(button, false); }
@@ -1034,7 +1040,7 @@ function coachNutrition() {
   const plans = state.data.nutritionPlans.filter((plan) => plan.is_active !== false);
   const selected = plans.find((plan) => plan.id === state.selectedNutritionPlanId) || plans.find((plan) => nutritionDayLabel(plan) === 'Training Day') || plans[0];
   state.selectedNutritionPlanId = selected?.id || null;
-  $('#clientWorkspaceBody').innerHTML = `<section class="nutrition-tools"><div><h2>Nutrition plan</h2><p class="muted">Edit targets, foods, quantities and preparation without leaving this page.</p></div><button class="btn gold" type="button" id="toggleNutritionImport">Import 3-day JSON</button></section>${nutritionImportPanel()}${plans.length ? `<div class="nutrition-day-tabs">${plans.map((plan) => `<button type="button" data-coach-nutrition-plan="${plan.id}" class="${plan.id === selected.id ? 'active' : ''}">${esc(nutritionDayLabel(plan))}</button>`).join('')}</div><form class="nutrition-editor" data-plan-editor="${selected.id}"><div class="editor-grid"><label>Plan name<input name="name" value="${esc(selected.name)}"></label><label>Day type<select name="day_type"><option${selected.day_type === 'Training Day' ? ' selected' : ''}>Training Day</option><option${selected.day_type === 'Rest Day' || selected.day_type === 'Non-Training Day' ? ' selected' : ''}>Rest Day</option><option${selected.day_type === 'Busy Day' ? ' selected' : ''}>Busy Day</option></select></label><label>Calories<input name="calories" type="number" min="0" value="${selected.calories ?? ''}"></label><label>Protein (g)<input name="protein_g" type="number" min="0" value="${selected.protein_g ?? ''}"></label><label>Carbs (g)<input name="carbs_g" type="number" min="0" value="${selected.carbs_g ?? ''}"></label><label>Fat (g)<input name="fat_g" type="number" min="0" value="${selected.fat_g ?? ''}"></label><label>Days/week<input name="days_per_week" type="number" min="0" max="7" value="${selected.days_per_week ?? 1}"></label><button class="btn primary small">Save targets</button></div></form><div class="meal-build-actions"><button class="btn ghost add-meal-button" type="button" id="addMeal">+ Create new meal</button>${(state.data.mealBank||[]).length?`<form id="assignMealBank"><select name="meal_id">${state.data.mealBank.map(meal=>`<option value="${meal.id}">${esc(meal.name)}</option>`).join('')}</select><button class="btn ghost">Assign from Meal Bank</button></form>`:''}</div>${assignedMealsForPlan(selected).length ? assignedMealPlan(selected, true) : mealPlan(selected)}` : '<div class="empty">No active nutrition plan is available for this client. Use Import 3-day JSON to add it.</div>'}`;
+  $('#clientWorkspaceBody').innerHTML = `<section class="nutrition-tools"><div><h2>Nutrition plan</h2><p class="muted">Edit targets, foods, quantities and preparation without leaving this page.</p></div><button class="btn gold" type="button" id="toggleNutritionImport">Import meal-plan JSON</button></section>${nutritionImportPanel()}${plans.length ? `<div class="nutrition-day-tabs">${plans.map((plan) => `<button type="button" data-coach-nutrition-plan="${plan.id}" class="${plan.id === selected.id ? 'active' : ''}">${esc(nutritionDayLabel(plan))}</button>`).join('')}</div><form class="nutrition-editor" data-plan-editor="${selected.id}"><div class="editor-grid"><label>Plan name<input name="name" value="${esc(selected.name)}"></label><label>Day type<select name="day_type"><option${selected.day_type === 'Training Day' ? ' selected' : ''}>Training Day</option><option${selected.day_type === 'Rest Day' || selected.day_type === 'Non-Training Day' ? ' selected' : ''}>Rest Day</option><option${selected.day_type === 'Busy Day' ? ' selected' : ''}>Busy Day</option></select></label><label>Calories<input name="calories" type="number" min="0" value="${selected.calories ?? ''}"></label><label>Protein (g)<input name="protein_g" type="number" min="0" value="${selected.protein_g ?? ''}"></label><label>Carbs (g)<input name="carbs_g" type="number" min="0" value="${selected.carbs_g ?? ''}"></label><label>Fat (g)<input name="fat_g" type="number" min="0" value="${selected.fat_g ?? ''}"></label><label>Days/week<input name="days_per_week" type="number" min="0" max="7" value="${selected.days_per_week ?? 1}"></label><button class="btn primary small">Save targets</button></div></form><div class="meal-build-actions"><button class="btn ghost add-meal-button" type="button" id="addMeal">+ Create new meal</button>${(state.data.mealBank||[]).length?`<form id="assignMealBank"><select name="meal_id">${state.data.mealBank.map(meal=>`<option value="${meal.id}">${esc(meal.name)}</option>`).join('')}</select><button class="btn ghost">Assign from Meal Bank</button></form>`:''}</div>${assignedMealsForPlan(selected).length ? assignedMealPlan(selected, true) : mealPlan(selected)}` : '<div class="empty">No active nutrition plan is available for this client. Use Import meal-plan JSON to add it.</div>'}`;
   $('#toggleNutritionImport').onclick = () => $('#nutritionImportPanel').classList.toggle('hidden');
   $('#nutritionJsonForm').onsubmit = importNutritionJson;
   $('#copyNutritionPrompt').onclick = copyNutritionPrompt;
@@ -1375,11 +1381,14 @@ function clientPlanner() {
   $('#clientMain').innerHTML = clientHeader('YOUR WEEK', 'Weekly planner', 'Training, steps, cardio, mobility and nutrition together.') + `<div class="planner-adherence"><strong>${completed}/${scheduled} completed</strong><span>${scheduled ? Math.round(completed / scheduled * 100) : 0}% adherence</span></div>${plannerCards({ interactive: true })}`;
   bindCompletionActions();
   bindOpenSessions();
+  bindMealPlanLinks();
 }
 
 function bindOpenSessions() {
   $$('[data-open-session]').forEach((button) => button.onclick = () => {
     state.selectedSessionId = button.dataset.openSession;
+    const session = state.data.sessions.find(item => item.id === state.selectedSessionId);
+    state.trainingCategory = ['mobility','recovery'].includes(session?.training_type) ? 'mobility' : session?.training_type === 'cardio' ? 'cardio' : 'weights';
     state.clientView = 'training';
     renderClient();
   });
@@ -1437,7 +1446,7 @@ function clientTraining() {
   }
   if (state.trainingCategory === 'cardio' || state.trainingCategory === 'mobility') {
     const sessions = allSessions.filter((session) => state.trainingCategory === 'cardio' ? session.training_type === 'cardio' : ['mobility', 'recovery'].includes(session.training_type));
-    $('#clientMain').innerHTML = clientHeader('', 'Training & activity', 'Your weights, cardio, mobility and steps in one clear place.') + categoryTabs + `<section class="panel"><div class="panel-head"><div><h2>${state.trainingCategory === 'cardio' ? 'Cardio' : 'Mobility & recovery'}</h2><span class="sub">${sessions.length} sessions this week</span></div></div><div class="activity-list">${sessions.map((session) => `<div class="activity-session">${taskMarkup(session)}${session.notes ? `<p>${esc(session.notes)}</p>` : ''}<div class="activity-rx">${session.duration_minutes ? `<span>${session.duration_minutes} min</span>` : ''}${session.distance_km ? `<span>${session.distance_km} km</span>` : ''}${session.zone ? `<span>${esc(session.zone)}</span>` : ''}${session.heart_rate_target ? `<span>${esc(session.heart_rate_target)}</span>` : ''}</div></div>`).join('') || '<div class="empty">Nothing assigned in this section.</div>'}</div></section>`;
+    $('#clientMain').innerHTML = clientHeader('', 'Training & activity', 'Your weights, cardio, mobility and steps in one clear place.') + categoryTabs + `<section class="panel"><div class="panel-head"><div><h2>${state.trainingCategory === 'cardio' ? 'Cardio' : 'Mobility & recovery'}</h2><span class="sub">${sessions.length} sessions this week</span></div></div><div class="activity-list">${sessions.map((session) => `<div class="activity-session">${taskMarkup(session)}${session.notes ? `<p>${esc(session.notes)}</p>` : ''}<div class="activity-rx">${session.duration_minutes ? `<span>${session.duration_minutes} min</span>` : ''}${session.distance_km ? `<span>${session.distance_km} km</span>` : ''}${session.zone ? `<span>${esc(session.zone)}</span>` : ''}${session.heart_rate_target ? `<span>${esc(session.heart_rate_target)}</span>` : ''}</div>${activityPrescription(session)}</div>`).join('') || '<div class="empty">Nothing assigned in this section.</div>'}</div></section>`;
     bindTrainingCategoryTabs(); bindCompletionActions(); return;
   }
   const sessions = allSessions.filter((session) => ['weights', 'resistance'].includes(session.training_type));
@@ -1505,15 +1514,7 @@ function clientSteps() {
 }
 
 function clientNutrition() {
-  const plans = state.data.nutritionPlans.filter((plan) => plan.is_active !== false);
-  const selected = plans.find((plan) => plan.id === state.selectedNutritionPlanId) || plans.find((plan) => nutritionDayLabel(plan) === 'Training Day') || plans[0];
-  state.selectedNutritionPlanId = selected?.id || null;
-  $('#clientMain').innerHTML = clientHeader('', 'Nutrition', 'Your targets, exact foods and preparation for each type of day.') + (plans.length ? `<div class="nutrition-day-tabs">${plans.map((plan) => `<button type="button" data-nutrition-plan="${plan.id}" class="${plan.id === selected.id ? 'active' : ''}">${esc(nutritionDayLabel(plan))}</button>`).join('')}</div>${nutritionPlanMarkup(selected)}` : '<div class="empty">No active nutrition plan is available.</div>');
-  $$('[data-nutrition-plan]').forEach((button) => button.onclick = () => { state.selectedNutritionPlanId = button.dataset.nutritionPlan; clientNutrition(); });
-}
-
-function slider(name, label, value = 5, inverse = false) {
-  return `<label class="slider-field"><span>${esc(label)}</span><output data-slider-output="${name}">${value}</output><input name="${name}" type="range" min="1" max="10" value="${value}" data-inverse="${inverse}"><small>1 — 10</small></label>`;
+  renderWeeklyNutrition();
 }
 
 function clientCheckin() {
