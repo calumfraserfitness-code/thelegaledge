@@ -56,6 +56,7 @@ async function paintFirmPilots() {
   const pilot = firmState.pilots.find(p => p.id === firmState.selected);
   const org = firmState.organizations.find(o => o.id === pilot?.organization_id);
   const roster = firmState.participants.filter(m => m.pilot_id === pilot?.id);
+  const activeRoster=roster.filter(m=>m.status!=='withdrawn');
   let report = [];
   if (pilot && !state.preview) report = await query('Aggregate pilot report', db.rpc('firm_pilot_summary', { target_pilot_id: pilot.id }));
   main.innerHTML = pageHead('FIRM PILOTS', 'Pilot workspace') + `
@@ -66,8 +67,10 @@ async function paintFirmPilots() {
     <section class="panel"><div class="panel-head"><h3>Pilots</h3></div>
       <form id="firmPilotForm" class="firm-form"><label>Firm<select name="organization_id" required><option value="">Choose firm</option>${firmState.organizations.map(o => `<option value="${esc(o.id)}">${esc(o.name)}</option>`).join('')}</select></label><label>Pilot name<input name="name" value="90-day lawyer performance pilot" required></label><div class="firm-dates"><label>Start<input name="start_date" type="date"></label><label>End<input name="end_date" type="date"></label></div><label>Capacity<input name="capacity" type="number" min="5" max="100" value="10" required></label><button class="btn primary" ${firmState.organizations.length ? '' : 'disabled'}>Create pilot</button></form>
       <div class="firm-list">${firmState.pilots.map(p => `<button type="button" data-pilot-id="${esc(p.id)}" class="firm-pilot-choice ${p.id === firmState.selected ? 'active' : ''}"><b>${esc(p.name)}</b><small>${esc(firmState.organizations.find(o => o.id === p.organization_id)?.name || '')} · ${esc(p.status)}</small></button>`).join('') || '<p class="muted">No pilots created yet.</p>'}</div></section></div>
-    ${pilot ? `<section class="panel"><div class="panel-head"><div><h3>${esc(org?.name || 'Firm')} · roster</h3><span class="sub">${roster.length}/${pilot.capacity} participants · ${roster.filter(m => firmState.consents.some(c => c.participant_id === m.id)).length} consented</span></div><span class="pill">${esc(pilot.status)}</span></div>
-      <form id="firmMemberForm" class="firm-member-form"><label>Add existing coaching client<select name="client_id" required><option value="">Choose client</option>${state.clients.filter(c => !roster.some(m => m.client_id === c.id)).map(c => `<option value="${esc(c.id)}">${esc(c.display_name)}</option>`).join('')}</select></label><button class="btn primary" ${roster.length >= pilot.capacity ? 'disabled' : ''}>Add to pilot</button></form>
+    ${pilot ? `<section class="panel"><div class="panel-head"><div><h3>${esc(org?.name || 'Firm')} · roster</h3><span class="sub">${activeRoster.length}/${pilot.capacity} participants · ${roster.filter(m => firmState.consents.some(c => c.participant_id === m.id)).length} consented</span></div><span class="pill">${esc(pilot.status)}</span></div>
+      <form id="firmPilotEditForm" class="firm-form"><h4>Pilot settings</h4><label>Pilot name<input name="name" value="${esc(pilot.name)}" maxlength="160" required></label><div class="firm-dates"><label>Start<input name="start_date" type="date" value="${esc(pilot.start_date||'')}"></label><label>End<input name="end_date" type="date" value="${esc(pilot.end_date||'')}"></label></div><label>Places<input name="capacity" type="number" min="${Math.max(5,activeRoster.length)}" max="100" value="${pilot.capacity}" required></label><label>Status<select name="status">${['planning','inviting','active','complete'].map(status=>`<option value="${status}" ${status===pilot.status?'selected':''}>${title(status)}</option>`).join('')}</select></label><button class="btn primary">Save pilot settings</button></form>
+      <p class="muted">Readiness: ${activeRoster.filter(m=>state.clients.find(c=>c.id===m.client_id)?.profile_id).length} linked logins · ${roster.filter(m=>firmState.consents.some(c=>c.participant_id===m.id)).length} consents · ${firmState.resources.filter(r=>r.pilot_id===pilot.id&&r.published).length} published resources. Create a client and link their login in the client roster before adding them here. Adding a participant does not send an email.</p>
+      <form id="firmMemberForm" class="firm-member-form"><label>Add existing coaching client<select name="client_id" required><option value="">Choose client</option>${state.clients.filter(c => (state.preview||c.profile_id) && !roster.some(m => m.client_id === c.id)).map(c => `<option value="${esc(c.id)}">${esc(c.display_name)}</option>`).join('')}</select></label><button class="btn primary" ${activeRoster.length >= pilot.capacity || pilot.status==='complete' ? 'disabled' : ''}>Add to pilot</button></form>
       <div class="firm-list">${roster.map(m => { const c = state.clients.find(x => x.id === m.client_id); const consent = firmState.consents.find(x => x.participant_id === m.id); return `<div><b>${esc(c?.display_name || 'Client')}</b><small>${esc(m.status)} · ${consent ? 'Consented' : 'Awaiting participant consent'}</small></div>`; }).join('') || '<p class="muted">No participants yet. Add an existing client; their individual coaching stays private.</p>'}</div></section>
       ${firmPilotReport(pilot, report)}
       <section class="panel"><h3>Firm resource library</h3><p class="muted">Tailor each resource to ${esc(org?.name || 'this firm')} and its ${pilot.capacity}-place pilot. Only published resources appear for members. No resource is sent automatically.</p>
@@ -77,6 +80,7 @@ async function paintFirmPilots() {
       </section><section class="panel"><h3>Coaching cadence</h3><p>Monthly coaching calls, weekly check-ins, and a 5–10 minute Loom review with clear next steps. Assessments at baseline, midpoint, and endline feed the aggregate report.</p></section>` : ''}`;
   $('#firmOrganizationForm').onsubmit = saveFirmOrganization;
   $('#firmPilotForm').onsubmit = saveFirmPilot;
+  $('#firmPilotEditForm') && ($('#firmPilotEditForm').onsubmit = updateFirmPilot);
   $('#firmMemberForm') && ($('#firmMemberForm').onsubmit = saveFirmMember);
   $('#firmResourceForm') && ($('#firmResourceForm').onsubmit = saveFirmResource);
   $$('[data-resource-idea]').forEach(button => button.onclick = () => {
@@ -123,14 +127,37 @@ async function saveFirmOrganization(event) {
 async function saveFirmPilot(event) {
   event.preventDefault(); const button = event.submitter; const fd = new FormData(event.target);
   const row = { coach_id: state.user?.id, organization_id: fd.get('organization_id'), name: String(fd.get('name')).trim(), start_date: fd.get('start_date') || null, end_date: fd.get('end_date') || null, capacity: Number(fd.get('capacity')), minimum_report_count: 5, status: 'planning' };
+  try { validateFirmPilot(row); } catch(error) { return toast(error.message,'error'); }
   setBusy(button, true);
   try { if (state.preview) row.id = `preview-pilot-${Date.now()}`; else Object.assign(row, (await query('Pilot', db.from('firm_pilots').insert(row).select()))[0]); firmState.pilots.unshift(row); firmState.selected = row.id; await paintFirmPilots(); toast('Pilot created'); }
   catch (error) { toast(error.message, 'error'); setBusy(button, false); }
 }
 
+function validateFirmPilot(row) {
+  const org=firmState.organizations.find(o=>o.id===row.organization_id);
+  if(!row.name || !Number.isInteger(row.capacity) || row.capacity<5 || row.capacity>100) throw new Error('Enter a pilot name and 5–100 places.');
+  if(org?.employee_count && row.capacity>org.employee_count) throw new Error('Pilot places cannot exceed firm employees.');
+  if(row.start_date && row.end_date && row.end_date<row.start_date) throw new Error('End date must follow the start date.');
+  if(row.status==='active' && (!row.start_date||!row.end_date)) throw new Error('Set start and end dates before activating the pilot.');
+}
+async function updateFirmPilot(event) {
+  event.preventDefault();const fd=new FormData(event.target),pilot=firmState.pilots.find(p=>p.id===firmState.selected);
+  const patch={name:String(fd.get('name')).trim(),start_date:fd.get('start_date')||null,end_date:fd.get('end_date')||null,capacity:Number(fd.get('capacity')),status:fd.get('status')};
+  try {
+    validateFirmPilot({...pilot,...patch});
+    if(patch.capacity<firmState.participants.filter(m=>m.pilot_id===pilot.id&&m.status!=='withdrawn').length) throw new Error('Capacity cannot be below the active roster.');
+    setBusy(event.submitter,true);
+    if(!state.preview){const [saved]=await query('Pilot settings',db.from('firm_pilots').update(patch).eq('id',pilot.id).select());if(!saved)throw new Error('Pilot was not updated. Reload and try again.');}
+    Object.assign(pilot,patch);await paintFirmPilots();toast('Pilot settings saved');
+  }catch(error){toast(error.message,'error');setBusy(event.submitter,false);}
+}
+
 async function saveFirmMember(event) {
   event.preventDefault(); const button = event.submitter; const fd = new FormData(event.target);
   const row = { pilot_id: firmState.selected, client_id: fd.get('client_id'), status: 'invited' };
+  const pilot=firmState.pilots.find(p=>p.id===row.pilot_id),client=state.clients.find(c=>c.id===row.client_id);
+  if(!client || (!state.preview&&!client.profile_id))return toast('Link a private client login before adding this participant','error');
+  if(pilot.status==='complete'||firmState.participants.filter(m=>m.pilot_id===pilot.id&&m.status!=='withdrawn').length>=pilot.capacity)return toast('This pilot is closed or full','error');
   setBusy(button, true);
   try { if (state.preview) row.id = `preview-member-${Date.now()}`; else Object.assign(row, (await query('Pilot participant', db.from('firm_participants').insert(row).select()))[0]); firmState.participants.unshift(row); await paintFirmPilots(); toast('Client added to pilot'); }
   catch (error) { toast(error.message, 'error'); setBusy(button, false); }
@@ -169,3 +196,4 @@ async function renderParticipantPilot() {
     });
   } catch (error) { renderError(main, error, renderParticipantPilot); }
 }
+

@@ -22,3 +22,13 @@ check("state.data.programs=[{days:[{id:'mobility',exercises:[{id:'move',name:'Hi
 assert.match(check("activityPrescription({id:'session',programme_day_id:'mobility'})"),/Hip mobility/);
 check("state.mealBatchPortions=3");assert.equal(check("scaledIngredientAmount({quantity:100,unit:'g'}, {})"),'300 g');
 console.log('PASS: seven-day and repeatable imports, missing-target rejection, unique weekdays, regional units, batch scaling, weekday precedence, mobility prescriptions, safe media URLs and source-menu filtering.');
+
+vm.runInContext(fs.readFileSync(path.join(__dirname,'../firm-pilots.js'),'utf8'),ctx);
+assert.equal(check("isOptionalProgramDay({}, {coach_notes:'OPTIONAL / BACKUP. Home session'})"),true);
+assert.equal(check("isOptionalProgramDay({}, {coach_notes:'NEW DRAFT — proposed Monday'})"),false);
+check("firmState.organizations=[{id:'firm',employee_count:20}]");
+assert.throws(()=>check("validateFirmPilot({organization_id:'firm',name:'Pilot',capacity:21})"),/employees/);
+assert.throws(()=>check("validateFirmPilot({organization_id:'firm',name:'Pilot',capacity:10,start_date:'2026-10-10',end_date:'2026-10-01'})"),/End date/);
+assert.throws(()=>check("validateFirmPilot({organization_id:'firm',name:'Pilot',capacity:10,status:'active'})"),/dates/);
+console.log('PASS: optional workout scheduling and corporate pilot validation.');
+

@@ -80,12 +80,19 @@ function bindMealPlanLinks() {
 function renderPilotDemo() {
   const auth = $('#auth');
   show('#auth');
-  auth.innerHTML=`<div class="auth-brand"><img class="brand-logo auth-logo" src="./assets/legal-edge-logo.svg" alt="The Legal Edge"><span class="eyebrow">FIRM PERFORMANCE PILOT</span><h1>A healthier team.<br><em>A practical plan.</em></h1><p>Personal coaching that fits demanding legal work, tailored to the people in your firm.</p><a class="btn ghost" href="./">Back to sign in</a></div><section class="auth-card"><span class="pill">INTERACTIVE DEMONSTRATION</span><h2>Explore your firm’s pilot</h2><p>See the participant experience with sample meals, a weekly planner and firm resources. This demonstration creates no accounts and saves no information.</p><form id="pilotDemoSetup"><label>Firm name<input name="firm" value="Example law firm" maxlength="120" required></label><label>Employees in firm<input name="employees" type="number" min="1" max="100000" value="50" required></label><label>Pilot places<input name="capacity" type="number" min="5" max="100" value="10" required></label><button class="btn primary">Open participant experience</button></form><p class="muted">Real participants receive a private coach-issued login. A live firm enrolment and invitation service is still being built.</p></section>`;
+  auth.innerHTML=`<div class="auth-brand"><img class="brand-logo auth-logo" src="./assets/legal-edge-logo.svg" alt="The Legal Edge"><span class="eyebrow">FIRM PERFORMANCE PILOT</span><h1>A healthier team.<br><em>A practical plan.</em></h1><p>Personal coaching that fits demanding legal work, tailored to the people in your firm.</p><a class="btn ghost" href="./">Back to sign in</a></div><section class="auth-card"><span class="pill">INTERACTIVE DEMONSTRATION</span><h2>Explore your firm’s pilot</h2><p>See the participant experience with sample meals, a weekly planner and firm resources. This demonstration creates no accounts and saves no information.</p><form id="pilotDemoSetup"><label>Firm name<input name="firm" value="Example law firm" maxlength="120" required></label><label>Employees in firm<input name="employees" type="number" min="1" max="100000" value="50" required></label><label>Pilot places<input name="capacity" type="number" min="5" max="100" value="10" required></label><button class="btn primary" name="view" value="participant">Open participant experience</button><button class="btn ghost" name="view" value="coach">Open coach pilot workspace</button></form><p class="muted">Real participants receive a private coach-issued login. A live firm enrolment and invitation service is still being built.</p></section>`;
   $('#pilotDemoSetup').onsubmit=event=>{
     event.preventDefault();const fd=new FormData(event.target);
     const employeeCount=Number(fd.get('employees')),capacity=Number(fd.get('capacity'));
     if(capacity>employeeCount)return toast('Pilot places cannot exceed the firm employee count','error');
     state.demoFirm={name:String(fd.get('firm')).trim(),employees:employeeCount,capacity};
+    if(event.submitter?.value==='coach'){
+      preview('coach');
+      firmState.organizations=[{id:'demo-firm',name:state.demoFirm.name,employee_count:employeeCount,contact_name:'Example contact'}];
+      firmState.pilots=[{id:'demo-pilot',organization_id:'demo-firm',name:'90-day performance pilot',capacity,status:'planning',minimum_report_count:5}];
+      Object.assign(firmState,{participants:[],consents:[],resources:[],selected:'demo-pilot',loaded:true});
+      state.coachView='firms';renderCoach();return;
+    }
     preview('client');state.hasPilot=true;state.client.display_name='Example participant';
     state.data.weeks[0].published=true;
     const weekStart = monday();
@@ -119,3 +126,4 @@ function updatePlannerAdherence() {
   container.querySelector('strong').textContent=`${done}/${total} completed`;
   container.querySelector('span').textContent=`${total?Math.round(done/total*100):0}% adherence`;
 }
+

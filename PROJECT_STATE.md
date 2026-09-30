@@ -296,3 +296,9 @@ URLs. The new data model and UI support entering these records now.
 Read this file first, inspect `git status` and the latest commit, then continue from
 the immediate next verification section. Do not restart the app or create another
 Supabase/Vercel project.
+
+
+## 2026-09-30 training and firm recovery
+User explicitly authorized new exercise prescriptions. Six NEW DRAFT programmes saved in Supabase, 143 prescription rows; source_system coach_requested_ai_draft. Original programmes untouched. Emmet cardio-only readiness assumption; Kevin proposed gym equipment; Joshua deadlift/swing alternatives; boxing classed cardio; paired home modules Mon/Wed/Fri; Zach backups optional and aligned Mon/Wed/Fri. Nothing published to clients. Roster account links still zero; no genuine participant login end-to-end test.
+Corporate audit reproduced infinite RLS recursion in firm_pilots insert: firm_org_participant_read queried pilots, while pilot policy queried organizations, and had incorrect p.organization_id=p.id. Replaced with private auth-scoped security-definer membership predicate; coach rollback test now creates organization/pilot/5 members and rejects 6th and capacity > employee count. Capacity guards lock pilot and validate coach ownership; RLS remains enabled. UI now edits pilot dates/name/capacity/status and shows linked-login/consent/published-resource readiness. Add-member chooser excludes unlinked logins. Live self-enrolment/email invitation service still absent; use existing secure coach client provisioning and link account before membership.
+Public ?pilot=demo now includes coach workspace and participant experience, all synthetic/local; no private roster exposed. Optional/backups excluded from programme scheduler. JavaScript checks and tests pass. Prescriptions remain draft for coach review, not recovered history. Missing client ingredient quantities/recipes not solved by this training update.
