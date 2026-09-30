@@ -1411,6 +1411,7 @@ function bindCompletionActions() {
   $$('[data-step-date]').forEach((input) => input.onchange = async () => {
     const date = input.dataset.stepDate;
     const old = state.data.steps.find((entry) => entry.entry_date === date);
+    const previous = old ? {...old} : null;
     const actual = input.checked ? safeStepGoal() : 0;
     const row = { client_id: state.client.id, entry_date: date, target_steps: safeStepGoal(), actual_steps: actual };
     if (old) Object.assign(old, row); else state.data.steps.push(row);
@@ -1419,7 +1420,7 @@ function bindCompletionActions() {
     try {
       await query('Steps', db.from('step_entries').upsert(row, { onConflict: 'client_id,entry_date' }).select());
       toast('Steps updated');
-    } catch (error) { if (old) old.actual_steps = old.steps = input.checked ? 0 : safeStepGoal(); input.checked = !input.checked; input.closest('.task')?.classList.toggle('done', input.checked); updatePlannerAdherence(); toast(error.message, 'error'); }
+    } catch (error) { if (old) Object.assign(old, previous); else state.data.steps = state.data.steps.filter(entry => entry !== row); input.checked = Number(previous?.actual_steps || previous?.steps || 0) >= safeStepGoal(); input.closest('.task')?.classList.toggle('done', input.checked); updatePlannerAdherence(); toast(error.message, 'error'); }
   });
   $$('[data-nutrition-complete]').forEach((input)=>input.onchange=async()=>{
     const day=state.data.nutritionDays.find(item=>item.nutrition_date===input.dataset.nutritionComplete); if(!day)return;
