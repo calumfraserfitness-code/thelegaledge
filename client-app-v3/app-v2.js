@@ -326,9 +326,24 @@ async function createClientAccount(event) {
       state.clients.unshift(normalizeClient({id:`preview-${Date.now()}`,display_name:payload.full_name,email:payload.email,phone:payload.phone,market_region:payload.market_region,status:'active',daily_steps_goal:payload.daily_steps_goal,checkin_day:payload.checkin_day,goal_summary:payload.goal_summary,cardio_enabled:payload.cardio_enabled,mobility_enabled:payload.mobility_enabled,onboarding_status:'pending',plan_status:'draft'}));
       event.target.closest('.modal-backdrop').remove(); toast('Preview client created locally'); renderCoach(); return;
     }
-    const {data,error}=await db.functions.invoke('provision-client',{body:payload}); if(error) throw error; if(data?.error) throw new Error(data.error); state.clients.unshift(normalizeClient(data.client)); event.target.closest('.modal-backdrop').remove(); toast('Client login created'); renderCoach();
+    const client = await provisionClientAccount(payload); state.clients.unshift(normalizeClient(client)); event.target.closest('.modal-backdrop').remove(); toast('Client login created'); renderCoach();
   }
   catch(error){toast(error.message||'Could not create client','error');setBusy(event.submitter,false);}
+}
+
+async function provisionClientAccount(payload) {
+  const { data: { session }, error: sessionError } = await db.auth.getSession();
+  if (sessionError || !session) throw new Error('Your coach session has ended. Sign in again before creating a client login.');
+  const { data, error } = await db.functions.invoke('provision-client', { body: payload });
+  if (error) {
+    let detail;
+    try { detail = await error.context?.json?.(); } catch { /* Response may not be JSON. */ }
+    if (error.context?.status === 401) throw new Error('Your coach session could not be verified. Sign out and sign in again.');
+    throw new Error(typeof detail?.error === 'string' ? detail.error : error.message || 'Client login could not be created.');
+  }
+  if (data?.error) throw new Error(data.error);
+  if (!data?.client?.id) throw new Error('The account response was incomplete. Refresh the roster before retrying.');
+  return data.client;
 }
 
 const COACH_TABS = ['overview', 'planner', 'training', 'nutrition', 'check-ins', 'progress', 'onboarding', 'legal', 'diagnostics'];
@@ -394,11 +409,9 @@ async function linkSavedClientAccount(event) {
   if (state.preview) { state.client.profile_id = 'preview-linked'; toast('Example login linked locally'); return coachOverview(); }
   setBusy(button, true, 'Creating…');
   try {
-    const { data, error } = await db.functions.invoke('provision-client', { body: { client_id: state.client.id, email: String(fd.get('email')).trim(), password: String(fd.get('password')) } });
-    if (error) throw error;
-    if (data?.error) throw new Error(data.error);
-    Object.assign(state.client, data.client);
-    Object.assign(state.clients.find(c => c.id === state.client.id), data.client);
+    const client = await provisionClientAccount({ client_id: state.client.id, email: String(fd.get('email')).trim(), password: String(fd.get('password')) });
+    Object.assign(state.client, client);
+    Object.assign(state.clients.find(c => c.id === state.client.id), client);
     toast('Login linked to this saved client'); coachOverview();
   } catch (error) { toast(error.message || 'Could not create login', 'error'); setBusy(button, false); }
 }
