@@ -71,6 +71,7 @@ async function paintFirmPilots() {
       <form id="firmPilotEditForm" class="firm-form"><h4>Pilot settings</h4><label>Pilot name<input name="name" value="${esc(pilot.name)}" maxlength="160" required></label><div class="firm-dates"><label>Start<input name="start_date" type="date" value="${esc(pilot.start_date||'')}"></label><label>End<input name="end_date" type="date" value="${esc(pilot.end_date||'')}"></label></div><label>Places<input name="capacity" type="number" min="${Math.max(5,activeRoster.length)}" max="100" value="${pilot.capacity}" required></label><label>Status<select name="status">${['planning','inviting','active','complete'].map(status=>`<option value="${status}" ${status===pilot.status?'selected':''}>${title(status)}</option>`).join('')}</select></label><button class="btn primary">Save pilot settings</button></form>
       <p class="muted">Readiness: ${activeRoster.filter(m=>state.clients.find(c=>c.id===m.client_id)?.profile_id).length} linked logins · ${roster.filter(m=>firmState.consents.some(c=>c.participant_id===m.id)).length} consents · ${firmState.resources.filter(r=>r.pilot_id===pilot.id&&r.published).length} published resources. Create a client and link their login in the client roster before adding them here. Adding a participant does not send an email.</p>
       <form id="firmMemberForm" class="firm-member-form"><label>Add existing coaching client<select name="client_id" required><option value="">Choose client</option>${state.clients.filter(c => (state.preview||c.profile_id) && !roster.some(m => m.client_id === c.id)).map(c => `<option value="${esc(c.id)}">${esc(c.display_name)}</option>`).join('')}</select></label><button class="btn primary" ${activeRoster.length >= pilot.capacity || pilot.status==='complete' ? 'disabled' : ''}>Add to pilot</button></form>
+      <details><summary>Create a new participant and private login</summary><form id="firmNewParticipantForm" class="firm-form"><label>Full name<input name="full_name" maxlength="160" required></label><label>Email<input name="email" type="email" required></label><label>Phone (optional)<input name="phone" type="tel"></label><label>Temporary password<input name="password" type="password" minlength="12" autocomplete="new-password" required></label><label>Region<select name="market_region"><option value="ireland">Ireland</option><option value="uk">UK</option><option value="us">USA</option><option value="other">Other</option></select></label><label>Goal (optional)<textarea name="goal_summary" rows="2"></textarea></label><p class="muted">Creates one private account linked to this pilot. First sign-in opens legal consent and onboarding. Collect weight and lifestyle details privately during onboarding. Share login details directly with the participant; no email is sent.</p><button class="btn primary" ${activeRoster.length>=pilot.capacity||pilot.status==='complete'?'disabled':''}>Create participant + login</button><p id="firmNewParticipantError" role="alert"></p></form></details>
       <div class="firm-list">${roster.map(m => { const c = state.clients.find(x => x.id === m.client_id); const consent = firmState.consents.find(x => x.participant_id === m.id); return `<div><b>${esc(c?.display_name || 'Client')}</b><small>${esc(m.status)} · ${consent ? 'Consented' : 'Awaiting participant consent'}</small></div>`; }).join('') || '<p class="muted">No participants yet. Add an existing client; their individual coaching stays private.</p>'}</div></section>
       ${firmPilotReport(pilot, report)}
       <section class="panel"><h3>Firm resource library</h3><p class="muted">Tailor each resource to ${esc(org?.name || 'this firm')} and its ${pilot.capacity}-place pilot. Only published resources appear for members. No resource is sent automatically.</p>
@@ -80,6 +81,7 @@ async function paintFirmPilots() {
       </section><section class="panel"><h3>Coaching cadence</h3><p>Monthly coaching calls, weekly check-ins, and a 5–10 minute Loom review with clear next steps. Assessments at baseline, midpoint, and endline feed the aggregate report.</p></section>` : ''}`;
   $('#firmOrganizationForm').onsubmit = saveFirmOrganization;
   $('#firmPilotForm').onsubmit = saveFirmPilot;
+  $('#firmNewParticipantForm') && ($('#firmNewParticipantForm').onsubmit = createFirmParticipant);
   $('#firmPilotEditForm') && ($('#firmPilotEditForm').onsubmit = updateFirmPilot);
   $('#firmMemberForm') && ($('#firmMemberForm').onsubmit = saveFirmMember);
   $('#firmResourceForm') && ($('#firmResourceForm').onsubmit = saveFirmResource);
@@ -150,6 +152,28 @@ async function updateFirmPilot(event) {
     if(!state.preview){const [saved]=await query('Pilot settings',db.from('firm_pilots').update(patch).eq('id',pilot.id).select());if(!saved)throw new Error('Pilot was not updated. Reload and try again.');}
     Object.assign(pilot,patch);await paintFirmPilots();toast('Pilot settings saved');
   }catch(error){toast(error.message,'error');setBusy(event.submitter,false);}
+}
+
+async function createFirmParticipant(event){
+  event.preventDefault();const fd=new FormData(event.target),button=event.submitter;
+  const payload={pilot_id:firmState.selected,full_name:String(fd.get('full_name')).trim(),email:String(fd.get('email')).trim(),password:String(fd.get('password')),phone:String(fd.get('phone')||'').trim(),market_region:fd.get('market_region'),goal_summary:String(fd.get('goal_summary')||'').trim()};
+  const pilot=firmState.pilots.find(p=>p.id===payload.pilot_id);
+  if(!pilot||pilot.status==='complete'||firmState.participants.filter(m=>m.pilot_id===pilot.id&&m.status!=='withdrawn').length>=pilot.capacity)return toast('This pilot is closed or full','error');
+  setBusy(button,true,'Creating participant…');
+  try{
+    if(state.preview){
+      const id=`preview-client-${Date.now()}`;
+      state.clients.unshift({id,display_name:payload.full_name,email:payload.email,status:'active',profile_id:'demo-profile',onboarding_status:'pending_legal'});
+      firmState.participants.unshift({id:`preview-member-${Date.now()}`,pilot_id:pilot.id,client_id:id,status:'invited'});
+    }else{
+      const {data,error}=await db.functions.invoke('provision-client',{body:payload});
+      if(error){let detail=error.message;try{detail=(await error.context.json()).error||detail;}catch{}throw new Error(detail);}
+      if(data?.error)throw new Error(data.error);
+      if(!data?.client||!data?.participant)throw new Error('Account response incomplete. Check the client roster before retrying.');
+      state.clients.unshift(normalizeClient(data.client));firmState.participants.unshift(data.participant);
+    }
+    event.target.reset();payload.password='';await paintFirmPilots();toast(state.preview?'Sample participant added; no account created':'Participant login created. Share access privately.');
+  }catch(error){$('#firmNewParticipantError').textContent=error.message;toast(error.message,'error');setBusy(button,false);}
 }
 
 async function saveFirmMember(event) {
