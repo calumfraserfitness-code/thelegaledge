@@ -32,3 +32,8 @@ assert.throws(()=>check("validateFirmPilot({organization_id:'firm',name:'Pilot',
 assert.throws(()=>check("validateFirmPilot({organization_id:'firm',name:'Pilot',capacity:10,status:'active'})"),/dates/);
 console.log('PASS: optional workout scheduling and corporate pilot validation.');
 
+
+assert.equal(check("firmAssessmentOpens('midpoint',{start_date:'2026-10-05'})"),'2026-11-09');
+assert.equal(check("firmAssessmentOpens('endline',{start_date:'2026-10-05',end_date:'2026-12-28'})"),'2026-12-21');
+assert.equal(check("firmAssessmentOpens('midpoint',{})"),'');
+console.log('PASS: participant assessment opening dates.');

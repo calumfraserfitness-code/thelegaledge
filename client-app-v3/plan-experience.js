@@ -114,7 +114,7 @@ function renderPilotDemo() {
 }
 if (new URLSearchParams(location.search).get('pilot')==='demo') {
   // All deferred application scripts, including the pilot module, load first.
-  window.addEventListener('DOMContentLoaded',renderPilotDemo,{once:true});
+  window.addEventListener('DOMContentLoaded',()=>renderPilotDemo(),{once:true});
 }
 
 function updatePlannerAdherence() {

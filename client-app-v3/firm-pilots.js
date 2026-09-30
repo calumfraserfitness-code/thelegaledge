@@ -59,8 +59,11 @@ async function paintFirmPilots() {
   const activeRoster=roster.filter(m=>m.status!=='withdrawn');
   let report = [];
   if (pilot && !state.preview) report = await query('Aggregate pilot report', db.rpc('firm_pilot_summary', { target_pilot_id: pilot.id }));
+  const weekStart=iso(monday());
+  const checkins=pilot&&!state.preview&&activeRoster.length?await query('Pilot weekly reviews',db.from('checkins').select('id,client_id,submitted_at,reviewed_at').in('client_id',activeRoster.map(m=>m.client_id)).gte('submitted_at',weekStart+'T00:00:00Z').order('submitted_at',{ascending:false}).limit(500)):[];
   main.innerHTML = pageHead('FIRM PILOTS', 'Pilot workspace') + `
     <div class="firm-intro"><div><strong>90-day lawyer performance pilot</strong><p>Private coaching for each participant, with anonymous cohort reporting for the sponsor.</p></div><span>Coach only</span></div>
+    ${pilot?firmDeliveryMarkup(pilot,activeRoster,checkins):''}
     <div class="firm-grid"><section class="panel"><div class="panel-head"><h3>Firms</h3></div>
       <form id="firmOrganizationForm" class="firm-form"><label>Firm name<input name="name" maxlength="160" required></label><label>Number of employees<input name="employee_count" type="number" min="1" max="100000"></label><label>Contact name<input name="contact_name"></label><label>Contact email<input name="contact_email" type="email"></label><button class="btn primary">Add firm</button></form>
       <div class="firm-list">${firmState.organizations.map(o => `<div><b>${esc(o.name)}</b><small>${o.employee_count ? `${Number(o.employee_count).toLocaleString()} employees · ` : ''}${esc(o.contact_name || 'No contact recorded')}</small></div>`).join('') || '<p class="muted">Add the first firm to start a pilot.</p>'}</div></section>
@@ -72,13 +75,14 @@ async function paintFirmPilots() {
       <p class="muted">Readiness: ${activeRoster.filter(m=>state.clients.find(c=>c.id===m.client_id)?.profile_id).length} linked logins · ${roster.filter(m=>firmState.consents.some(c=>c.participant_id===m.id)).length} consents · ${firmState.resources.filter(r=>r.pilot_id===pilot.id&&r.published).length} published resources. Create a client and link their login in the client roster before adding them here. Adding a participant does not send an email.</p>
       <form id="firmMemberForm" class="firm-member-form"><label>Add existing coaching client<select name="client_id" required><option value="">Choose client</option>${state.clients.filter(c => (state.preview||c.profile_id) && !roster.some(m => m.client_id === c.id)).map(c => `<option value="${esc(c.id)}">${esc(c.display_name)}</option>`).join('')}</select></label><button class="btn primary" ${activeRoster.length >= pilot.capacity || pilot.status==='complete' ? 'disabled' : ''}>Add to pilot</button></form>
       <details><summary>Create a new participant and private login</summary><form id="firmNewParticipantForm" class="firm-form"><label>Full name<input name="full_name" maxlength="160" required></label><label>Email<input name="email" type="email" required></label><label>Phone (optional)<input name="phone" type="tel"></label><label>Temporary password<input name="password" type="password" minlength="12" autocomplete="new-password" required></label><label>Region<select name="market_region"><option value="ireland">Ireland</option><option value="uk">UK</option><option value="us">USA</option><option value="other">Other</option></select></label><label>Goal (optional)<textarea name="goal_summary" rows="2"></textarea></label><p class="muted">Creates one private account linked to this pilot. First sign-in opens legal consent and onboarding. Collect weight and lifestyle details privately during onboarding. Share login details directly with the participant; no email is sent.</p><button class="btn primary" ${activeRoster.length>=pilot.capacity||pilot.status==='complete'?'disabled':''}>Create participant + login</button><p id="firmNewParticipantError" role="alert"></p></form></details>
-      <div class="firm-list">${roster.map(m => { const c = state.clients.find(x => x.id === m.client_id); const consent = firmState.consents.find(x => x.participant_id === m.id); return `<div><b>${esc(c?.display_name || 'Client')}</b><small>${esc(m.status)} · ${consent ? 'Consented' : 'Awaiting participant consent'}</small></div>`; }).join('') || '<p class="muted">No participants yet. Add an existing client; their individual coaching stays private.</p>'}</div></section>
+      <div class="firm-list">${roster.map(m => { const c = state.clients.find(x => x.id === m.client_id); const consent = firmState.consents.find(x => x.participant_id === m.id); return `<div><b>${esc(c?.display_name || 'Client')}</b><small>${esc(m.status)} · ${consent ? 'Consented' : 'Awaiting participant consent'}</small><button class="btn ghost small" type="button" data-firm-client="${esc(m.client_id)}">Private workspace</button></div>`; }).join('') || '<p class="muted">No participants yet. Add an existing client; their individual coaching stays private.</p>'}</div></section>
       ${firmPilotReport(pilot, report)}
       <section class="panel"><h3>Firm resource library</h3><p class="muted">Tailor each resource to ${esc(org?.name || 'this firm')} and its ${pilot.capacity}-place pilot. Only published resources appear for members. No resource is sent automatically.</p>
         <form id="firmResourceForm" class="firm-form"><label>Title<input name="title" maxlength="160" required></label><label>Topic<input name="topic" maxlength="80" required></label><label>Short description<textarea name="summary" minlength="10" maxlength="500" required></textarea></label><label>Practical guidance<textarea name="body" rows="6" minlength="30" required></textarea></label><button class="btn primary">Save draft</button></form>
         <div class="firm-list">${firmState.resources.filter(r => r.pilot_id === pilot.id).map(r => `<article><b>${esc(r.title)}</b><small>${esc(r.topic)} · ${r.published ? 'Published to members' : 'Draft'}</small><p>${esc(r.summary)}</p><button class="btn ghost small" type="button" data-resource-publish="${esc(r.id)}">${r.published ? 'Unpublish' : 'Publish to members'}</button></article>`).join('') || '<p class="muted">No firm resources yet. Start with one of the ideas below.</p>'}</div>
         <h4>Ideas to tailor</h4><div class="firm-list">${firmResourceIdeas.map((idea, i) => `<button type="button" data-resource-idea="${i}"><b>${esc(idea[0])}</b><small>${esc(idea[1])}</small></button>`).join('')}</div>
       </section><section class="panel"><h3>Coaching cadence</h3><p>Monthly coaching calls, weekly check-ins, and a 5–10 minute Loom review with clear next steps. Assessments at baseline, midpoint, and endline feed the aggregate report.</p></section>` : ''}`;
+  $$('[data-firm-client]').forEach(button=>button.onclick=()=>openFirmClient(button.dataset.firmClient,button.dataset.reviewTab||'overview'));
   $('#firmOrganizationForm').onsubmit = saveFirmOrganization;
   $('#firmPilotForm').onsubmit = saveFirmPilot;
   $('#firmNewParticipantForm') && ($('#firmNewParticipantForm').onsubmit = createFirmParticipant);
@@ -94,6 +98,20 @@ async function paintFirmPilots() {
   });
   $$('[data-resource-publish]').forEach(button => button.onclick = () => toggleFirmResource(button));
   $$('[data-pilot-id]').forEach(button => button.onclick = () => { firmState.selected = button.dataset.pilotId; paintFirmPilots().catch(error => renderError(main, error, renderFirmPilots)); });
+}
+
+function firmDeliveryMarkup(pilot,roster,checkins){
+  const linked=roster.filter(m=>state.clients.find(c=>c.id===m.client_id)?.profile_id).length;
+  const ready=roster.filter(m=>firmState.consents.some(c=>c.participant_id===m.id)).length;
+  const unreviewed=checkins.filter(c=>!c.reviewed_at);
+  const date=days=>pilot.start_date?fmt(iso(new Date(+new Date(pilot.start_date+'T12:00:00Z')+days*864e5))):'Set launch date';
+  return `<section class="panel firm-delivery"><div class="panel-head"><div><span class="eyebrow">DELIVERY OVERVIEW</span><h3>One cohort. A clear service rhythm.</h3><span class="sub">Coach-only operations. Individual information stays out of the sponsor report.</span></div></div><div class="firm-operations">${[[roster.length,'Enrolled'],[linked,'Linked logins'],[ready,'Reporting consents'],[unreviewed.length,'Reviews due this week']].map(([value,label])=>`<article><strong>${value}</strong><small>${label}</small></article>`).join('')}</div><div class="firm-calendar">${[['Launch / baseline',date(0)],['First monthly call',date(28)],['Midpoint',date(42)],['Second monthly call',date(56)],['Endline / continuation',pilot.end_date?fmt(pilot.end_date):date(84)]].map(([name,when])=>`<article><b>${name}</b><small>${esc(when)}</small></article>`).join('')}</div><p class="muted">Thursday: participant check-in. Friday / Saturday: personal Loom and up to three priorities. Every four weeks: private 30-minute call. Milestone dates are planning references; calls and reminders are not automatically booked or sent.</p><h4>Private weekly review queue</h4>${unreviewed.length?unreviewed.map(c=>`<div class="firm-review-item"><div><b>${esc(state.clients.find(x=>x.id===c.client_id)?.display_name||'Client')}</b><small>Submitted ${fmt(c.submitted_at)} · awaiting review</small></div><button class="btn ghost small" data-firm-client="${esc(c.client_id)}" data-review-tab="checkins">Open check-in</button></div>`).join(''):'<p class="muted">No unreviewed check-ins submitted this week. This does not indicate that every participant has checked in.</p>'}</section>`;
+}
+async function openFirmClient(id,tab){
+  const client=state.clients.find(c=>c.id===id);if(!client)return toast('Client is unavailable','error');
+  state.client=client;state.clientTab=tab;state.data=emptyData();
+  try{if(state.preview)state.data=demoData();else await loadClientData(id);renderCoach();}
+  catch(error){state.client=null;toast(error.message,'error');renderCoach();}
 }
 
 async function saveFirmResource(event) {
@@ -187,14 +205,21 @@ async function saveFirmMember(event) {
   catch (error) { toast(error.message, 'error'); setBusy(button, false); }
 }
 
+function firmAssessmentOpens(phase,pilot){
+  if(phase==='baseline')return null;
+  const base=phase==='midpoint'?pilot.start_date:(pilot.end_date||pilot.start_date);
+  if(!base)return '';
+  const offset=phase==='midpoint'?35:(pilot.end_date?-7:77);
+  return iso(new Date(+new Date(base+'T12:00:00Z')+offset*864e5));
+}
 async function renderParticipantPilot() {
   const main = $('#clientMain');
   main.innerHTML = pageHead('FIRM PILOT', 'Your pilot') + '<section class="panel">Loading…</section>';
   try {
     if (state.preview) { main.innerHTML = pageHead('FIRM PILOT', 'Your pilot') + '<section class="panel"><h3>Private coaching</h3><p>If your firm sponsors a pilot, its invitation and optional assessments appear here. Your coaching records remain private.</p></section>'; return; }
-    const memberships = await query('Your pilot', db.from('firm_participants').select('*').eq('client_id', state.client.id));
+    const memberships = await query('Your pilot', db.from('firm_participants').select('*').eq('client_id', state.client.id).order('joined_at',{ascending:false}));
     if (!memberships.length) { main.innerHTML = pageHead('FIRM PILOT', 'Your pilot') + '<section class="panel"><p>No firm pilot invitation is linked to your account.</p></section>'; return; }
-    const member = memberships[0];
+    const member = memberships.find(m=>m.status!=='withdrawn')||memberships[0];
     const [pilot] = await query('Pilot', db.from('firm_pilots').select('id,name,start_date,end_date,organization_id').eq('id', member.pilot_id));
     const [org] = pilot ? await query('Firm', db.from('firm_organizations').select('name').eq('id', pilot.organization_id)) : [];
     const [consents, assessments, resources] = await Promise.all([
@@ -205,7 +230,7 @@ async function renderParticipantPilot() {
     main.innerHTML = pageHead('FIRM PILOT', pilot?.name || 'Your pilot') + `<section class="panel"><div class="panel-head"><div><h3>${esc(org?.name || 'Firm-sponsored coaching')}</h3><span class="sub">${fmt(pilot?.start_date)} – ${fmt(pilot?.end_date)}</span></div></div><p>Your training, nutrition, check-ins, messages and health records are private to you and your coach. The firm receives only anonymous group averages when at least five participants answer an assessment.</p>
       ${member.status === 'withdrawn' ? '<p>This invitation has been withdrawn.</p>' : consents.length ? '<p class="pill">Aggregate reporting consent recorded</p>' : '<button class="btn primary" id="acceptFirmConsent">I agree to anonymous group reporting</button>'}</section>
       ${member.status !== 'withdrawn' ? `<section class="panel"><div class="panel-head"><div><h3>Resources for ${esc(org?.name || 'your firm')}</h3><span class="sub">Practical guidance selected by your coach for this pilot.</span></div></div>${resources.map(r => `<article class="firm-resource"><span class="eyebrow">${esc(r.topic)}</span><h4>${esc(r.title)}</h4><p>${esc(r.summary)}</p><div class="resource-body">${esc(r.body).replaceAll('\n', '<br>')}</div></article>`).join('') || '<p class="muted">Your coach has not published any firm resources yet.</p>'}</section>` : ''}
-      ${consents.length && member.status !== 'withdrawn' ? `<section class="panel"><h3>Short assessments</h3><p>Rate each from 1 to 10. Your individual answers stay private.</p>${firmPhases.map(phase => assessments.some(a => a.phase === phase) ? `<p>${title(phase)} submitted</p>` : `<form class="firm-assessment" data-phase="${phase}"><h4>${title(phase)}</h4><div class="firm-score-grid">${['energy','sleep','stress','workload','consistency'].map(key => `<label>${title(key)}<input name="${key}" type="number" min="1" max="10" required></label>`).join('')}</div><button class="btn primary">Submit ${phase}</button></form>`).join('')}</section>` : ''}`;
+      ${consents.length && member.status !== 'withdrawn' ? `<section class="panel"><h3>Short assessments</h3><p>Rate each from 1 to 10. Your individual answers stay private.</p>${firmPhases.map(phase => assessments.some(a => a.phase === phase) ? `<p>${title(phase)} submitted</p>` : (firmAssessmentOpens(phase,pilot)===''||firmAssessmentOpens(phase,pilot)>iso(new Date())) ? `<p class="muted">${title(phase)} ${firmAssessmentOpens(phase,pilot)?'opens '+fmt(firmAssessmentOpens(phase,pilot)):'will open once programme dates are confirmed'}.</p>` : `<form class="firm-assessment" data-phase="${phase}"><h4>${title(phase)}</h4><div class="firm-score-grid">${['energy','sleep','stress','workload','consistency'].map(key => `<label>${title(key)}<input name="${key}" type="number" min="1" max="10" required></label>`).join('')}</div><button class="btn primary">Submit ${phase}</button></form>`).join('')}</section>` : ''}`;
     $('#acceptFirmConsent') && ($('#acceptFirmConsent').onclick = async () => {
       try { await query('Pilot consent', db.from('firm_consents').insert({ participant_id: member.id, client_id: state.client.id }).select()); toast('Consent recorded'); renderParticipantPilot(); }
       catch (error) { toast(error.message, 'error'); }
