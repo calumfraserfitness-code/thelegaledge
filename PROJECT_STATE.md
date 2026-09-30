@@ -1,6 +1,15 @@
 # The Legal Edge Client App — Persistent Project State
 
-Last updated: 29 September 2026
+Last updated: 30 September 2026
+
+## 30 September account error handling and deployment verification
+
+- Live app: https://legal-edge-client-app.vercel.app/ ; browser verified deployed script `app-v2.js?v=20260930-1` and real sign-in page.
+- Account creation and existing-roster linking share a provisioning helper. It gates expired sessions, surfaces backend JSON errors (including already-linked accounts), explains rejected authentication, and requires a returned client ID. Incomplete responses ask the coach to refresh the roster before retrying.
+- JavaScript syntax check and isolated helper tests passed for missing session, backend conflict detail, rejected JWT, success, and incomplete response.
+- Reconfirmed database: 13 saved clients, zero linked client identities, one auth user, zero firm pilots. Imported old-app passwords are not accounts in this new project's auth service.
+- Private coach/client end-to-end flows remain unverified. The prior secure coach sign-in request was cancelled; do not restart it automatically. No accounts were provisioned, no firm invitations were sent, and no pilot was created.
+- App commit: 36e39a5c2020af5976b8b9a598bf729e931db615. Cache-key commit: 886d9dd25c9d68df2b7e4102aa455fbf0c7fe397.
 
 ## 29 September client activation and firm resource update
 
