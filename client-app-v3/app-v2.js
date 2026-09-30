@@ -862,10 +862,9 @@ async function saveExercisePrescription(event) {
   const fd = new FormData(event.target);
   const patch = Object.fromEntries(['name', 'reps', 'tempo', 'video_url', 'image_url', 'coach_instructions', 'superset_group'].map((key) => [key, String(fd.get(key) || '').trim() || null]));
   for (const key of ['sets', 'rest_seconds', 'rpe', 'rir']) patch[key] = fd.get(key) === '' ? null : Number(fd.get(key));
-  Object.assign(exercise, patch);
-  if (state.preview) { toast('Exercise updated in preview'); return coachTraining(); }
+  if (state.preview) { Object.assign(exercise,patch);toast('Exercise updated in preview'); return coachTraining(); }
   setBusy(event.submitter, true);
-  try { await query('Exercise update', db.from('program_exercises').update(patch).eq('id', exercise.id).select()); toast('Exercise saved'); coachTraining(); }
+  try { const [saved]=await query('Exercise update', db.from('program_exercises').update(patch).eq('id', exercise.id).select());if(!saved)throw new Error('Exercise was not saved. Reload and try again.');Object.assign(exercise,saved);toast('Exercise saved'); coachTraining(); }
   catch (error) { toast(error.message, 'error'); setBusy(event.submitter, false); }
 }
 
@@ -1095,16 +1094,15 @@ async function removeMealAssignment(mealId, plan) {
 async function saveMeal(event) {
   event.preventDefault();
   const id = event.target.dataset.mealEditor;
-  const assignment = state.data.mealAssignments.find((item) => item.meal?.id === id);
+  const assignment = state.data.mealAssignments.find((item) => item.meal?.id === id && item.nutrition_plan_id === state.selectedNutritionPlanId);
   if (!assignment) return toast('Meal not found', 'error');
   const fd = new FormData(event.target);
   const ingredients = String(fd.get('ingredients') || '').split('\n').map((line) => line.trim()).filter(Boolean).map((line) => { const [quantity, unit, ...name] = line.split('|').map((part) => part.trim()); return { quantity: quantity || null, unit: unit || null, name: name.join(' | ') || unit || quantity }; }).filter((item) => item.name);
   const patch = { name: String(fd.get('name') || '').trim(), meal_type: String(fd.get('meal_type') || '').trim() || null, ingredients, cooking_instructions: String(fd.get('cooking_instructions') || '').trim() || null };
   for (const key of ['calories', 'protein_g', 'carbs_g', 'fat_g']) patch[key] = fd.get(key) === '' ? null : Number(fd.get(key));
-  Object.assign(assignment.meal, patch);
-  if (state.preview) { toast('Meal updated in preview'); return coachNutrition(); }
+  if (state.preview) { assignment.meal={...assignment.meal,...patch};toast('Meal updated in preview'); return coachNutrition(); }
   setBusy(event.submitter, true);
-  try { await query('Meal update', db.from('meal_bank').update(patch).eq('id', id).select()); toast('Meal saved'); coachNutrition(); }
+  try { const saved = await query('Personal meal update', db.rpc('save_client_meal', { target_assignment_id: assignment.id, meal_patch: patch })); if(!saved?.meal?.id)throw new Error('Meal was not saved. Reload and try again.'); assignment.meal_id=saved.meal.id;assignment.meal=saved.meal; toast('Personal meal saved'); coachNutrition(); }
   catch (error) { toast(error.message, 'error'); setBusy(event.submitter, false); }
 }
 
