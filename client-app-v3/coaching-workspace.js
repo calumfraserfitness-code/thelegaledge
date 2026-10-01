@@ -7,7 +7,7 @@ function recordedAverage(rows,key){const values=rows.filter(r=>finiteRecorded(r[
 function coachingGoalValue(goal){
  const latest=state.data.checkins[0],week=currentWeek();
  switch(goal.metric){
- case 'steps':return recordedAverage(recentHealthRows(),'steps')??(finiteRecorded(latest?.average_steps)?Number(latest.average_steps):null);
+ case 'steps':{const cutoff=iso(new Date(Date.now()-6*864e5));const manual=(state.data.steps||[]).filter(r=>r.entry_date>=cutoff&&r.entry_date<=iso(new Date()));return recordedAverage(recentHealthRows(),'steps')??recordedAverage(manual,'actual_steps')??(finiteRecorded(latest?.average_steps)?Number(latest.average_steps):null);}
  case 'weight_kg':{const p=state.data.progress.find(p=>finiteRecorded(p.weight_kg));return p?Number(p.weight_kg):null;}
  case 'weekly_sessions':return week?state.data.sessions.filter(s=>s.week_id===week.id&&s.status==='completed'&&['weights','resistance'].includes(s.training_type)).length:null;
  case 'sleep_minutes':return recordedAverage(recentHealthRows(),'sleep_minutes')??(finiteRecorded(latest?.sleep_hours)?Number(latest.sleep_hours)*60:null);
@@ -67,7 +67,7 @@ async function saveCoachingRecord(event,table,key,id,render){
 }
 function clientScheduleMarkup(){
  const week=currentWeek();if(!week)return '';
- return `<section class="panel"><div class="panel-head"><div><span class="eyebrow">FIT YOUR WEEK</span><h2>Choose when to train</h2><p>Move planned activities within this week. Your prescribed exercises stay attached; meal assignments stay on their dates.</p></div></div>${state.data.sessions.filter(s=>s.week_id===week.id&&s.status!=='completed').map(s=>`<form class="cw-schedule" data-cw-session="${s.id}"><b>${esc(s.title)}</b><label>Day<input name="session_date" type="date" min="${week.week_start}" max="${iso(new Date(new Date(week.week_start+'T12:00:00').getTime()+6*864e5))}" value="${s.session_date}" required></label><label>Time<input name="scheduled_time" type="time" value="${s.scheduled_time?.slice(0,5)||''}"></label><label>Timezone<select name="schedule_timezone">${['Europe/Dublin','Europe/London','America/New_York','America/Chicago','America/Los_Angeles',Intl.DateTimeFormat().resolvedOptions().timeZone].filter((v,i,a)=>a.indexOf(v)===i).map(v=>`<option ${v===(s.schedule_timezone||Intl.DateTimeFormat().resolvedOptions().timeZone)?'selected':''}>${v}</option>`).join('')}</select></label><button class="btn ghost">Save timing</button></form>`).join('')||'<div class="empty">No uncompleted scheduled activities to move.</div>'}</section>`;
+ return `<section class="panel" id="cwTimingPanel"><div class="panel-head"><div><span class="eyebrow">FIT YOUR WEEK</span><h2>Choose when to train</h2><p>Move planned activities within this week. Your prescribed exercises stay attached; meal assignments stay on their dates.</p></div></div>${state.data.sessions.filter(s=>s.week_id===week.id&&s.status!=='completed').map(s=>`<form class="cw-schedule" data-cw-session="${s.id}"><b>${esc(s.title)}</b><label>Day<input name="session_date" type="date" min="${week.week_start}" max="${iso(new Date(new Date(week.week_start+'T12:00:00').getTime()+6*864e5))}" value="${s.session_date}" required></label><label>Time<input name="scheduled_time" type="time" value="${s.scheduled_time?.slice(0,5)||''}"></label><label>Timezone<select name="schedule_timezone">${['Europe/Dublin','Europe/London','America/New_York','America/Chicago','America/Los_Angeles',Intl.DateTimeFormat().resolvedOptions().timeZone].filter((v,i,a)=>a.indexOf(v)===i).map(v=>`<option ${v===(s.schedule_timezone||Intl.DateTimeFormat().resolvedOptions().timeZone)?'selected':''}>${v}</option>`).join('')}</select></label><button class="btn ghost">Save timing</button></form>`).join('')||'<div class="empty">No uncompleted scheduled activities to move.</div>'}</section>`;
 }
 function bindClientScheduling(){
  $$('[data-cw-session]').forEach(form=>form.onsubmit=async event=>{
@@ -91,7 +91,7 @@ renderClient=function(){
 };
 const originalCoachingPlanner=clientPlanner;
 clientPlanner=function(){originalCoachingPlanner();if(!currentWeek()?.published&&!state.preview)return;
- const week=currentWeek(),panel=document.createElement('div');panel.innerHTML=`${week?.coach_note?`<section class="panel coach-note"><h3>This week’s priorities</h3><p>${esc(week.coach_note)}</p></section>`:''}${clientScheduleMarkup()}${coachingGoalsMarkup()}`;$('#clientMain').append(panel);bindClientScheduling();
+ const week=currentWeek(),panel=document.createElement('div');panel.innerHTML=`${week?.coach_note?`<section class="panel coach-note"><h3>This week’s priorities</h3><p>${esc(week.coach_note)}</p></section>`:''}${clientScheduleMarkup()}${clientManualStepsMarkup()}${coachingGoalsMarkup()}`;$('#clientMain').append(panel);bindClientScheduling();$('.planner-adherence')?.insertAdjacentHTML('beforebegin','<button class="btn primary cw-arrange" id="cwArrangeWeek">Arrange my week</button>');$('#cwArrangeWeek').onclick=()=>$('#cwTimingPanel')?.scrollIntoView({behavior:'smooth',block:'start'});bindManualSteps();
  $$('[data-open-session]').forEach(button=>{const session=state.data.sessions.find(s=>s.id===button.dataset.openSession);if(session?.scheduled_time)button.insertAdjacentHTML('beforebegin',`<small class="cw-session-time">${esc(session.scheduled_time.slice(0,5))} · ${esc(session.schedule_timezone)}</small>`);});
 };
 const originalCoachingProgress=clientProgress;
@@ -154,3 +154,14 @@ function startFullCoachingDemo(){
  const banner=document.createElement('div');banner.className='cw-demo-banner';banner.innerHTML='FULL COACHING WORKSPACE · FICTIONAL DATA · CHANGES RESET ON RELOAD <a href="?pilot=demo">Back to firm preview</a>';document.body.prepend(banner);
 }
 if(new URLSearchParams(location.search).get('workspace')==='demo')document.addEventListener('DOMContentLoaded',startFullCoachingDemo,{once:true});
+
+function slider(name,label,value=5,highIsHard=false){
+ return `<label class="field checkin-rating"><span>${esc(label)} <output data-slider-output="${esc(name)}">${value}</output> / 10</span><input name="${esc(name)}" type="range" min="1" max="10" step="1" value="${value}" aria-label="${esc(label)} rating"><small>1 ${highIsHard?'low':'poor'} · 10 ${highIsHard?'high':'excellent'}</small></label>`;
+}
+
+function clientManualStepsMarkup(){
+ return `<section class="panel"><h3>Record your actual steps</h3><p>If you do not use a connected tracker, record the count shown on your phone or watch.</p><form id="cwStepsForm" class="editor-grid"><label>Date<input name="entry_date" type="date" value="${iso(new Date())}" max="${iso(new Date())}" required></label><label>Actual steps<input name="actual_steps" type="number" min="0" max="100000" step="1" required></label><button class="btn primary">Save step count</button></form></section>`;
+}
+function bindManualSteps(){
+ $('#cwStepsForm').onsubmit=async event=>{event.preventDefault();const fd=new FormData(event.target),clientId=state.client.id,row={client_id:clientId,entry_date:fd.get('entry_date'),actual_steps:Number(fd.get('actual_steps')),target_steps:safeStepGoal()};setBusy(event.submitter,true);try{const saved=state.preview?{...row,id:'sample-steps-'+Date.now()}:(await query('Actual step count',db.from('step_entries').upsert(row,{onConflict:'client_id,entry_date'}).select()))[0];if(!saved)throw new Error('Steps were not saved');if(state.client.id!==clientId)return;const old=state.data.steps.find(s=>s.entry_date===saved.entry_date);if(old)Object.assign(old,saved);else state.data.steps.unshift(saved);clientPlanner();toast(state.preview?'Sample step count updated':'Actual step count saved');}catch(error){toast(error.message,'error');setBusy(event.submitter,false);}};
+}
