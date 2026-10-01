@@ -1,0 +1,14 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert'),path=require('path');
+const noop=()=>{},ctx=vm.createContext({state:{data:{checkins:[],progress:[],sessions:[]}},Date,Number,Math,Set,Intl,URLSearchParams,location:{search:''},document:{addEventListener:noop},loadClientData:noop,COACH_TABS:[],renderClientWorkspace:noop,renderClient:noop,clientPlanner:noop,clientProgress:noop,clientCheckin:noop,preferredHealthDays:()=>[],iso:d=>d.toISOString().slice(0,10),currentWeek:()=>({id:'w'})});
+vm.runInContext(fs.readFileSync(path.join(__dirname,'../coaching-workspace.js'),'utf8'),ctx);
+assert.equal(vm.runInContext("recordedAverage([{steps:null},{steps:6000},{steps:''},{steps:8000}], 'steps')",ctx),7000);
+assert.equal(vm.runInContext("recordedAverage([{sleep_minutes:null}], 'sleep_minutes')",ctx),null);
+assert.equal(vm.runInContext('coachingGoalPercent({baseline:90,target:80},85)',ctx),50);
+assert.equal(vm.runInContext('coachingGoalPercent({baseline:0,target:2},null)',ctx),null);
+ctx.state.data.sessions=[{week_id:'w',status:'completed',training_type:'weights'},{week_id:'w',status:'completed',training_type:'mobility'},{week_id:'other',status:'completed',training_type:'weights'}];
+assert.equal(vm.runInContext("coachingGoalValue({metric:'weekly_sessions'})",ctx),1);
+ctx.state.data.checkins=[{average_steps:6500,sleep_hours:7,energy:8}];
+assert.equal(vm.runInContext("coachingGoalValue({metric:'steps'})",ctx),6500);
+assert.equal(vm.runInContext("coachingGoalValue({metric:'sleep_minutes'})",ctx),420);
+assert.equal(vm.runInContext("coachingGoalValue({metric:'energy'})",ctx),8);
+console.log('PASS: missing health readings excluded, decreasing goals, no-data goals, distinct strength-session counts and check-in metric fallback.');

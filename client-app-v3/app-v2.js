@@ -187,7 +187,7 @@ function demoData() {
 
 async function boot() {
   try {
-    if (new URLSearchParams(location.search).get('pilot') === 'demo') return;
+    if (new URLSearchParams(location.search).get('pilot') === 'demo'||new URLSearchParams(location.search).get('workspace') === 'demo') return;
     if (!db) throw new Error('The secure connection did not load. Refresh the page.');
     if (recoveryMode) return show('#recovery');
     const { data: { user } } = await db.auth.getUser();
@@ -428,9 +428,9 @@ function preferredHealthDays() {
 }
 
 function healthSummaryMarkup() {
-  const rows = preferredHealthDays().slice(0, 7);
+  const rows = recentHealthRows(7);
   if (!rows.length) return '<section class="panel health-summary"><div class="panel-head"><div><h3>Connected health</h3><span class="sub">No wearable data connected yet. Manual tracking remains available.</span></div></div></section>';
-  const avg = (key) => { const values=rows.map(r=>Number(r[key])).filter(Number.isFinite); return values.length ? values.reduce((a,b)=>a+b,0)/values.length : null; };
+  const avg = (key) => { const values=rows.filter(r=>finiteRecorded(r[key])).map(r=>Number(r[key])); return values.length ? values.reduce((a,b)=>a+b,0)/values.length : null; };
   const steps=avg('steps'), sleep=avg('sleep_minutes'), resting=avg('resting_heart_rate'), latest=rows[0];
   const hits=rows.filter(r=>Number(r.steps)>=safeStepGoal()).length;
   return `<section class="panel health-summary"><div class="panel-head"><div><h3>Connected health</h3><span class="sub">Transparent seven-day summaries · latest ${fmt(latest.date)}</span></div><span class="pill">${esc(title(latest.source.replaceAll('_',' ')))}</span></div><div class="metric-strip"><div class="metric"><span>AVG STEPS</span><strong>${steps==null?'—':Math.round(steps).toLocaleString()}</strong><small>${hits}/${rows.length} target days</small></div><div class="metric"><span>AVG SLEEP</span><strong>${sleep==null?'—':`${Math.floor(sleep/60)}h ${Math.round(sleep%60)}m`}</strong></div><div class="metric"><span>RESTING HR</span><strong>${resting==null?'—':`${Math.round(resting)} bpm`}</strong></div><div class="metric"><span>LATEST WEIGHT</span><strong>${displayWeight(latest.weight_kg)}</strong></div></div></section>`;
@@ -1523,7 +1523,7 @@ function clientNutrition() {
 
 function clientCheckin() {
   const unit = state.client.weight_unit === 'lbs' ? 'lb' : 'kg';
-  const wearable=preferredHealthDays().slice(0,7), wearableSteps=wearable.map(row=>Number(row.steps)).filter(Number.isFinite), autoSteps=wearableSteps.length?Math.round(wearableSteps.reduce((sum,value)=>sum+value,0)/wearableSteps.length):'';const autoWeight=wearable.find(row=>row.weight_kg!=null)?.weight_kg;const displayAutoWeight=autoWeight?(Number(autoWeight)*(unit==='lb'?2.20462:1)).toFixed(1):'';
+  const wearable=recentHealthRows(7), wearableSteps=wearable.filter(row=>finiteRecorded(row.steps)).map(row=>Number(row.steps)), autoSteps=wearableSteps.length?Math.round(wearableSteps.reduce((sum,value)=>sum+value,0)/wearableSteps.length):'';const autoWeight=wearable.find(row=>row.weight_kg!=null)?.weight_kg;const displayAutoWeight=autoWeight?(Number(autoWeight)*(unit==='lb'?2.20462:1)).toFixed(1):'';
   $('#clientMain').innerHTML = clientHeader('WEEKLY REVIEW', 'Check-in', `Your check-in day is ${DAYS[state.client.checkin_day ?? 5]}. Missed weeks can still be submitted.`) + `<form id="checkinForm" class="panel checkin-form quick-checkin">${wearable.length?`<div class="wearable-prefill wide"><b>Wearable data added</b><span>${wearable.length} recent days were used to prefill weight and average steps. You can edit them before submitting.</span></div>`:''}<div class="checkin-grid"><label class="field">Week number<input name="week_number" type="number" min="1" value="${currentWeek()?.week_number || ''}"></label><label class="field">Weight (${unit})<input name="weight_display" type="number" step="0.1" value="${displayAutoWeight}"></label><label class="field">Average daily steps<input name="average_steps" type="number" value="${autoSteps}"></label><label class="field">Training completed %<input name="training_adherence" type="number" min="0" max="100"></label><label class="field">Nutrition adherence %<input name="nutrition_adherence" type="number" min="0" max="100"></label></div><div class="checkin-sliders">${slider('energy', 'Energy')}${slider('sleep', 'Sleep')}${slider('stress', 'Stress', 5, true)}${slider('hunger', 'Hunger', 5, true)}${slider('cravings', 'Cravings', 5, true)}</div><label class="field wide">Biggest win<textarea name="wins" rows="2"></textarea></label><label class="field wide">Main challenge or feedback<textarea name="challenges" rows="2"></textarea></label><label class="field wide">Support needed next week<textarea name="support_needed" rows="2"></textarea></label><fieldset class="checkin-photos wide"><legend>Optional progress photos</legend><label>Front<input name="photo_front" type="file" accept="image/jpeg,image/png,image/webp"></label><label>Side<input name="photo_side" type="file" accept="image/jpeg,image/png,image/webp"></label><label>Back<input name="photo_back" type="file" accept="image/jpeg,image/png,image/webp"></label></fieldset><button class="btn primary wide">Submit weekly check-in</button></form><section class="client-history"><div class="panel-head"><h2>Previous check-ins</h2><span class="pill">${state.data.checkins.length} WEEKS</span></div>${state.data.checkins.map((checkin) => checkinCard(checkin)).join('') || '<div class="empty">No previous check-ins.</div>'}</section>`;
   $$('input[type="range"]').forEach((input) => input.oninput = () => $(`[data-slider-output="${input.name}"]`).textContent = input.value);
   $('#checkinForm').onsubmit = submitCheckin;
