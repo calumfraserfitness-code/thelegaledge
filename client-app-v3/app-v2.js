@@ -113,11 +113,12 @@ async function query(label, promise) {
 }
 
 async function loadCoach() {
-  const [clients, qaRows] = await Promise.all([query('Clients', db.from('clients')
+  const [clients, qaRows, memberships] = await Promise.all([query('Clients', db.from('clients')
     .select('*,profile:profiles!clients_profile_id_fkey(full_name,email)')
-    .order('start_date')), query('Client QA', db.from('client_qa_summary').select('*'))]);
+    .order('start_date')), query('Client QA', db.from('client_qa_summary').select('*')), query('Corporate memberships', db.from('firm_participants').select('client_id'))]);
   state.clients = clients.map(normalizeClient);
   state.qaRows = qaRows;
+  state.corporateMemberships = memberships;
 }
 
 async function loadClientData(clientId) {
@@ -304,8 +305,15 @@ function qaDashboard(active) {
   return `<section class="panel"><div class="panel-head"><div><h3>Client plan QA</h3><span class="sub">Coach-only completeness checks. Clients never see this.</span></div></div><div class="qa-table"><div class="qa-head"><span>Client</span><span>Nutrition</span><span>Training</span><span>Planner</span><span>Progress</span><span>Health</span></div>${rows.map(row=>{const nutrition=Number(row.nutrition_days)>=3&&Number(row.assigned_meals)>=9&&Number(row.complete_meals)===Number(row.assigned_meals);const training=Number(row.active_programmes)>0&&Number(row.programme_days)>0&&Number(row.prescribed_exercises)>0;return `<div class="qa-row"><b>${esc(row.display_name)}</b><span class="${nutrition?'pass':'fail'}">${nutrition?'PASS':`${row.nutrition_days||0} days · ${row.complete_meals||0}/${row.assigned_meals||0} meals`}</span><span class="${training?'pass':'fail'}">${training?'PASS':`${row.programme_days||0} days · ${row.prescribed_exercises||0} exercises`}</span><span class="${Number(row.published_weeks)>0?'pass':'fail'}">${Number(row.published_weeks)>0?'PASS':'NOT PUBLISHED'}</span><span class="${Number(row.progress_entries)>0?'pass':'fail'}">${row.progress_entries||0} entries</span><span>${Number(row.health_connections)>0?'CONNECTED':'Not connected'}</span></div>`}).join('')}</div></section>`;
 }
 
+function directCoachingClients() {
+  const memberships = typeof firmState !== 'undefined' && firmState.loaded ? firmState.participants : (state.corporateMemberships || []);
+  const corporateIds = new Set(memberships.map(member => member.client_id));
+  return state.clients.filter(client => !corporateIds.has(client.id));
+}
+
 function renderRoster() {
-  $('#coachMain').innerHTML = pageHead('CLIENT MANAGEMENT', 'All clients', '<input id="clientSearch" class="search" placeholder="Search clients…"><button class="btn primary" data-add-client>+ Add client</button>') + `<section class="panel">${clientRows(state.clients)}</section>`;
+  const clients = directCoachingClients();
+  $('#coachMain').innerHTML = pageHead('1-TO-1 COACHING', '1-to-1 Clients', '<input id="clientSearch" class="search" placeholder="Search your clients…"><button class="btn primary" data-add-client>+ Add client</button>') + `<section class="panel"><div class="panel-head"><div><h3>Your saved roster · ${clients.length}</h3><p class="muted">Current and past personal clients. Firm participants are managed in Corporate.</p></div></div>${clientRows(clients)}</section>`;
   bindAddClient();
   bindClientRows();
   $('#clientSearch').oninput = (event) => $$('[data-client-id]').forEach((row) => row.classList.toggle('hidden', !row.innerText.toLowerCase().includes(event.target.value.toLowerCase())));

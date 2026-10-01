@@ -41,3 +41,9 @@ assert.equal(check("firmAssessmentOpens('midpoint',{start_date:'2026-10-05'})"),
 assert.equal(check("firmAssessmentOpens('endline',{start_date:'2026-10-05',end_date:'2026-12-28'})"),'2026-12-21');
 assert.equal(check("firmAssessmentOpens('midpoint',{})"),'');
 console.log('PASS: participant assessment opening dates.');
+check("state.clients=[{id:'direct',status:'active'},{id:'past',status:'archived'},{id:'firm',status:'active'}];state.corporateMemberships=[{client_id:'firm'}];firmState.loaded=false");
+assert.equal(check("directCoachingClients().map(c=>c.id).join(',')"),'direct,past');
+check("firmState.loaded=true;firmState.participants=[{client_id:'direct',status:'withdrawn'},{client_id:'firm',status:'invited'}]");
+assert.equal(check("directCoachingClients().map(c=>c.id).join(',')"),'past');
+assert.equal(check('state.clients.length'),3);
+console.log('PASS: direct roster keeps past clients, separates corporate memberships and preserves all saved records.');
