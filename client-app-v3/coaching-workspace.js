@@ -149,7 +149,7 @@ function fullCoachingSample(index=0){
 }
 function startFullCoachingDemo(){
  const index=Math.min(9,Math.max(0,Number(new URLSearchParams(location.search).get('person'))||0));
- state.preview=true;state.role='coach';state.client=normalizeClient({id:'sample-client-'+index,display_name:pilotPeople[index][0]+' · sample',status:'active',weight_unit:'lbs',start_weight_kg:84,goal_weight_kg:80,daily_steps_goal:7000,cardio_enabled:true,mobility_enabled:true,checkin_day:4,track_weight:true,onboarding_status:'complete',plan_status:'published',profile_id:'sample-profile',market_region:'us'});state.clients=[state.client];state.data=fullCoachingSample(index);state.clientTab='planner';state.coachView='clients';state.clientView='planner';state.selectedNutritionPlanId=null;
+ state.preview=true;state.role='coach';state.client=normalizeClient({id:'sample-client-'+index,display_name:pilotPeople[index][0]+' · sample',status:'active',weight_unit:'lbs',start_weight_kg:84,goal_weight_kg:80,daily_steps_goal:7000,cardio_enabled:true,mobility_enabled:true,checkin_day:4,track_weight:true,onboarding_status:'complete',plan_status:'published',profile_id:'sample-profile',market_region:'us'});state.clients=[state.client];state.data=fullCoachingSample(index);state.clientTab='planner';state.coachView='clients';state.clientView='today';state.selectedNutritionPlanId=null;
  $('#coachName').textContent='Calum · full coaching example';show('#coachApp');renderCoach();
  const banner=document.createElement('div');banner.className='cw-demo-banner';banner.innerHTML='FULL COACHING WORKSPACE · FICTIONAL DATA · CHANGES RESET ON RELOAD <a href="?pilot=demo">Back to firm preview</a>';document.body.prepend(banner);
 }

@@ -29,7 +29,7 @@ const state = {
   role: null,
   preview: false,
   coachView: 'dashboard',
-  clientView: 'planner',
+  clientView: 'today',
   hasPilot: false,
   selectedSessionId: null,
   selectedNutritionPlanId: null,
@@ -372,7 +372,7 @@ function renderClientWorkspace() {
     $('#clientHello').textContent = client.display_name;
     $('#returnCoach').classList.remove('hidden');
     show('#clientApp');
-    state.clientView = 'planner';
+    state.clientView = 'today';
     renderClient();
   };
   const views = {
@@ -1148,7 +1148,8 @@ function checkinCard(checkin, coach = false) {
   return `<details class="checkin-card rich-checkin" ${checkin === state.data.checkins[0] ? 'open' : ''}><summary><div><span class="eyebrow">WEEK ${checkin.week_number || '—'}</span><h3>${esc(checkin.original_date_text || fmt(checkin.submitted_at))}</h3></div><div class="score">${checkin.week_score ?? '—'}/10</div></summary>
     <div class="detail-list"><div class="detail"><label>Weight</label>${displayWeight(checkin.weight_kg)}</div><div class="detail"><label>Energy</label>${checkin.energy ?? '—'}/10</div><div class="detail"><label>Sleep</label>${checkin.sleep ?? '—'}/10</div><div class="detail"><label>Stress</label>${checkin.stress ?? '—'}/10</div><div class="detail"><label>Training</label>${checkin.training_adherence == null ? '—' : checkin.training_adherence + '%'}</div><div class="detail"><label>Nutrition</label>${checkin.nutrition_adherence == null ? '—' : checkin.nutrition_adherence + '%'}</div><div class="detail"><label>Average steps</label>${checkin.average_steps != null ? Number(checkin.average_steps).toLocaleString() : '—'}</div></div>
     <div class="original-answers">${answers.length ? answers.map(([question, answer]) => `<div class="answer-block"><h4>${esc(question)}</h4><p>${esc(answer)}</p></div>`).join('') : '<p class="source-gap">No written response was submitted for this week.</p>'}</div>
-    ${checkin.voice_note_url ? `<a class="loom-card" href="${esc(checkin.voice_note_url)}" target="_blank" rel="noopener"><span>▶</span><div><b>Weekly check-in video</b><small>Open coach review</small></div></a>` : ''}
+    ${safeMediaUrl(checkin.voice_note_url) ? `<a class="loom-card" href="${esc(safeMediaUrl(checkin.voice_note_url))}" target="_blank" rel="noopener"><span>▶</span><div><b>Weekly check-in video</b><small>Open coach review</small></div></a>` : ''}
+    ${!coach && checkin.focus_next_week ? `<div class="coach-note"><b>Agreed action points</b><p>${esc(checkin.focus_next_week)}</p></div>` : ''}
     ${coach ? `<label class="field">Coach response<textarea data-checkin-response="${checkin.id}">${esc(checkin.coach_response || '')}</textarea></label><label class="field">Weekly video URL<input type="url" data-checkin-video="${checkin.id}" value="${esc(checkin.voice_note_url || '')}"></label>` : (checkin.coach_response ? `<div class="coach-note"><b>Coach response</b><p>${esc(checkin.coach_response)}</p></div>` : '')}
   </details>`;
 }
@@ -1331,7 +1332,7 @@ function renderClient() {
   $('.account-menu [data-account-view="pilot"]')?.classList.toggle('hidden', !(state.role === 'client' && state.hasPilot) && !state.preview);
   $$('#clientNav button').forEach((button) => button.classList.toggle('active', button.dataset.clientView === state.clientView));
   const views = {
-    planner: clientPlanner, training: clientTraining,
+    today: clientToday, planner: clientPlanner, training: clientTraining,
     nutrition: clientNutrition, checkin: clientCheckin, progress: clientProgress,
     onboarding: clientOnboarding, legal: clientLegal, diagnostics: clientDiagnostics, health: clientHealth, pilot: renderParticipantPilot
   };
@@ -1414,23 +1415,18 @@ function bindCompletionActions() {
     input.closest('.task')?.classList.toggle('done', input.checked); updatePlannerAdherence();
     if (state.preview) return toast('Preview updated');
     try {
-      await query('Session completion', db.from('training_sessions').update({ status: session.status, completed_at: input.checked ? new Date().toISOString() : null }).eq('id', session.id).select());
+      const saved = await query('Session completion', db.from('training_sessions').update({ status: session.status, completed_at: input.checked ? new Date().toISOString() : null }).eq('id', session.id).select());
+      if (!saved.length) throw new Error('Session was not saved. Refresh and try again.');
       toast('Weekly plan updated');
     } catch (error) { session.status = previous; input.checked = previous === 'completed'; input.closest('.task')?.classList.toggle('done', input.checked); updatePlannerAdherence(); toast(error.message, 'error'); }
   });
-  $$('[data-step-date]').forEach((input) => input.onchange = async () => {
-    const date = input.dataset.stepDate;
-    const old = state.data.steps.find((entry) => entry.entry_date === date);
-    const previous = old ? {...old} : null;
-    const actual = input.checked ? safeStepGoal() : 0;
-    const row = { client_id: state.client.id, entry_date: date, target_steps: safeStepGoal(), actual_steps: actual };
-    if (old) Object.assign(old, row); else state.data.steps.push(row);
-    input.closest('.task')?.classList.toggle('done', input.checked); updatePlannerAdherence();
-    if (state.preview) return toast('Preview updated');
-    try {
-      await query('Steps', db.from('step_entries').upsert(row, { onConflict: 'client_id,entry_date' }).select());
-      toast('Steps updated');
-    } catch (error) { if (old) Object.assign(old, previous); else state.data.steps = state.data.steps.filter(entry => entry !== row); input.checked = Number(previous?.actual_steps || previous?.steps || 0) >= safeStepGoal(); input.closest('.task')?.classList.toggle('done', input.checked); updatePlannerAdherence(); toast(error.message, 'error'); }
+  $$('[data-step-date]').forEach((input) => input.onchange = () => {
+    const entry = state.data.steps.find(row => row.entry_date === input.dataset.stepDate);
+    input.checked = Number(entry?.actual_steps ?? entry?.steps ?? -1) >= safeStepGoal();
+    toast('Record the actual count from your phone or watch. Ticking a target does not create step data.');
+    const field = document.querySelector('#cwStepsForm input[name="actual_steps"]');
+    if(field){field.scrollIntoView({block:'center',behavior:'smooth'});field.focus();}
+    else {state.clientView='today';renderClient();}
   });
   $$('[data-nutrition-complete]').forEach((input)=>input.onchange=async()=>{
     const day=state.data.nutritionDays.find(item=>item.nutrition_date===input.dataset.nutritionComplete); if(!day)return;
@@ -1704,4 +1700,3 @@ db?.auth.onAuthStateChange((event) => {
   }
 });
 boot();
-
