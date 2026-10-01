@@ -107,6 +107,24 @@ async function saveExplicitCoachReview(event,checkin) {
 }
 const beforeTodayCompletionBindings=bindCompletionActions;
 bindCompletionActions=function(){beforeTodayCompletionBindings();$$('[data-session-complete]').forEach(input=>{const save=input.onchange,clientId=state.client.id;input.onchange=async()=>{await save();if(state.clientView==='today'&&state.client?.id===clientId)clientToday();};});};
+importTrainingJson=async function(event){
+  event.preventDefault();let plan;
+  try{plan=validateTrainingPlan(parsePastedPlanJson(new FormData(event.target).get('training_json')));}
+  catch(error){const message='Invalid programme: '+error.message;const field=$('#trainingImportError');if(field){field.textContent=message;field.hidden=false;}return toast(message,'error');}
+  $('#trainingImportError')&&($('#trainingImportError').hidden=true);
+  const clientId=state.client.id;setBusy(event.submitter,true,'Saving draft…');
+  try{
+    if(state.preview){
+      const stamp=Date.now(),program={id:'sample-program-'+stamp,name:plan.programme_name,status:'draft',source_json:plan,days:plan.days.map((day,i)=>({...day,id:'sample-day-'+stamp+'-'+i,day_index:day.weekday??day.day_index??Math.min(i,6),coach_notes:day.optional?'OPTIONAL / BACKUP. '+(day.coach_notes||''):day.coach_notes,exercises:(day.exercises||[]).map((exercise,j)=>({...exercise,id:'sample-exercise-'+stamp+'-'+i+'-'+j,sort_order:j}))}))};
+      state.data.programs.unshift(program);state.data.exercises.push(...program.days.flatMap(day=>day.exercises));
+    }else{
+      const result=await query('Complete training import',db.rpc('import_client_training',{target_client_id:clientId,payload:plan}));
+      if(!result?.programme_id)throw new Error('The programme draft was not saved.');
+      await loadClientData(clientId);if(state.client?.id!==clientId)return;
+    }
+    toast(state.preview?'Sample programme draft saved locally':'Complete programme saved as a draft. Review it before scheduling.');coachTraining();
+  }catch(error){const field=$('#trainingImportError');if(field){field.textContent=error.message;field.hidden=false;}toast(error.message,'error');setBusy(event.submitter,false);}
+};
 document.addEventListener('DOMContentLoaded',()=>{
   state.sampleClientData=new Map();
   $('#coachNav')?.addEventListener('click',()=>{if(state.preview&&state.client)state.sampleClientData.set(state.client.id,state.data);},{capture:true});
