@@ -28,7 +28,7 @@ clientToday = function() {
     <section class="panel"><div class="panel-head"><h2>Today’s training & activity</h2><button class="btn ghost small" data-today-view="planner">Arrange my week</button></div>${!m.published ? '<p>Your coach has not published this week yet. Historical workouts remain in your training history.</p>' : m.sessions.length ? m.sessions.map(s => `<div class="pw-activity">${taskMarkup(s)}<div>${s.scheduled_time ? `<small>${esc(s.scheduled_time.slice(0,5))} · ${esc(s.schedule_timezone || '')}</small>` : ''}<button class="btn ghost small" data-open-session="${esc(s.id)}">Open prescription</button></div></div>`).join('') : '<p>No training, cardio or mobility is scheduled for today.</p>'}</section>
     <section class="panel"><div class="panel-head"><h2>Meals for today</h2>${m.mealPlan ? `<button class="btn primary small" data-open-meal-plan="${esc(m.mealPlan.id)}" data-meal-date="${m.date}">Ingredients & preparation</button>` : ''}</div>${m.mealPlan ? `<h3>${esc(nutritionDayLabel(m.mealPlan))}</h3>${meals.length ? `<div class="pw-meals">${meals.map(({meal}) => `<div><span class="eyebrow">${esc(title(meal.meal_type || 'Meal'))}</span><h3>${esc(meal.name)}</h3></div>`).join('')}</div>` : '<p>No measured meals are attached to this assigned menu yet. Ask your coach to complete it.</p>'}` : '<p>No meal plan is assigned to today. Your coach can assign a dated menu in your planner.</p>'}</section>
     <section class="panel"><div class="panel-head"><h2>This week</h2><button class="btn ghost small" data-today-view="progress">View progress</button></div><div class="pw-week-stats"><div><strong>${completed}/${m.weeklySessions.length}</strong><span>Assigned activities completed</span></div><div><strong>${m.checkin ? (m.checkin.reviewed_at ? 'Reviewed' : 'Submitted') : 'Not submitted'}</strong><span>Weekly check-in</span></div></div><button class="btn primary" data-today-view="checkin">${m.checkin ? 'View weekly check-in' : 'Complete weekly check-in'}</button></section>
-    ${m.week?.coach_notes ? `<section class="panel"><span class="eyebrow">WEEKLY FOCUS</span><p class="cw-lines">${esc(m.week.coach_notes)}</p></section>` : ''}
+    ${m.week?.coach_note ? `<section class="panel"><span class="eyebrow">WEEKLY FOCUS</span><p class="cw-lines">${esc(m.week.coach_note)}</p></section>` : ''}
     ${m.checkin?.coach_response || m.checkin?.focus_next_week ? `<section class="panel"><h2>Your coach’s next steps</h2>${m.checkin.coach_response ? `<p class="cw-lines">${esc(m.checkin.coach_response)}</p>` : ''}${m.checkin.focus_next_week ? `<p class="cw-lines">${esc(m.checkin.focus_next_week)}</p>` : ''}${safeMediaUrl(m.checkin.voice_note_url) ? `<a class="btn ghost" href="${esc(safeMediaUrl(m.checkin.voice_note_url))}" target="_blank" rel="noopener">Watch coach review</a>` : ''}</section>` : ''}
     ${nextCall ? `<section class="panel"><h2>Upcoming coaching review</h2><p>${esc(nextCall.title)} · ${fmt(nextCall.scheduled_at)} · ${nextCall.duration_minutes} minutes</p><button class="btn ghost" data-today-view="support">View agreed time & details</button></section>` : ''}`;
   bindCompletionActions(); bindOpenSessions(); bindMealPlanLinks();
@@ -54,7 +54,7 @@ function reviewFacts(c) {
   return parts.join(' · ') || 'Open the submitted answers';
 }
 async function loadReviewQueue(page = 0) {
-  if(state.preview){state.reviewRows=(state.data.checkins||[]).filter(c=>!c.reviewed_at).map(c=>({...c,client_id:c.client_id || state.clients[0]?.id}));state.reviewCount=state.reviewRows.length;return;}
+  if(state.preview){const records=state.sampleClientData?.size?[...state.sampleClientData].flatMap(([id,data])=>(data.checkins||[]).map(c=>({...c,client_id:id}))):(state.data.checkins||[]).map(c=>({...c,client_id:c.client_id || state.clients[0]?.id}));state.reviewRows=records.filter(c=>!c.reviewed_at);state.reviewCount=state.reviewRows.length;return;}
   const result=await db.from('checkins').select('id,client_id,submitted_at,period_start,week_number,energy,sleep,stress,workload,training_adherence,nutrition_adherence,busy_week,support_needed,coach_response,reviewed_at,source_system',{count:'exact'}).is('reviewed_at',null).order('submitted_at',{ascending:false}).order('id',{ascending:false}).range(page*50,page*50+49);
   if(result.error)throw new Error('Review queue: '+result.error.message);
   state.reviewRows=result.data || [];state.reviewCount=result.count ?? state.reviewRows.length;state.reviewPage=page;
@@ -74,7 +74,7 @@ async function openQueuedReview(button) {
   setBusy(button,true);
   try {
     state.client=client;state.clientTab='check-ins';
-    if(!state.preview)await loadClientData(client.id);
+    if(!state.preview)await loadClientData(client.id);else state.data=state.sampleClientData?.get(client.id)||state.data;
     renderCoach();
     const form=$(`[data-coach-review="${button.dataset.reviewCheckin}"]`);if(form){form.closest('details').open=true;form.scrollIntoView({block:'center',behavior:'smooth'});}
   }catch(error){state.client=null;toast(error.message,'error');renderReviewQueue();}
@@ -105,6 +105,10 @@ async function saveExplicitCoachReview(event,checkin) {
     Object.assign(checkin,saved);coachCheckins();toast(state.preview?'Sample review saved locally':args.mark_reviewed?'Review completed':'Review draft saved');
   }catch(error){toast(error.message,'error');setBusy(event.submitter,false);}
 }
+const beforeTodayCompletionBindings=bindCompletionActions;
+bindCompletionActions=function(){beforeTodayCompletionBindings();$$('[data-session-complete]').forEach(input=>{const save=input.onchange,clientId=state.client.id;input.onchange=async()=>{await save();if(state.clientView==='today'&&state.client?.id===clientId)clientToday();};});};
 document.addEventListener('DOMContentLoaded',()=>{
+  state.sampleClientData=new Map();
+  $('#coachNav')?.addEventListener('click',()=>{if(state.preview&&state.client)state.sampleClientData.set(state.client.id,state.data);},{capture:true});
   $('#coachNav')?.insertAdjacentHTML('beforeend','<button class="side-link" data-coach-view="reviews"><span>✓</span>Review queue</button>');
 });

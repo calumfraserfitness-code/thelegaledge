@@ -272,7 +272,7 @@ function bindClientRows() {
     $('#coachMain').innerHTML = '<div class="loading-state">Loading client workspace…</div>';
     try {
       if (!state.preview) await loadClientData(client.id);
-      else state.data = demoData();
+      else state.data = state.sampleClientData?.get(client.id) || demoData();
       renderCoach();
     } catch (error) {
       renderError($('#coachMain'), error, () => row.click());
