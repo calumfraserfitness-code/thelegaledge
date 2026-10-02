@@ -12,3 +12,10 @@ assert.equal(vm.runInContext("coachingGoalValue({metric:'steps'})",ctx),6500);
 assert.equal(vm.runInContext("coachingGoalValue({metric:'sleep_minutes'})",ctx),420);
 assert.equal(vm.runInContext("coachingGoalValue({metric:'energy'})",ctx),8);
 console.log('PASS: missing health readings excluded, decreasing goals, no-data goals, distinct strength-session counts and check-in metric fallback.');
+
+ctx.firmState={participants:Array.from({length:6},(_,i)=>({id:'member-'+i,client_id:'person-'+i,status:'active'})),consents:Array.from({length:6},(_,i)=>({participant_id:'member-'+i}))};
+ctx.monday=()=>new Date('2026-09-28T00:00:00Z');ctx.state.sampleClientData=new Map(Array.from({length:6},(_,i)=>['person-'+i,{checkins:[{period_start:'2026-09-28',energy:6,sleep:7,stress:4,workload:8,wins:'PRIVATE ANSWER'}]}]));
+let pulse=vm.runInContext('sharedSamplePulse()',ctx);assert.equal(pulse.count,6);assert.equal(pulse.energy,'6.0');assert.equal(pulse.sleep,'7.0');assert.ok(!JSON.stringify(pulse).includes('PRIVATE'));
+ctx.firmState.consents.splice(0,2);pulse=vm.runInContext('sharedSamplePulse()',ctx);assert.equal(pulse.suppressed,true);assert.equal(pulse.energy,null);
+ctx.firmState.consents.push({participant_id:'member-0'},{participant_id:'member-1'});ctx.state.sampleClientData.get('person-0').checkins[0].period_start='2026-09-21';assert.equal(vm.runInContext('sharedSamplePulse().count',ctx),5);
+console.log('PASS: shared sample reporting uses current-week consented records, actual metric keys, no private text and five-response suppression.');

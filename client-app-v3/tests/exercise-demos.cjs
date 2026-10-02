@@ -10,3 +10,6 @@ console.log('PASS: exact equipment/variant matching, bounded 45-second embed req
 
 assert.equal(vm.runInContext("rpDemoForExercise({name:'Neutral-Grip Lat Pulldown'}).id",ctx),'--utaPT7XYQ');
 assert.ok(vm.runInContext('rpTechniqueDemos.length',ctx)>=35);
+
+assert.ok(vm.runInContext('rpTechniqueDemos.every(d=>Number.isFinite(d.seconds)&&d.seconds>0&&d.seconds<=45)',ctx));
+assert.equal(vm.runInContext('new Set(rpTechniqueDemos.map(d=>d.id)).size===rpTechniqueDemos.length',ctx),true);
