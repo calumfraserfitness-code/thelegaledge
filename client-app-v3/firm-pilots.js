@@ -62,7 +62,7 @@ async function paintFirmPilots() {
   if (pilot && !state.preview) report = await query('Aggregate pilot report', db.rpc('firm_pilot_summary', { target_pilot_id: pilot.id }));
   const weekStart=iso(monday());
   const weeklyReport=pilot&&!state.preview?await query('Weekly group check-in report',db.rpc('firm_weekly_summary',{target_pilot_id:pilot.id,target_week:weekStart})):null;
-  const checkins=pilot&&!state.preview&&activeRoster.length?await query('Pilot weekly reviews',db.from('checkins').select('id,client_id,submitted_at,reviewed_at').in('client_id',activeRoster.map(m=>m.client_id)).gte('submitted_at',weekStart+'T00:00:00Z').order('submitted_at',{ascending:false}).limit(500)):[];
+  const checkins=pilot&&!state.preview&&activeRoster.length?await query('Pilot weekly reviews',db.from('checkins').select('id,client_id,submitted_at,reviewed_at').in('client_id',activeRoster.map(m=>m.client_id)).gte('submitted_at',weekStart+'T00:00:00Z').order('submitted_at',{ascending:false}).limit(500)):state.preview&&state.sampleClientData?activeRoster.flatMap(m=>(state.sampleClientData.get(m.client_id)?.checkins||[]).filter(c=>String(c.submitted_at||'').slice(0,10)>=weekStart)):[];
   main.innerHTML = pageHead('CORPORATE COACHING', 'Firms & pilot rosters') + `
     <div class="firm-intro"><div><strong>90-day lawyer performance pilot</strong><p>Private coaching for each participant, with anonymous cohort reporting for the sponsor.</p></div><span>Coach only</span></div>
     ${pilot?firmDeliveryMarkup(pilot,activeRoster,checkins)+firmProgrammeBriefMarkup(pilot):''}
