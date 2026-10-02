@@ -96,3 +96,8 @@ async function checkFitbitAvailability(main){
   status.textContent=data?.fitbit?.configured?'Fitbit is available. Link your account to start syncing.':'Fitbit is not configured yet. Your coach needs to finish the provider setup.';
  }catch(error){if(main.contains(connect))status.textContent='Fitbit availability could not be verified. Please try again later.';}
 }
+
+const clientRenderBeforeClarity=renderClient;
+renderClient=function(){clientRenderBeforeClarity();const select=$('.le-preview-bar select');if(select)select.value='participant';};
+const coachRenderBeforeClarity=renderCoach;
+renderCoach=function(){coachRenderBeforeClarity();const select=$('.le-preview-bar select');if(select)select.value=state.coachView==='firms'?'firms':'clients';};
