@@ -3,7 +3,7 @@ const rpTechniqueDemos = [
  {id:'UCXxvVItLoM',seconds:18,name:'Seated cable row',aliases:['seated cable row'],cues:['Sit tall with feet supported and knees slightly bent.','Pull the handle towards your lower ribs, without rocking back.','Return slowly, letting your arms reach forward.']},
  {id:'HzIiNhHhhtA',seconds:13,name:'Seated dumbbell shoulder press',aliases:['seated dumbbell shoulder press','seated db shoulder press','seated dumbbell shoulder press (light)'],cues:['Sit against the backrest with feet planted.','Press the dumbbells overhead without arching your back.','Lower under control through your comfortable range.']},
  {id:'EUIri47Epcg',seconds:15,name:'Normal-grip lat pulldown',aliases:['lat pulldown','normal grip pulldown'],cues:['Secure your thighs under the pad and keep your torso steady.','Pull your elbows down, bringing the bar towards your upper chest.','Return slowly; avoid swinging or pulling behind your head.']},
- {id:'5CECBjd7HLQ',name:'Incline dumbbell press',aliases:['incline dumbbell press','incline dumbbell bench press','incline db press'],cues:['Set the bench to a moderate incline and plant both feet.','Lower the dumbbells under control beside your chest.','Press up with wrists stacked over your forearms.']}
+ {id:'5CECBjd7HLQ',seconds:12,name:'Incline dumbbell press',aliases:['incline dumbbell press','incline dumbbell bench press','incline db press'],cues:['Set the bench to a moderate incline and plant both feet.','Lower the dumbbells under control beside your chest.','Press up with wrists stacked over your forearms.']}
 ];
 function rpDemoForExercise(exercise){
  const name=String(exercise.name||'').trim().toLowerCase().replace(/\s+/g,' ');
