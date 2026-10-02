@@ -149,10 +149,17 @@ function fullCoachingSample(index=0){
 }
 function startFullCoachingDemo(){
  const index=Math.min(9,Math.max(0,Number(new URLSearchParams(location.search).get('person'))||0));
- state.preview=true;state.role='coach';state.client=normalizeClient({id:'sample-client-'+index,display_name:pilotPeople[index][0]+' · sample',status:'active',weight_unit:'lbs',start_weight_kg:84,goal_weight_kg:80,daily_steps_goal:7000,cardio_enabled:true,mobility_enabled:true,checkin_day:4,track_weight:true,onboarding_status:'complete',plan_status:'published',profile_id:'sample-profile',market_region:'us'});state.clients=[state.client];state.data=fullCoachingSample(index);state.clientTab=['planner','training','nutrition','check-ins','progress','goals','support'].includes(new URLSearchParams(location.search).get('tab'))?new URLSearchParams(location.search).get('tab'):'planner';state.coachView='clients';state.clientView='today';state.selectedNutritionPlanId=null;
+ state.preview=true;state.role='coach';state.sampleClientData=new Map();
+ state.clients=pilotPeople.map((person,i)=>sampleWorkspaceClient(i,person[0]));
+ state.clients.push(sampleWorkspaceClient(10,'Morgan · 1-to-1'),sampleWorkspaceClient(11,'Charlie · 1-to-1'));
+ state.clients.forEach((client,i)=>{const data=fullCoachingSample(i);data.checkins=(data.checkins||[]).map((c,j)=>({...c,id:'sample-checkin-'+i+'-'+j,client_id:client.id}));state.sampleClientData.set(client.id,data);});
+ Object.assign(firmState,{loaded:true,selected:'sample-pilot',organizations:[{id:'sample-firm',name:'Alder & West · fictional firm',employee_count:140,contact_name:'Sample HR contact'}],pilots:[{id:'sample-pilot',organization_id:'sample-firm',name:'90-day performance pilot · sample',capacity:10,status:'active',minimum_report_count:5}],participants:state.clients.slice(0,10).map((c,i)=>({id:'sample-member-'+i,pilot_id:'sample-pilot',client_id:c.id,status:'active'})),consents:state.clients.slice(0,10).map((c,i)=>({participant_id:'sample-member-'+i,accepted_at:new Date().toISOString()})),resources:[],briefs:[]});
+ state.client=state.clients[index];state.data=state.sampleClientData.get(state.client.id);state.clientTab=['planner','training','nutrition','check-ins','progress','goals','support'].includes(new URLSearchParams(location.search).get('tab'))?new URLSearchParams(location.search).get('tab'):'planner';state.coachView='clients';state.clientView='today';state.selectedNutritionPlanId=null;
  $('#coachName').textContent='Calum · full coaching example';show('#coachApp');renderCoach();
  if(new URLSearchParams(location.search).get('view')==='client'){$('#clientHello').textContent=state.client.display_name;$('#returnCoach').classList.remove('hidden');show('#clientApp');renderClient();}
- const banner=document.createElement('div');banner.className='cw-demo-banner';banner.innerHTML='FULL COACHING WORKSPACE · FICTIONAL DATA · CHANGES RESET ON RELOAD <a href="?pilot=demo">Back to firm preview</a>';document.body.prepend(banner);
+ const banner=document.createElement('div');banner.className='cw-demo-banner';banner.innerHTML='<span>LEGAL EDGE APP PREVIEW · FICTIONAL DATA · RELOAD RESETS CHANGES</span><nav aria-label="App preview roles"><button class="btn ghost small" data-sample-scene="firms">Corporate roster</button><button class="btn ghost small" data-sample-scene="clients">1-to-1 roster</button><button class="btn ghost small" data-sample-scene="participant">Participant view</button><button class="btn ghost small" data-sample-scene="sponsor">CEO / HR report</button></nav>';document.body.prepend(banner);
+ banner.querySelectorAll('[data-sample-scene]').forEach(b=>b.onclick=()=>openSampleScene(b.dataset.sampleScene));
+ if(new URLSearchParams(location.search).get('section')==='corporate')openSampleScene('firms');
 }
 if(new URLSearchParams(location.search).get('workspace')==='demo')document.addEventListener('DOMContentLoaded',startFullCoachingDemo,{once:true});
 
@@ -165,4 +172,24 @@ function clientManualStepsMarkup(){
 }
 function bindManualSteps(){
  $('#cwStepsForm').onsubmit=async event=>{event.preventDefault();const fd=new FormData(event.target),clientId=state.client.id,row={client_id:clientId,entry_date:fd.get('entry_date'),actual_steps:Number(fd.get('actual_steps')),target_steps:safeStepGoal()};setBusy(event.submitter,true);try{const saved=state.preview?{...row,id:'sample-steps-'+Date.now()}:(await query('Actual step count',db.from('step_entries').upsert(row,{onConflict:'client_id,entry_date'}).select()))[0];if(!saved)throw new Error('Steps were not saved');if(state.client.id!==clientId)return;const old=state.data.steps.find(s=>s.entry_date===saved.entry_date);if(old)Object.assign(old,saved);else state.data.steps.unshift(saved);clientPlanner();toast(state.preview?'Sample step count updated':'Actual step count saved');}catch(error){toast(error.message,'error');setBusy(event.submitter,false);}};
+}
+
+function sampleWorkspaceClient(index,name){return normalizeClient({id:'sample-client-'+index,display_name:name+' · sample',status:'active',weight_unit:'lbs',start_weight_kg:84,goal_weight_kg:80,daily_steps_goal:7000,cardio_enabled:true,mobility_enabled:true,checkin_day:4,track_weight:true,onboarding_status:'complete',plan_status:'published',profile_id:'sample-profile-'+index,market_region:'us'});}
+function openSampleScene(scene){
+ if(!state.preview||!state.sampleClientData)return;
+ if(state.client)state.sampleClientData.set(state.client.id,state.data);
+ if(scene==='participant'){state.client=state.client||state.clients[0];state.data=state.sampleClientData.get(state.client.id);state.clientView='today';$('#clientHello').textContent=state.client.display_name;$('#returnCoach').classList.remove('hidden');show('#clientApp');renderClient();return;}
+ state.client=null;show('#coachApp');
+ if(scene==='sponsor'){renderSharedSampleSponsor();return;}
+ state.coachView=scene==='firms'?'firms':'clients';renderCoach();
+}
+function sharedSamplePulse(){
+ const start=iso(monday()),rows=firmState.participants.filter(m=>m.status!=='withdrawn'&&firmState.consents.some(c=>c.participant_id===m.id)).map(m=>(state.sampleClientData.get(m.client_id)?.checkins||[]).filter(c=>c.period_start?c.period_start===start:String(c.submitted_at||'').slice(0,10)>=start).sort((a,b)=>String(b.submitted_at).localeCompare(String(a.submitted_at)))[0]).filter(Boolean);
+ const result={count:rows.length,suppressed:rows.length<5};
+ for(const key of ['energy_rating','sleep_rating','stress_rating','workload_rating']){const values=rows.map(r=>r[key]).filter(v=>v!=null&&Number.isFinite(Number(v)));result[key]=values.length>=5?(values.reduce((a,b)=>a+Number(b),0)/values.length).toFixed(1):null;}
+ return result;
+}
+function renderSharedSampleSponsor(){
+ const pulse=sharedSamplePulse();
+ $('#coachMain').innerHTML=pageHead('CEO / HR · SAMPLE REPORT','Alder & West')+pilotCompanyValue()+`<section class="panel"><h2>This week’s group pulse</h2><p>Uses the same fictional participant check-ins as the coaching workspace. No private answers or individual records appear here.</p><p>${pulse.count} consenting responses this week · minimum five per metric.</p>${pulse.suppressed?'<p>Group scores are withheld until five consenting people respond.</p>':`<div class="stat-grid">${[['energy_rating','Energy'],['sleep_rating','Sleep'],['stress_rating','Stress'],['workload_rating','Workload']].map(([key,label])=>`<div class="stat"><span>${label}</span><strong>${pulse[key]||'Withheld'}</strong><small>${pulse[key]?' / 10':'Fewer than five recorded values'}</small></div>`).join('')}</div>`}<p class="muted">Public sample role switch. Real employer sign-in and report delivery remain unfinished. These are fictional responses, not evidence of business impact.</p></section>`;
 }

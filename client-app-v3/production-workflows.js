@@ -126,7 +126,7 @@ importTrainingJson=async function(event){
   }catch(error){const field=$('#trainingImportError');if(field){field.textContent=error.message;field.hidden=false;}toast(error.message,'error');setBusy(event.submitter,false);}
 };
 document.addEventListener('DOMContentLoaded',()=>{
-  state.sampleClientData=new Map();
+  state.sampleClientData=state.sampleClientData||new Map();
   $('#coachNav')?.addEventListener('click',()=>{if(state.preview&&state.client)state.sampleClientData.set(state.client.id,state.data);},{capture:true});
   $('#coachNav')?.insertAdjacentHTML('beforeend','<button class="side-link" data-coach-view="reviews"><span>✓</span>Review queue</button>');
 });

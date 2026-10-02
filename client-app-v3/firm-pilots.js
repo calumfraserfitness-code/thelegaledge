@@ -113,7 +113,7 @@ function firmDeliveryMarkup(pilot,roster,checkins){
 async function openFirmClient(id,tab){
   const client=state.clients.find(c=>c.id===id);if(!client)return toast('Client is unavailable','error');
   state.client=client;state.clientTab=COACH_TABS.includes(tab)?tab:'overview';state.selectedNutritionPlanId=null;state.data=emptyData();
-  try{if(state.preview)state.data=demoData();else await loadClientData(id);renderCoach();}
+  try{if(state.preview)state.data=state.sampleClientData?.get(id)||demoData();else await loadClientData(id);renderCoach();}
   catch(error){state.client=null;toast(error.message,'error');renderCoach();}
 }
 
