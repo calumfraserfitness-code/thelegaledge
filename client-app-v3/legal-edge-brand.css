@@ -1,0 +1,12 @@
+/* Tokens and fonts from thelegal-edge.com/styles.css. */
+:root{--ink:#0b1929;--ink2:#0f2440;--paper:#f8f9fa;--card:#fff;--muted:#677487;--line:#dce2e9;--gold:#b8962e;--gold2:#d4af50;--radius:10px;--font-display:'Playfair Display',Georgia,serif;--font-body:'Lato',sans-serif;--font-accent:'Montserrat',sans-serif}
+body{font-family:var(--font-body);background:var(--paper)}
+h1,h2,.pd-hero h1,.pd-heading h2,.pd-metric strong,.pd-hero-detail b,.pd-meal-grid h4{font-family:var(--font-display)}
+.eyebrow,.btn,.pd-tabs button,.pd-brand,.side-brand strong,.client-nav button{font-family:var(--font-accent)}
+.btn,.panel,.auth-card{border-radius:8px}.btn.primary{background:var(--ink)}
+.brand-logo{object-fit:contain}.auth-logo{width:180px;height:150px}.shell-logo{width:58px;height:48px}
+.pd-brand{display:flex;align-items:center;gap:12px;letter-spacing:.08em}.pd-brand img{width:72px;height:60px;object-fit:contain}.pd-brand span{font-family:var(--font-body);letter-spacing:0}
+.cw-demo-banner{background:var(--ink);color:#fff;border-bottom:2px solid var(--gold)}.cw-demo-banner a{color:var(--gold2)}
+.cw-goals progress{accent-color:var(--gold)}
+.rp-demo{margin:18px 0 24px;border:1px solid var(--line);border-radius:8px;padding:16px;background:var(--paper)}
+.rp-demo summary{display:flex;align-items:center;gap:14px;cursor:pointer;list-style:none}.rp-demo summary::-webkit-details-marker{display:none}.rp-demo small{display:block;color:var(--muted);margin-top:5px;line-height:1.5}.rp-play{display:grid;place-items:center;width:44px;height:44px;border-radius:50%;background:var(--ink);color:var(--gold2);flex:none}.rp-demo iframe{width:100%;aspect-ratio:16/9;border:0;border-radius:8px;margin-top:16px;background:var(--ink)}.rp-demo h4{margin:18px 0 8px;font-size:15px}.rp-demo ol{padding-left:22px;margin:0;line-height:1.65}.rp-demo li+li{margin-top:6px}.rp-demo p{font-size:12px;line-height:1.6}
