@@ -6,3 +6,4 @@
 #clientMain .prescription-grid{grid-template-columns:repeat(3,minmax(0,1fr))}#clientMain .set-log-row{grid-template-columns:.6fr 1fr 1fr}
 [hidden]{display:none!important}
 @media(max-width:700px){.le-preview-bar{flex-wrap:wrap;padding:8px 12px!important}.le-preview-bar small{width:100%}.le-preview-bar select{max-width:210px}.le-fold>summary{padding:16px}.client-head{flex-wrap:wrap;gap:10px}.le-more-tabs>div{right:0}}
+@media(min-width:901px){body:has(#coachApp:not(.hidden)) .le-preview-bar{margin-left:248px;width:calc(100% - 248px)}}
