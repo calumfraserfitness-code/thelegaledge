@@ -41,12 +41,23 @@ const rpTechniqueDemos = [
  {"id":"KxEYX_cuesM","seconds":13,"name":"Leg-press calf raise","group":"Calves","aliases":["leg press calves","leg-press calf raise"],"cues":["Place the balls of your feet securely on the platform.","Raise and lower your heels with control through the agreed range.","Pause briefly rather than bouncing through the repetitions."]},
  {"id":"N3awlEyTY98","seconds":12,"name":"Calf raise machine","group":"Calves","aliases":["calf raise machine"],"cues":["Place the balls of your feet securely on the platform.","Raise and lower your heels with control through the agreed range.","Pause briefly rather than bouncing through the repetitions."]},
  {"id":"__qfDhdByMY","seconds":12,"name":"Stair calf raise","group":"Calves","aliases":["stair calf raise"],"cues":["Place the balls of your feet securely on the platform.","Raise and lower your heels with control through the agreed range.","Pause briefly rather than bouncing through the repetitions."]}
+,
+{"id": "physitrack-0", "seconds": 15, "name": "Half-kneeling hip flexor stretch", "aliases": ["half-kneeling hip flexor stretch", "half kneeling hip flexor stretch"], "group": "Mobility", "source": "Physitrack", "sourceUrl": "https://na.physitrack.com/home-exercise-video/hip-flexor-stretch-in-half-kneeling", "cues": []},
+{"id": "physitrack-1", "seconds": 13, "name": "Side-lying thoracic rotation", "aliases": ["side-lying thoracic rotation", "side lying thoracic rotation"], "group": "Mobility", "source": "Physitrack", "sourceUrl": "https://na.physitrack.com/home-exercise-video/side-lying-thoracic-rotation", "cues": []},
+{"id": "physitrack-2", "seconds": 23, "name": "Cat-cow", "aliases": ["cat-cow", "cat cow", "cat/cow"], "group": "Mobility", "source": "Physitrack", "sourceUrl": "https://na.physitrack.com/home-exercise-video/cat-cow", "cues": []},
+{"id": "physitrack-3", "seconds": 11, "name": "Seated figure-four stretch", "aliases": ["seated figure-four stretch", "seated figure 4 stretch"], "group": "Mobility", "source": "Physitrack", "sourceUrl": "https://us.physitrack.com/home-exercise-video/seated-gluteus-stretch---figure-4-stretch", "cues": []},
+{"id": "physitrack-4", "seconds": 24, "name": "Supported 90/90 hip rotations", "aliases": ["supported 90/90 hip rotations", "hip 90-90 rotations with support"], "group": "Mobility", "source": "Physitrack", "sourceUrl": "https://us.physitrack.com/home-exercise-video/hip-90-90-rotations", "cues": []}
+,
+{"id": "pjAewD4LxXs", "seconds": null, "name": "Dumbbell split squat", "aliases": ["dumbbell split squat", "db split squat"], "group": "Legs", "cues": ["Set up with secure footing and a controllable load.", "Use the exact movement shown within your prescribed comfortable range.", "Control each repetition without rushing."]},
+{"id": "eFWCn5iEbTU", "seconds": null, "name": "Dumbbell walking lunge", "aliases": ["dumbbell walking lunge", "walking lunges (db)", "walking lunges (dumbbells)"], "group": "Legs", "cues": ["Set up with secure footing and a controllable load.", "Use the exact movement shown within your prescribed comfortable range.", "Control each repetition without rushing."]},
+{"id": "EF7jXP17DPE", "seconds": null, "name": "Barbell hip thrust", "aliases": ["barbell hip thrust"], "group": "Legs", "cues": ["Set up with secure footing and a controllable load.", "Use the exact movement shown within your prescribed comfortable range.", "Control each repetition without rushing."]}
 ];
 function rpDemoForExercise(exercise){
  const name=String(exercise.name||'').trim().toLowerCase().replace(/\s+/g,' ');
  return rpTechniqueDemos.find(demo=>demo.aliases.includes(name))||null;
 }
 function rpDemoMarkup(demo){
+ if(demo.sourceUrl)return `<section class="rp-demo"><a class="btn ghost small" href="${esc(demo.sourceUrl)}" target="_blank" rel="noopener noreferrer">▶ Watch ${demo.seconds}-second demo ↗</a><p class="muted">${esc(demo.source)} · opens the official demonstration.</p></section>`;
  // Load only after opening: dozens of hidden players must not slow the planner.
  const url='https://www.youtube-nocookie.com/embed/'+demo.id+'?start=0&end=45&rel=0&playsinline=1';
  return `<section class="rp-demo"><details class="rp-video"><summary><span class="rp-play" aria-hidden="true">▶</span><span><b>Watch exercise demo</b><small>Renaissance Periodization · ${demo.seconds?demo.seconds+' seconds':'up to 45-second segment'}</small></span></summary><template><iframe src="${url}" title="${esc(demo.name)} — Renaissance Periodization demonstration" loading="lazy" allow="encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></template><div class="rp-player-slot"></div><p class="muted">Follow your prescribed range and coach instructions.</p></details><h4>How to do it</h4><ol>${demo.cues.map(cue=>`<li>${esc(cue)}</li>`).join('')}</ol></section>`;
@@ -55,15 +66,16 @@ const exerciseCardBeforeDemos=exerciseCard;
 exerciseCard=function(exercise,loggable=false){
  const demo=rpDemoForExercise(exercise);
  let html=exerciseCardBeforeDemos(exercise,loggable);
+ if(!demo&&/^(?:steps|daily steps|brisk walk|walking)$/i.test(exercise.name||''))return html.replace('<span class="pill">NO VIDEO</span>','');
  if(!demo)return html.replace('<span class="pill">NO VIDEO</span>','<span class="pill">Demo not yet added</span>');
- html=html.replace(/<a class="btn ghost small"[^>]*>Watch video<\/a>|<span class="pill">NO VIDEO<\/span>/,'<span class="pill">RP technique demo</span>');
+ html=html.replace(/<a class="btn ghost small"[^>]*>Watch video<\/a>|<span class="pill">NO VIDEO<\/span>/,`<span class="pill">${demo.source||'RP'} technique demo</span>`);
  return html.replace('<div class="prescription-grid">',rpDemoMarkup(demo)+'<div class="prescription-grid">');
 };
 // The sample's shoulder press is explicitly seated to match the demonstration.
 const sampleBeforeDemos=fullCoachingSample;
 fullCoachingSample=function(index=0){
  const data=sampleBeforeDemos(index);
- for(const exercise of data.exercises||[])if(exercise.name==='Dumbbell shoulder press')exercise.name='Seated dumbbell shoulder press';
+ for(const exercise of data.exercises||[]){if(exercise.name==='Dumbbell shoulder press')exercise.name='Seated dumbbell shoulder press';if(exercise.name==='Hip flexor stretch')exercise.name='Half-kneeling hip flexor stretch';if(exercise.name==='Thoracic rotation')exercise.name='Side-lying thoracic rotation';}
  return data;
 };
 if(typeof exerciseBankMarkup==='function'){
@@ -71,7 +83,7 @@ if(typeof exerciseBankMarkup==='function'){
  exerciseBankMarkup=function(){
   const exercises=(state.data.programs||[]).flatMap(p=>(p.days||[]).flatMap(d=>d.exercises||[]));
   const missing=[...new Set(exercises.filter(e=>!rpDemoForExercise(e)).map(e=>e.name))];
-  return bankBeforeDemos()+`<section class="panel"><div class="panel-head"><div><h2>RP technique library · ${rpTechniqueDemos.length} movements</h2><span class="sub">Short demonstrations matched to the exact movement. Your client prescriptions stay unchanged.</span></div></div><label class="field">Find an exercise<input type="search" data-rp-search placeholder="Search presses, rows, leg work…"></label><div class="cw-guidance rp-library">${rpTechniqueDemos.map(d=>`<article data-rp-name="${esc(d.name.toLowerCase())}"><h3>${esc(d.name)}</h3>${rpDemoMarkup(d)}</article>`).join('')}</div>${missing.length?`<details><summary>${missing.length} programme movements still need RP demos</summary><ul>${missing.map(name=>`<li>${esc(name)}</li>`).join('')}</ul></details>`:''}</section>`;
+  return bankBeforeDemos()+`<section class="panel"><div class="panel-head"><div><h2>Technique library · ${rpTechniqueDemos.length} movements</h2><span class="sub">Short demonstrations matched to the exact movement. Your client prescriptions stay unchanged.</span></div></div><label class="field">Find an exercise<input type="search" data-rp-search placeholder="Search presses, rows, leg work…"></label><div class="cw-guidance rp-library">${rpTechniqueDemos.map(d=>`<article data-rp-name="${esc(d.name.toLowerCase())}"><h3>${esc(d.name)}</h3>${rpDemoMarkup(d)}</article>`).join('')}</div>${missing.length?`<details><summary>${missing.length} programme movements still need matched demos</summary><ul>${missing.map(name=>`<li>${esc(name)}</li>`).join('')}</ul></details>`:''}</section>`;
  };
 }
 

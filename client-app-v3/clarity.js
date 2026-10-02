@@ -11,7 +11,7 @@ function simplifyCoachTraining(){
  const setup=body.querySelector('.fast-builder');foldCoachContent(setup,'Manage programme & weekly schedule',tools);
  for(const panel of [...body.querySelectorAll(':scope > .panel')]){
   const heading=panel.querySelector('h2')?.textContent||'';
-  if(/technique library|Exercise \/ video bank/.test(heading))foldCoachContent(panel,heading,tools);
+  if(/[Tt]echnique library|Exercise \/ video bank/.test(heading))foldCoachContent(panel,heading,tools);
  }
  body.querySelectorAll('[data-exercise-editor]').forEach(form=>foldCoachContent(form,'Edit this exercise'));
 }
@@ -69,6 +69,8 @@ clientHealth=function(){healthBeforeClarity();const main=$('#clientMain');
  main.querySelector('.live-health .eyebrow').textContent='ACCOUNT CONNECTION';
  main.querySelector('.live-health .sub').textContent='Connect your Fitbit account to share steps, sleep, heart rate and weight. Requires Fitbit setup and your permission.';
  const oauth=(state.data.healthConnections||[]).find(c=>c.provider==='fitbit'&&c.status==='connected'&&!c.scopes?.includes('file_import'));
+ $('#connectFitbit').disabled=true;
+ if(!state.preview)checkFitbitAvailability(main);
  $('#syncFitbit').disabled=!oauth;$('#syncFitbit').textContent='Refresh Fitbit data';
  if(!oauth)$('#fitbitStatus').textContent=state.preview?'Live connections require your signed-in client account. This sample does not connect a device.':'No Fitbit account linked yet.';
  const imports=main.querySelector('.health-import');foldCoachContent(imports,'Import a health export');
@@ -82,3 +84,15 @@ clientHealth=function(){healthBeforeClarity();const main=$('#clientMain');
  });
  const history=[...main.children].find(n=>n.querySelector('h3')?.textContent==='Import history');foldCoachContent(history,'Import history');
 };
+
+async function checkFitbitAvailability(main){
+ const connect=main.querySelector('#connectFitbit'),status=main.querySelector('#fitbitStatus');
+ if(!connect||!db)return;
+ status.textContent='Checking Fitbit connection availability…';
+ try{const {data,error}=await db.functions.invoke('health-provider-status',{body:{}});
+  if(error)throw error;
+  if(!main.contains(connect))return;
+  connect.disabled=!data?.fitbit?.configured;
+  status.textContent=data?.fitbit?.configured?'Fitbit is available. Link your account to start syncing.':'Fitbit is not configured yet. Your coach needs to finish the provider setup.';
+ }catch(error){if(main.contains(connect))status.textContent='Fitbit availability could not be verified. Please try again later.';}
+}
