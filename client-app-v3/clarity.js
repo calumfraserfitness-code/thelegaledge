@@ -49,7 +49,7 @@ function refreshPreviewControl(){
  banner.classList.add('le-preview-bar');banner.innerHTML='<span>Sample preview</span><label>Viewing <select aria-label="Preview view"><option value="firms">Coach · Corporate</option><option value="clients">Coach · 1-to-1</option><option value="participant">Client</option><option value="sponsor">CEO / HR</option></select></label><small>Fictional data · resets on reload</small>';
  const select=banner.querySelector('select');select.value=new URLSearchParams(location.search).get('view')==='client'?'participant':state.coachView==='firms'?'firms':'clients';select.onchange=()=>openSampleScene(select.value);
 }
-document.addEventListener('DOMContentLoaded',refreshPreviewControl);
+document.addEventListener('DOMContentLoaded',()=>{refreshPreviewControl();const params=new URLSearchParams(location.search),tab=params.get('tab');if(state.preview&&params.get('view')==='client'&&['today','planner','training','nutrition','checkin','progress','health','support'].includes(tab)){state.clientView=tab;renderClient();}});
 // Clear client prescriptions: sets, repetitions and rest first. Advanced fields stay coach-side.
 const cardBeforeClarity=exerciseCard;
 exerciseCard=function(exercise,loggable=false){let html=cardBeforeClarity(exercise,loggable);
