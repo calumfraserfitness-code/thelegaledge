@@ -110,10 +110,11 @@ async function submitAtomicCoachingCheckin(event){
  if(photos.some(x=>x.file.size>10*1024*1024))return toast('Each photo must be under 10 MB','error');
  setBusy(event.submitter,true,'Saving…');let saved=null;
  try{
- const result=state.preview?{checkin:{...answers,id:'sample-checkin-'+Date.now(),client_id:clientId,submitted_at:new Date().toISOString()},already_submitted:state.data.checkins.some(c=>c.period_start===period)}:await query('Weekly check-in and progress',db.rpc('submit_client_checkin',{target_client_id:clientId,answers}));
+ const previewExisting=state.preview?state.data.checkins.find(c=>c.period_start===period):null;
+ const result=state.preview?{checkin:previewExisting||{...answers,id:'sample-checkin-'+Date.now(),client_id:clientId,submitted_at:new Date().toISOString()},already_submitted:Boolean(previewExisting)}:await query('Weekly check-in and progress',db.rpc('submit_client_checkin',{target_client_id:clientId,answers}));
  saved=result.checkin;if(!saved?.id)throw new Error('Check-in response incomplete');if(state.client.id!==clientId)return;
  if(!result.already_submitted){state.data.checkins.unshift(saved);if(result.progress){const index=state.data.progress.findIndex(p=>p.id===result.progress.id);if(index>=0)state.data.progress[index]=result.progress;else state.data.progress.unshift(result.progress);}for(const photo of photos){if(!state.preview)await storeProgressPhoto(photo.file,photo.view,Number(answers.week_number)||null,saved.id);}}
- if(!result.already_submitted&&typeof storeCheckinAudio==='function')await storeCheckinAudio(saved.id,Number(answers.week_number)||null);
+ if(typeof storeCheckinAudio==='function')await storeCheckinAudio(saved.id,Number(answers.week_number)||null);
  toast(result.already_submitted?'This week was already submitted; no duplicate saved':state.preview?'Sample check-in saved locally':'Check-in and progress saved together');clientCheckin();
  }catch(error){toast(saved?'Check-in saved; attachment upload failed: '+error.message:error.message,'error');setBusy(event.submitter,false);}
 }
