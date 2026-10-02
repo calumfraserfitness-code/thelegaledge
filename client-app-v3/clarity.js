@@ -57,6 +57,7 @@ exerciseCard=function(exercise,loggable=false){let html=cardBeforeClarity(exerci
  if(!inClientView)return html;
  html=html.replace(/<div><span>TEMPO \/ INTENSITY<\/span><strong>[\s\S]*?<\/strong><\/div>/,'');
  html=html.replace(/<label>RIR<input[^>]*><\/label>/g,'');
+ html=html.replace(/(<form class="set-log"[\s\S]*?<\/form>)/g,'<details class="le-instructions"><summary>Log my sets</summary>$1</details>');
  html=html.replace(/<h4>How to do it<\/h4><ol>([\s\S]*?)<\/ol>/g,'<details class="le-instructions"><summary>Technique tips</summary><ol>$1</ol></details>');
  return html;
 };
