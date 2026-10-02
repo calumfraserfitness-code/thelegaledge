@@ -64,7 +64,7 @@ function toast(message, tone = '') {
 }
 
 function show(selector) {
-  ['#auth', '#recovery', '#coachApp', '#clientApp'].forEach((id) => $(id)?.classList.add('hidden'));
+  ['#auth', '#recovery', '#coachApp', '#clientApp', '#employerApp'].forEach((id) => $(id)?.classList.add('hidden'));
   $(selector)?.classList.remove('hidden');
 }
 
@@ -204,6 +204,8 @@ async function boot() {
       renderCoach();
       return;
     }
+    const employerAccess = await query('Company access', db.from('firm_employer_access').select('organization_id,display_name').eq('user_id', user.id));
+    if(employerAccess.length){state.role='employer';await renderEmployerPortal();return;}
     const client = await query('Client profile', db.from('clients').select('*').eq('profile_id', user.id).single());
     state.client = { ...client, display_name: state.profile.full_name, daily_steps_goal: safeStepGoal(client) };
     await loadClientData(client.id);
