@@ -116,8 +116,8 @@ async function loadCoach() {
   const [clients, qaRows, memberships] = await Promise.all([query('Clients', db.from('clients')
     .select('*,profile:profiles!clients_profile_id_fkey(full_name,email)')
     .order('start_date')), query('Client QA', db.from('client_qa_summary').select('*')), query('Corporate memberships', db.from('firm_participants').select('client_id'))]);
-  state.clients = clients.map(normalizeClient);
-  state.qaRows = qaRows;
+  state.clients = clients.filter(c => c.source_system !== 'coach_health_test').map(normalizeClient);
+  state.qaRows = qaRows.filter(row => state.clients.some(c => c.id === row.client_id));
   state.corporateMemberships = memberships;
 }
 
