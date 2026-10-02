@@ -103,7 +103,7 @@ function pilotDraftSponsor(){
  const sampleRows=respondents?[{phase,respondents,energy:phase==='baseline'?5.6:6.4,sleep:phase==='baseline'?5.8:6.2,stress:phase==='baseline'?6.9:6.2,workload:7.2,consistency:phase==='baseline'?4.9:6.1}]:[];
  return `<div class="pd-heading"><div><span class="eyebrow">${pilotDraft.audience==='ceo'?'CEO / LEADERSHIP':'HR / PROGRAMME OWNER'} WORKSPACE</span><h2>Clear evidence. Private people.</h2><p>A readout the firm can use, with coverage and limits visible.</p></div><span class="pd-state">Synthetic report · no employer login</span></div>
  <div class="pd-modes pd-light" aria-label="Firm role">${[['hr','Director of HR'],['ceo','CEO / leadership']].map(([role,label])=>`<button data-firm-audience="${role}" class="${pilotDraft.audience===role?'active':''}">${label}</button>`).join('')}</div>
- ${pilotConnectedFirm()}
+ ${pilotCompanyValue()}${pilotConnectedFirm()}
  ${pilotWeeklyReport()}
  <div class="pd-metrics">${draftMetric('10','Places agreed')}${draftMetric('8 / 10','Activated')}${draftMetric(`${respondents} / 10`,'Assessment responses',phase==='endline'?'No endline results yet':'80% cohort coverage')}${draftMetric('5','Minimum reporting count','No individual or small-group breakdowns')}</div>
  <section class="pd-card"><div class="pd-card-head"><div><span class="eyebrow">REPORTING WINDOW</span><h3>${title(phase)} snapshot</h3></div><div class="pd-modes pd-light">${firmPhases.map(p=>`<button data-draft-phase="${p}" class="${phase===p?'active':''}" aria-pressed="${phase===p}">${title(p)}</button>`).join('')}</div></div>${firmPilotReport({minimum_report_count:5},sampleRows)}<p class="pd-fine">Illustrative 1–10 ratings. Lower stress is favourable; higher energy, sleep and consistency are favourable. Phase averages are descriptive, not paired participant change. No productivity, retention or causal ROI claim is supported.</p></section>
@@ -132,19 +132,19 @@ function renderPilotShowcase(){
  show('#auth');$('#auth').classList.add('pilot-showcase');
  const views={coach:pilotDraftCoach,'coach-person':pilotCoachPerson,participant:pilotDraftParticipant,sponsor:pilotDraftSponsor,scale:pilotDraftScale};
  $('#auth').innerHTML=`<div class="pd-shell"><header class="pd-top"><a href="./" class="pd-brand">THE LEGAL EDGE<span>Firm performance programme</span></a><span class="pd-demo">DRAFT PREVIEW · SAMPLE DATA</span><a href="./" class="pd-signin">Sign in →</a></header><section class="pd-hero"><div><span class="eyebrow">ALDER & WEST / FICTIONAL FIRM</span><h1>One firm.<br><em>A connected programme.</em></h1><p>A confidential 90-day programme with personal coaching, practical weekly plans and clear firm-level reporting.</p></div><div class="pd-hero-detail"><b>10 people. 12 weeks.</b><span>Individual coaching · weekly check-ins<br>Monthly calls · private plans<br>Baseline → midpoint → endline</span></div></section><nav class="pd-tabs" aria-label="Pilot draft views">${[['coach','Calum / coach'],['participant','Participant'],['sponsor','CEO / HR'],['scale','Scale & economics']].map(([view,label])=>`<button data-draft-view="${view}" aria-pressed="${(pilotDraft.view===view||(view==='coach'&&pilotDraft.view==='coach-person'))}" class="${(pilotDraft.view===view||(view==='coach'&&pilotDraft.view==='coach-person'))?'active':''}">${label}</button>`).join('')}<button id="draftOriginalSetup">Pilot setup</button></nav><div class="pd-context"><b>Alder & West · Cohort 01</b><span>Same programme, different permissions · role switching is for this draft only</span></div><main id="pilotDraftBody">${views[pilotDraft.view]()}</main><footer class="pd-footer">Fictional draft for product review. No real employees, invitations or results. <a href="./">Open the live sign-in</a></footer></div>`;
- $$('[data-coach-person]').forEach(b=>b.onclick=()=>{location.href='?workspace=demo&person='+Number(b.dataset.coachPerson);});
+ $$('[data-coach-person]').forEach(b=>b.onclick=()=>{location.href=pilotWorkspaceUrl(b.dataset.coachPerson);});
  $$('[data-coach-section]').forEach(b=>b.onclick=()=>{pilotDraft.coachSection=b.dataset.coachSection;pilotDraft.view='coach-person';renderPilotShowcase();});
  $('#draftCheckinForm')?.addEventListener('submit',event=>{event.preventDefault();const fd=new FormData(event.target),r=Object.fromEntries(fd);for(const key of ['energy','sleep','stress','workload','sessions','nutritionDays','sleepHours','steps'])r[key]=Number(r[key]);pilotDraft.checkins[pilotDraft.person]=r;pilotDraft.reportConsent[pilotDraft.person]=fd.has('reportConsent');pilotDraft.reviews.delete(pilotDraft.person);pilotDraft.clientSection='progress';renderPilotShowcase();toast('Sample check-in updated; group pulse recalculated');});
  $('#draftGoalForm')?.addEventListener('submit',event=>{event.preventDefault();const goal=Object.fromEntries(new FormData(event.target));goal.target=Number(goal.target);goal.current=Number(goal.current);pilotDraft.goals[pilotDraft.person]=goal;pilotDraft.coachSection='progress';renderPilotShowcase();toast('Personal sample goal saved');});
- $$('[data-draft-view]').forEach(b=>b.onclick=()=>{pilotDraft.view=b.dataset.draftView;renderPilotShowcase();});
+ $$('[data-draft-view]').forEach(b=>b.onclick=()=>{if(b.dataset.draftView==='participant'){location.href=pilotWorkspaceUrl(pilotDraft.person,'client');return;}pilotDraft.view=b.dataset.draftView;renderPilotShowcase();});
  $$('[data-client-section]').forEach(b=>b.onclick=()=>{pilotDraft.clientSection=b.dataset.clientSection;renderPilotShowcase();});
  $$('[data-firm-audience]').forEach(b=>b.onclick=()=>{pilotDraft.audience=b.dataset.firmAudience;renderPilotShowcase();});
  $$('[data-scale-preset]').forEach(b=>b.onclick=()=>applyPilotScalePreset(b.dataset.scalePreset));
- $$('[data-draft-person]').forEach(b=>b.onclick=()=>{pilotDraft.person=Number(b.dataset.draftPerson);pilotDraft.mode=pilotPeople[pilotDraft.person][3];pilotDraft.view='participant';renderPilotShowcase();});
+ $$('[data-draft-person]').forEach(b=>b.onclick=()=>{location.href=pilotWorkspaceUrl(b.dataset.draftPerson,'client');});
  $$('[data-draft-mode]').forEach(b=>b.onclick=()=>{pilotDraft.mode=b.dataset.draftMode;renderPilotShowcase();});
  $$('[data-draft-phase]').forEach(b=>b.onclick=()=>{pilotDraft.phase=b.dataset.draftPhase;renderPilotShowcase();});
- $$('[data-draft-plan]').forEach(b=>b.onclick=()=>openDraftPlan(Number(b.dataset.draftPlan)));
- $$('[data-draft-review]').forEach(b=>b.onclick=()=>openDraftReview(Number(b.dataset.draftReview)));
+ $$('[data-draft-plan]').forEach(b=>b.onclick=()=>location.href=pilotWorkspaceUrl(b.dataset.draftPlan,'coach','training'));
+ $$('[data-draft-review]').forEach(b=>b.onclick=()=>location.href=pilotWorkspaceUrl(b.dataset.draftReview,'coach','check-ins'));
  $$('[data-draft-task]').forEach(input=>input.onchange=()=>{input.checked?pilotDraft.completed.add(input.dataset.draftTask):pilotDraft.completed.delete(input.dataset.draftTask);input.closest('label').classList.toggle('done',input.checked);});
  $('#draftApproveReport')?.addEventListener('click',()=>{pilotDraft.reportApproved=true;renderPilotShowcase();});
  $('#draftOriginalSetup').onclick=()=>{$('#auth').classList.remove('pilot-showcase');renderOriginalPilotSetup();};
@@ -153,3 +153,12 @@ function renderPilotShowcase(){
 }
 const renderOriginalPilotSetup=renderPilotDemo;
 renderPilotDemo=renderPilotShowcase;
+
+function pilotWorkspaceUrl(person,view='coach',tab='planner'){
+ const index=Math.min(9,Math.max(0,Math.trunc(Number(person)||0)));
+ const section=['planner','training','nutrition','check-ins','progress','goals','support'].includes(tab)?tab:'planner';
+ return '?workspace=demo&person='+index+'&view='+(view==='client'?'client':'coach')+'&tab='+section;
+}
+function pilotCompanyValue(){
+ return `<section class="pd-card"><span class="eyebrow">VALUE TO THE FIRM · PROPOSED PILOT BRIEF</span><h3>Support people through demanding work.</h3><p>Offer practical, confidential coaching that employees can use during deadlines, travel and long days. Test whether the service is useful and manageable before expanding it.</p><div class="pd-stage-grid"><article><b>More usable support</b><p>Personal meals, movement and recovery plans, with a smaller plan when the working week changes.</p></article><article><b>Less coordination for HR</b><p>One programme contact, an agreed timetable, firm-specific resources and a reviewed group summary.</p></article><article><b>A clear decision at week 12</b><p>Compare participation, response coverage and descriptive group results against criteria agreed before launch.</p></article></div><h4>Example success criteria to agree</h4><ul><li>At least 8 of 10 volunteers activate their account.</li><li>At least 7 of 10 complete the final assessment; report metrics only where the privacy threshold is met.</li><li>Review coaching delivery, participant feedback gathered voluntarily and capacity before a second cohort.</li></ul><p class="pd-fine">Proposed criteria, not achieved results. Private coaching answers are not employer feedback. Participant satisfaction and business outcomes have not been measured in this example.</p></section>`;
+}

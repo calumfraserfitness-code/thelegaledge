@@ -1,5 +1,5 @@
 // Coach-operated firm pilot workflow. Sponsor output is aggregate-only.
-const firmState = { organizations: [], pilots: [], participants: [], consents: [], resources: [], selected: null, loaded: false };
+const firmState = { organizations: [], pilots: [], participants: [], consents: [], resources: [], briefs: [], selected: null, loaded: false };
 const firmPhases = ['baseline', 'midpoint', 'endline'];
 const firmResourceIdeas = [
   ['Deadline-week nutrition', 'Nutrition', 'A realistic meal structure for late meetings and unpredictable lunch breaks.', 'Choose a reliable breakfast, prepare a portable lunch, and decide on one easy dinner before the busiest day begins. Keep water available at your desk. Make the plan fit your actual meeting schedule and any food restrictions recorded with your coach.'],
@@ -17,14 +17,15 @@ async function loadFirmPilots() {
       firmState.consents = [];
     }
   } else {
-    const [organizations, pilots, participants, consents, resources] = await Promise.all([
+    const [organizations, pilots, participants, consents, resources, briefs] = await Promise.all([
       query('Firms', db.from('firm_organizations').select('*').order('created_at', { ascending: false })),
       query('Firm pilots', db.from('firm_pilots').select('*').order('created_at', { ascending: false })),
       query('Pilot roster', db.from('firm_participants').select('*').order('joined_at', { ascending: false })),
       query('Pilot consents', db.from('firm_consents').select('participant_id,accepted_at')),
-      query('Firm resources', db.from('firm_resources').select('*').order('created_at', { ascending: false }))
+      query('Firm resources', db.from('firm_resources').select('*').order('created_at', { ascending: false })),
+      query('Firm programme briefs', db.from('firm_programme_briefs').select('*'))
     ]);
-    Object.assign(firmState, { organizations, pilots, participants, consents, resources });
+    Object.assign(firmState, { organizations, pilots, participants, consents, resources, briefs });
   }
   firmState.loaded = true;
   if (!firmState.pilots.some(p => p.id === firmState.selected)) firmState.selected = firmState.pilots[0]?.id || null;
@@ -64,7 +65,7 @@ async function paintFirmPilots() {
   const checkins=pilot&&!state.preview&&activeRoster.length?await query('Pilot weekly reviews',db.from('checkins').select('id,client_id,submitted_at,reviewed_at').in('client_id',activeRoster.map(m=>m.client_id)).gte('submitted_at',weekStart+'T00:00:00Z').order('submitted_at',{ascending:false}).limit(500)):[];
   main.innerHTML = pageHead('CORPORATE COACHING', 'Firms & pilot rosters') + `
     <div class="firm-intro"><div><strong>90-day lawyer performance pilot</strong><p>Private coaching for each participant, with anonymous cohort reporting for the sponsor.</p></div><span>Coach only</span></div>
-    ${pilot?firmDeliveryMarkup(pilot,activeRoster,checkins):''}
+    ${pilot?firmDeliveryMarkup(pilot,activeRoster,checkins)+firmProgrammeBriefMarkup(pilot):''}
     <div class="firm-grid"><section class="panel"><div class="panel-head"><h3>Firms</h3></div>
       <form id="firmOrganizationForm" class="firm-form"><label>Firm name<input name="name" maxlength="160" required></label><label>Number of employees<input name="employee_count" type="number" min="1" max="100000"></label><label>Contact name<input name="contact_name"></label><label>Contact email<input name="contact_email" type="email"></label><button class="btn primary">Add firm</button></form>
       <div class="firm-list">${firmState.organizations.map(o => `<div><b>${esc(o.name)}</b><small>${o.employee_count ? `${Number(o.employee_count).toLocaleString()} employees · ` : ''}${esc(o.contact_name || 'No contact recorded')}</small></div>`).join('') || '<p class="muted">Add the first firm to start a pilot.</p>'}</div></section>
@@ -84,6 +85,7 @@ async function paintFirmPilots() {
         <h4>Ideas to tailor</h4><div class="firm-list">${firmResourceIdeas.map((idea, i) => `<button type="button" data-resource-idea="${i}"><b>${esc(idea[0])}</b><small>${esc(idea[1])}</small></button>`).join('')}</div>
       </section><section class="panel"><h3>Coaching cadence</h3><p>Monthly coaching calls, weekly check-ins, and a 5–10 minute Loom review with clear next steps. Assessments at baseline, midpoint, and endline feed the aggregate report.</p></section>` : ''}`;
   $$('[data-firm-client]').forEach(button=>button.onclick=()=>openFirmClient(button.dataset.firmClient,button.dataset.reviewTab||'overview'));
+  $('#firmProgrammeBriefForm')?.addEventListener('submit',saveFirmProgrammeBrief);
   $('#firmOrganizationForm').onsubmit = saveFirmOrganization;
   $('#firmPilotForm').onsubmit = saveFirmPilot;
   $('#firmNewParticipantForm') && ($('#firmNewParticipantForm').onsubmit = createFirmParticipant);
@@ -251,4 +253,22 @@ async function renderParticipantPilot() {
 function firmWeeklyReportMarkup(report){
  if(!report)return '';
  return `<section class="panel"><h3>Weekly group check-in draft</h3><p>Week beginning ${fmt(report.week_start)} · ${report.respondents} consenting respondents. Uses one latest response per person; excludes responses before consent or pilot enrolment.</p><div class="firm-operations">${[['energy','Energy'],['sleep','Sleep quality'],['stress','Stress']].map(([key,label])=>`<article><strong>${report[key]==null?'Withheld':esc(report[key])+'/10'}</strong><small>${label} · ${report[key+'_count']} valid responses</small></article>`).join('')}</div><p class="muted">Each metric needs ${report.minimum_count} valid responses. Only participants who explicitly opt into weekly ratings are included. Written answers, weight, goals and private feedback never appear here. Coach review draft; employer accounts and automatic report delivery are not built.</p></section>`;
+}
+
+function firmProgrammeBriefMarkup(pilot){
+ const brief=firmState.briefs.find(b=>b.pilot_id===pilot.id)||{};
+ return `<section class="panel"><div class="panel-head"><div><span class="eyebrow">COMPANY OBJECTIVES</span><h3>Agree what this pilot needs to deliver</h3><span class="sub">Saved separately for this pilot. Coach-only working brief; no employer access or automatic sharing.</span></div></div><form id="firmProgrammeBriefForm" class="firm-form" data-brief-pilot-id="${esc(pilot.id)}"><label>What does the firm want to improve?<textarea name="objective" minlength="10" maxlength="2000" required placeholder="For example: practical support for volunteers during deadline and travel weeks.">${esc(brief.objective||'')}</textarea></label><label>Success criteria agreed before launch<textarea name="success_criteria" minlength="10" maxlength="3000" required placeholder="Specify activation and response coverage targets, the measures to review, and delivery commitments.">${esc(brief.success_criteria||'')}</textarea></label><label>Working patterns and delivery constraints<textarea name="constraints" maxlength="3000" placeholder="Office locations, shift patterns, busy periods, eligible volunteers and available coaching capacity.">${esc(brief.constraints||'')}</textarea></label><label>Pilot review date<input type="date" name="review_date" value="${esc(brief.review_date||'')}"></label><label>Continuation recommendation<select name="recommendation">${[['pending','Pending evidence review'],['continue','Continue'],['adjust','Adjust programme'],['pause','Pause expansion']].map(([key,label])=>`<option value="${key}" ${brief.recommendation===key?'selected':''}>${label}</option>`).join('')}</select></label><label>Next action and evidence supporting it<textarea name="next_action" maxlength="3000" placeholder="Record the decision owner, next step and limitations. Do not include private participant records.">${esc(brief.next_action||'')}</textarea></label><button class="btn primary">Save firm brief</button><p class="muted">Use participation, agreed delivery and eligible group assessments to review the pilot. Company productivity, absence, retention and financial return need separate evidence; they are not calculated from personal check-ins.</p></form></section>`;
+}
+async function saveFirmProgrammeBrief(event){
+ event.preventDefault();const form=event.currentTarget,button=event.submitter,pilotId=form.dataset.briefPilotId,fd=new FormData(form);
+ const row={pilot_id:pilotId,objective:String(fd.get('objective')||'').trim(),success_criteria:String(fd.get('success_criteria')||'').trim(),constraints:String(fd.get('constraints')||'').trim(),review_date:fd.get('review_date')||null,recommendation:fd.get('recommendation'),next_action:String(fd.get('next_action')||'').trim(),updated_at:new Date().toISOString()};
+ if(row.objective.length<10||row.success_criteria.length<10)return toast('Add the firm objective and measurable success criteria','error');
+ setBusy(button,true);
+ try{
+  const saved=state.preview?row:(await query('Firm programme brief',db.from('firm_programme_briefs').upsert(row,{onConflict:'pilot_id'}).select()))[0];
+  if(!saved)throw new Error('Brief was not saved. Reload and try again.');
+  const old=firmState.briefs.find(b=>b.pilot_id===pilotId);if(old)Object.assign(old,saved);else firmState.briefs.push(saved);
+  if(state.coachView==='firms'&&!state.client&&firmState.selected===pilotId)await paintFirmPilots();
+  toast(state.preview?'Sample firm brief updated; reload resets it':'Firm brief saved');
+ }catch(error){toast(error.message,'error');setBusy(button,false);}
 }
