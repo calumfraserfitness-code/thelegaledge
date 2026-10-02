@@ -292,7 +292,7 @@ function renderDashboard() {
   const active = state.clients.filter((client) => client.status === 'active');
   const archived = state.clients.length - active.length;
   $('#coachMain').innerHTML = pageHead('COACH WORKSPACE', 'Client overview', '<button class="btn ghost" data-coach-view-link="clients">View all clients</button><button class="btn primary" data-add-client>+ Add client</button>') + `
-    <div class="stats"><div class="stat"><span>ACTIVE CLIENTS</span><strong>${active.length}</strong></div><div class="stat"><span>PAST / ARCHIVED</span><strong>${archived}</strong></div><div class="stat"><span>CHECK-INS</span><strong>Weekly</strong></div><div class="stat"><span>STEP BASELINE</span><strong>8,000</strong></div></div>
+    <div class="stats"><div class="stat"><span>ACTIVE CLIENTS</span><strong>${active.length}</strong></div><div class="stat"><span>PAST / ARCHIVED</span><strong>${archived}</strong></div><div class="stat"><span>CHECK-INS</span><strong>Weekly</strong></div><div class="stat"><span>GOALS</span><strong>Individual</strong></div></div>
     <section class="panel"><div class="panel-head"><div><h3>Active clients</h3><span class="sub">Open a client to manage their current week.</span></div></div>${clientRows(active)}</section>${qaDashboard(active)}`;
   $('[data-coach-view-link]')?.addEventListener('click', () => { state.coachView = 'clients'; renderCoach(); });
   bindAddClient();
