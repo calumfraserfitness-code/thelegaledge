@@ -3,7 +3,7 @@
 let coachHealthTimer=null,coachHealthRequest=0,coachHealthEntryHandled=false;
 const coachHealthRenderBefore=renderCoach;
 renderCoach=function(){
- if(!coachHealthEntryHandled&&!state.preview&&state.role==='coach'&&new URLSearchParams(location.search).get('setup')==='health'){state.coachView='my-health';coachHealthEntryHandled=true;}
+ if(!coachHealthEntryHandled&&!state.preview&&state.role==='coach'&&['health','hevy'].includes(new URLSearchParams(location.search).get('setup'))){state.coachView='my-health';coachHealthEntryHandled=true;}
  clearInterval(coachHealthTimer);coachHealthRequest++;
  if(!$('#coachHealthNav')){const button=document.createElement('button');button.id='coachHealthNav';button.className='side-link';button.textContent='My health connection';button.onclick=()=>{state.coachView='my-health';renderCoach();};$('#coachNav').append(button);}
  $('#coachHealthNav').classList.toggle('active',state.coachView==='my-health');
