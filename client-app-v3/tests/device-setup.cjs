@@ -1,0 +1,11 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const context=vm.createContext({URL});vm.runInContext(fs.readFileSync(__dirname+'/../device-setup.js','utf8'),context);
+const token='a'.repeat(64),run=(scopes)=>context.appleExporterSetup(token,scopes),u=new URL(run(['steps','sleep_minutes']));
+assert.equal(u.protocol,'com.healthexport:');assert.equal(u.hostname,'automation');
+assert.equal(u.searchParams.get('url'),'https://baxvhilvrhshlfizakak.supabase.co/functions/v1/health-device-ingest');
+assert.equal(u.searchParams.get('metrics'),'Step Count,Sleep Analysis');
+assert.equal(u.searchParams.get('interval'),'days');assert.equal(u.searchParams.get('aggregatedata'),'true');assert.equal(u.searchParams.get('aggregatesleep'),'true');
+assert.equal(u.searchParams.get('headers'),'X-Legal-Edge-Key,'+token+',Content-Type,application/json');assert.equal(u.searchParams.get('batchrequests'),'false');
+assert.equal(new URL(run(['steps'])).searchParams.get('metrics'),'Step Count');
+assert.equal(run(['protein_g']),null);assert.equal(run([]),null);assert.throws(()=>context.appleExporterSetup('bad',['steps']));
+console.log('PASS: iPhone configuration requests only selected verified metrics, encodes scoped header and daily aggregation, and does not default to all metrics.');
