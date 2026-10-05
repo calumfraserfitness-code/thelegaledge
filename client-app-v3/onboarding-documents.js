@@ -61,5 +61,5 @@ Contact Calum first if you want to exercise a right or raise a concern. You may 
 REVIEW BEFORE LIVE USE
 Confirm the controller contact, actual processing bases, processor list, transfer safeguards, retention/deletion process and employer reporting terms. This is a review draft and is not used automatically for real enrollments.`;
 document.addEventListener('DOMContentLoaded',()=>{
- if(journeyDemo&&journeyCurrent){journeyCurrent.contract_title='Legal Edge Coaching Agreement · review draft';journeyCurrent.contract_version='DRAFT-2026-10-05';journeyCurrent.contract_body=legalEdgeDraftAgreement;journeyCurrent.privacy_version='DRAFT-2026-10-05';journeyCurrent.privacy_body=legalEdgeDraftPrivacy;}
+ if(journeyDemo&&journeyCurrent){journeyCurrent.contract_title='Legal Edge Coaching Agreement · review draft';journeyCurrent.contract_version='DRAFT-2026-10-05';journeyCurrent.contract_body=legalEdgeDraftAgreement;journeyCurrent.privacy_version='DRAFT-2026-10-05';journeyCurrent.privacy_body=legalEdgeDraftPrivacy;const step=new URLSearchParams(location.search).get('step');if(step==='agreement'||step==='privacy'){journeyCurrent.stage='contract';if(step==='privacy'){journeyCurrent.signed_at=new Date().toISOString();journeyCurrent.signature_name='Preview Client';}renderJourney(journeyCurrent);}}
 });
