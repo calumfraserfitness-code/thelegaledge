@@ -25,13 +25,13 @@ function renderJourney(j){
   $('#journeyContinue').onclick=async e=>{setBusy(e.target,true);try{await journeyCall('welcome');renderClient();}catch(err){toast(err.message,'error');setBusy(e.target,false);}};return;
  }
  if(j.stage==='contract'){
-  if(j.signed_at){renderLegalGate();$('.account-menu')?.classList.add('hidden');$('#clientMain .eyebrow').textContent='AGREEMENT SAVED · HEALTH & PRIVACY CONSENT';$('#clientMain').insertAdjacentHTML('afterbegin','<p class="journey-note">Agreement saved. Complete your health and privacy consent to continue.</p>');if(journeyDemo)$('#legalGate').onsubmit=e=>{e.preventDefault();j.stage='intake';renderJourney(j);};return;}
+  if(j.signed_at){renderLegalGate();$('.account-menu')?.classList.add('hidden');$('#clientMain .eyebrow').textContent='AGREEMENT SAVED · HEALTH & PRIVACY CONSENT';$('#clientMain').insertAdjacentHTML('afterbegin','<p class="journey-note">'+(journeyDemo?'FICTIONAL PREVIEW · ':'')+'Agreement saved. Complete your health and privacy consent to continue.</p>');if(journeyDemo)$('#legalGate').onsubmit=e=>{e.preventDefault();j.stage='intake';renderJourney(j);};return;}
   journeyFrame(j,`<h1>Your coaching agreement.</h1><p>Read your agreement and sign below. A saved copy will be available to you and your coach.</p><article class="journey-contract"><h2>${esc(j.contract_title)}</h2><small>Version ${esc(j.contract_version)}</small><pre>${esc(j.contract_body)}</pre></article><form id="journeySign"><label>Full legal name<input name="name" autocomplete="name" minlength="2" required></label><label>Postal address<textarea name="address" autocomplete="street-address" minlength="8" required></textarea></label><label class="toggle-field"><input name="consent" type="checkbox" required> I have read this agreement, agree to its terms, and consent to signing electronically using my typed name.</label><button class="btn primary">Sign and continue</button></form>`);
   $('#journeySign').onsubmit=async e=>{e.preventDefault();setBusy(e.submitter,true);const f=new FormData(e.target);try{await journeyCall('sign',{name:f.get('name'),address:f.get('address'),consent:true});renderClient();}catch(err){toast(err.message,'error');setBusy(e.submitter,false);}};return;
  }
  if(j.stage==='intake'){
   renderOnboardingWizard();$('.account-menu')?.classList.add('hidden');$('#clientMain .eyebrow').textContent='STEP 4 OF 6';
-  $('#clientMain').insertAdjacentHTML('afterbegin','<p class="journey-note">Agreement complete. Your only next step is your coaching profile.</p>');
+  $('#clientMain').insertAdjacentHTML('afterbegin','<p class="journey-note">'+(journeyDemo?'FICTIONAL PREVIEW · ':'')+'Agreement complete. Your only next step is your coaching profile.</p>');
   journeyIntakePages();
   if(journeyDemo)$('#onboardingWizard').onsubmit=e=>{e.preventDefault();j.stage='review';j.intake_completed_at=new Date().toISOString();renderJourney(j);};return;
  }
