@@ -188,7 +188,7 @@ function demoData() {
 
 async function boot() {
   try {
-    if (new URLSearchParams(location.search).get('pilot') === 'demo'||new URLSearchParams(location.search).get('workspace') === 'demo') return;
+    if (new URLSearchParams(location.search).get('onboarding') === 'demo'||new URLSearchParams(location.search).get('pilot') === 'demo'||new URLSearchParams(location.search).get('workspace') === 'demo') return;
     if (!db) throw new Error('The secure connection did not load. Refresh the page.');
     if (recoveryMode) return show('#recovery');
     const { data: { user } } = await db.auth.getUser();

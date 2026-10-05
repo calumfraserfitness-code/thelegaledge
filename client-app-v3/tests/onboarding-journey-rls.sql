@@ -1,0 +1,34 @@
+begin;
+create temporary table journey_test_context(client_id uuid,owner_id uuid,coach_id uuid);
+insert into journey_test_context select gen_random_uuid(),gen_random_uuid(),id from public.profiles where role='coach' limit 1;
+insert into auth.users(id,email,raw_user_meta_data) select owner_id,'journey-rollback-test@example.invalid','{"full_name":"Rollback Journey"}'::jsonb from journey_test_context;
+insert into public.profiles(id,role,full_name,email) select owner_id,'client','Rollback Journey','journey-rollback-test@example.invalid' from journey_test_context on conflict(id) do nothing;
+insert into public.clients(id,profile_id,coach_id,display_name,onboarding_status,plan_status) select client_id,owner_id,coach_id,'Rollback Journey','pending_legal','awaiting_onboarding' from journey_test_context;
+grant select on journey_test_context to authenticated;
+select set_config('request.jwt.claim.sub',(select coach_id::text from journey_test_context),true);
+set local role authenticated;
+select public.journey_action(client_id,'enroll','{"welcome_url":"https://example.com/welcome.mp4","contract_title":"Test only","contract_version":"TEST","contract_body":"Fictional agreement for rollback test only. Not a real contract."}'::jsonb) is not null as coach_enrollment from journey_test_context;
+select public.journey_action(client_id,'payment','{"reference":"rollback-receipt"}') is not null as payment_confirmed from journey_test_context;
+do $$ begin
+ begin perform public.journey_action(client_id,'sign','{"name":"No","address":"Test address","consent":true}') from journey_test_context;raise exception 'TEST FAILED coach signed';exception when others then if sqlerrm='TEST FAILED coach signed' then raise;end if;end;
+end $$;
+select set_config('request.jwt.claim.sub',(select owner_id::text from journey_test_context),true);
+do $$ begin
+ begin perform public.journey_action(client_id,'payment','{"reference":"fake"}') from journey_test_context;raise exception 'TEST FAILED client confirmed payment';exception when others then if sqlerrm='TEST FAILED client confirmed payment' then raise;end if;end;
+ begin update public.onboarding_journeys set stage='ready';raise exception 'TEST FAILED direct update';exception when insufficient_privilege then null;end;
+ begin insert into public.onboarding_responses(client_id,version,completed_at,responses) select client_id,2,now(),'{"sections":{"training":{}}}'::jsonb from journey_test_context;raise exception 'TEST FAILED early intake';exception when others then if sqlerrm='TEST FAILED early intake' then raise;end if;end;
+end $$;
+select public.journey_action(client_id,'welcome') is not null as welcome_completed from journey_test_context;
+select public.journey_action(client_id,'sign','{"name":"Test Client","address":"123 Test Street, Test City","consent":true}') is not null as contract_signed from journey_test_context;
+insert into public.legal_consents(client_id,document_version,signature_name,consent_type) select client_id,'TEST','Test Client','coaching_privacy_health' from journey_test_context;
+insert into public.onboarding_responses(client_id,version,completed_at,submitted_at,responses) select client_id,2,now(),now(),'{"sections":{"training":{"training_days":"2"},"nutrition":{"typical_eating":"test"},"lifestyle":{"goals":"test"}}}'::jsonb from journey_test_context;
+do $$ begin if (select stage from public.onboarding_journeys where client_id=(select client_id from journey_test_context))<>'review' then raise exception 'TEST FAILED review transition';end if;end $$;
+select set_config('request.jwt.claim.sub',gen_random_uuid()::text,true);
+do $$ begin if exists(select 1 from public.onboarding_journeys) then raise exception 'TEST FAILED unrelated read';end if;
+ begin perform public.journey_action(client_id,'welcome') from journey_test_context;raise exception 'TEST FAILED unrelated mutation';exception when others then if sqlerrm='TEST FAILED unrelated mutation' then raise;end if;end;
+end $$;
+reset role;
+update public.clients set plan_status='published' where id=(select client_id from journey_test_context);
+do $$ begin if (select stage from public.onboarding_journeys where client_id=(select client_id from journey_test_context))<>'ready' then raise exception 'TEST FAILED ready transition';end if;end $$;
+select 'PASS: enrollment, payment, signing, consent, intake, publish, isolation and direct-write denial' as result;
+rollback;
