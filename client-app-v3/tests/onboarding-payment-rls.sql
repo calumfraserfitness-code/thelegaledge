@@ -1,0 +1,32 @@
+begin;
+create temporary table payment_test(client_id uuid,other_id uuid,coach_id uuid);
+insert into payment_test select gen_random_uuid(),gen_random_uuid(),id from public.profiles where role='coach' limit 1;
+insert into public.clients(id,profile_id,coach_id,display_name,onboarding_status,plan_status) select client_id,null,coach_id,'Payment rollback fixture','pending_legal','awaiting_onboarding' from payment_test;
+insert into public.clients(id,profile_id,coach_id,display_name,onboarding_status,plan_status) select other_id,null,coach_id,'Corporate rollback fixture','pending_legal','awaiting_onboarding' from payment_test;
+grant select on payment_test to authenticated,service_role;
+select set_config('request.jwt.claim.sub',(select coach_id::text from payment_test),true);
+set local role authenticated;
+select public.journey_action(client_id,'enroll','{"welcome_url":"https://example.com/test.mp4","contract_title":"Test","contract_version":"TEST","contract_body":"Fictional rollback contract only. No actual contract is made.","privacy_version":"TEST","privacy_body":"Fictional rollback privacy notice. No actual client information or health data is being shared. This fixture will be rolled back.","payment_url":"https://buy.stripe.com/test","stripe_payment_link_id":"plink_test"}') is not null from payment_test;
+do $$ begin
+ begin perform public.onboarding_stripe_paid('evt_test','wrong','plink_test','cs_test');raise exception 'TEST FAILED client payment forge';exception when insufficient_privilege then null;end;
+ begin perform public.journey_action(other_id,'enroll','{"welcome_url":"https://example.com/test.mp4","contract_title":"Test","contract_version":"TEST","contract_body":"Fictional rollback contract only. No actual contract is made.","privacy_version":"TEST","privacy_body":"Fictional rollback privacy notice. No actual client information or health data is being shared. This fixture will be rolled back.","funding_mode":"corporate","funding_reference":"Test firm"}') from payment_test;raise exception 'TEST FAILED corporate without membership';exception when others then if sqlerrm='TEST FAILED corporate without membership' then raise;end if;end;
+end $$;
+reset role;
+set local role service_role;
+do $$ declare token text;begin
+ select payment_match_token into token from public.onboarding_journeys where client_id=(select client_id from payment_test);
+ if public.onboarding_stripe_paid('evt_test',token,'plink_wrong','cs_test') then raise exception 'TEST FAILED wrong payment link';end if;
+ if not public.onboarding_stripe_paid('evt_test',token,'plink_test','cs_test') then raise exception 'TEST FAILED verified matching payment';end if;
+ if not public.onboarding_stripe_paid('evt_test',token,'plink_test','cs_test') then raise exception 'TEST FAILED idempotent retry';end if;
+end $$;
+reset role;
+do $$ begin if (select stage from public.onboarding_journeys where client_id=(select client_id from payment_test))<>'welcome' then raise exception 'TEST FAILED paid welcome';end if;end $$;
+insert into public.firm_organizations(id,coach_id,name) values('22222222-2222-4222-8222-222222222222',(select coach_id from payment_test),'Rollback firm');
+insert into public.firm_pilots(id,organization_id,coach_id,name,start_date,end_date,capacity,status) values('33333333-3333-4333-8333-333333333333','22222222-2222-4222-8222-222222222222',(select coach_id from payment_test),'Rollback pilot',current_date,current_date+30,10,'planning');
+insert into public.firm_participants(pilot_id,client_id,status) select '33333333-3333-4333-8333-333333333333',other_id,'invited' from payment_test;
+set local role authenticated;
+select public.journey_action(other_id,'enroll','{"welcome_url":"https://example.com/test.mp4","contract_title":"Test","contract_version":"TEST","contract_body":"Fictional rollback contract only. No actual contract is made.","privacy_version":"TEST","privacy_body":"Fictional rollback privacy notice. No actual client information or health data is being shared. This fixture will be rolled back.","funding_mode":"corporate","funding_reference":"Test firm"}') is not null from payment_test;
+do $$ begin if (select stage from public.onboarding_journeys where client_id=(select other_id from payment_test))<>'welcome' then raise exception 'TEST FAILED corporate payment bypass';end if;end $$;
+reset role;
+select 'PASS payment privilege denial, matching offer, retry idempotency, membership guard and firm-funded welcome' as result;
+rollback;

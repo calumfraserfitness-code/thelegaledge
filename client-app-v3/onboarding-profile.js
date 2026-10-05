@@ -57,9 +57,9 @@ const profileSections=[
  ['anything_else','Anything else you would like Calum to understand?','text']]}
 ];
 let profileDraft={},profileStep=0,profileLoad=0;
-function profileField(f){const [name,label,type,required,min,max]=f,r=required?'required':'',a=`name="${name}" ${r}`;
+function profileField(f){const [name,label,type,required,min,max]=f,r=(required||type==='yesno')?'required':'',a=`name="${name}" ${r}`;
  const control=type==='text'?`<textarea ${a} rows="3"></textarea>`:type==='select'||type==='yesno'?`<select ${a}><option value="">Choose an answer</option>${(type==='yesno'?['no','yes']:min).map(v=>`<option value="${esc(v)}">${esc(v==='yes'?'Yes':v==='no'?'No':v)}</option>`).join('')}</select>`:`<input ${a} type="${type==='number'?'number':'text'}" ${type==='number'?`min="${min}" max="${max}" step="any"`:''}>`;
- return `<label class="${type==='text'||type==='yesno'?'wide':''}">${esc(label)}${required?'':' <small>Optional</small>'}${control}</label>`;}
+ return `<label class="${type==='text'||type==='yesno'?'wide':''}">${esc(label)}${required||type==='yesno'?'':' <small>Optional</small>'}${control}</label>`;}
 const originalJourneyWizard=renderOnboardingWizard;
 renderOnboardingWizard=function(){
  if(!journeyCurrent&&!journeyDemo)return originalJourneyWizard();
@@ -80,7 +80,7 @@ journeyIntakePages=function(){
  const controls=document.createElement('div');controls.className='journey-intake-controls';controls.innerHTML='<button type="button" class="btn ghost" id="journeyBack">Back</button><button type="button" class="btn primary" id="journeyNext">Save & continue</button>';f.append(controls);
  function paint(){headings.forEach((h,i)=>h.hidden=i!==profileStep);grids.forEach((g,i)=>g.hidden=i!==profileStep);submit.hidden=profileStep!==grids.length-1;$('#journeyBack').hidden=profileStep===0;$('#journeyNext').hidden=profileStep===grids.length-1;$('#profileProgress').style.width=((profileStep+1)/grids.length*100)+'%';($('#journeyExisting .eyebrow')||$('#clientMain .eyebrow')).textContent=`COACHING PROFILE · ${profileStep+1} OF ${grids.length}`;}
  window.profilePaint=paint;
- $('#journeyBack').onclick=()=>{profileStep--;paint();};$('#journeyNext').onclick=async e=>{if(!profileValidate(grids[profileStep]))return;setBusy(e.target,true);try{await profileSave(profileStep+1);paint();}catch(err){toast(err.message,'error');}finally{setBusy(e.target,false);}};paint();
+ $('#journeyBack').onclick=()=>{profileStep--;paint();f.scrollIntoView({block:'start'});};$('#journeyNext').onclick=async e=>{if(!profileValidate(grids[profileStep]))return;setBusy(e.target,true);try{await profileSave(profileStep+1);paint();f.scrollIntoView({block:'start'});}catch(err){toast(err.message,'error');}finally{setBusy(e.target,false);}};paint();
 };
 async function profileSubmit(e){
  e.preventDefault();const grids=[...e.target.querySelectorAll('.editor-grid')];for(let i=0;i<grids.length;i++){profileStep=i;window.profilePaint?.();if(!profileValidate(grids[i]))return;}
