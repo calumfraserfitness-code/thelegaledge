@@ -7,5 +7,6 @@ assert.equal(u.searchParams.get('metrics'),'Step Count,Sleep Analysis');
 assert.equal(u.searchParams.get('interval'),'days');assert.equal(u.searchParams.get('aggregatedata'),'true');assert.equal(u.searchParams.get('aggregatesleep'),'true');
 assert.equal(u.searchParams.get('headers'),'X-Legal-Edge-Key,'+token+',Content-Type,application/json');assert.equal(u.searchParams.get('batchrequests'),'false');
 assert.equal(new URL(run(['steps'])).searchParams.get('metrics'),'Step Count');
-assert.equal(run(['protein_g']),null);assert.equal(run([]),null);assert.throws(()=>context.appleExporterSetup('bad',['steps']));
+assert.equal(new URL(run(['protein_g'])).searchParams.get('metrics'),'Protein');
+const scopes=['weight_kg','resting_heart_rate','consumed_calories','protein_g','carbs_g','fat_g','water_ml'];assert.equal(new URL(run(scopes)).searchParams.get('metrics'),'Weight & Body Mass,Resting Heart Rate,Dietary Energy,Protein,Carbohydrates,Total Fat,Dietary Water');assert.equal(run(['unsupported']),null);assert.equal(run([]),null);assert.throws(()=>context.appleExporterSetup('bad',['steps']));
 console.log('PASS: iPhone configuration requests only selected verified metrics, encodes scoped header and daily aggregation, and does not default to all metrics.');
