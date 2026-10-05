@@ -425,3 +425,13 @@ Apple Health guided setup uses existing Health Auto Export Premium iPhone bridge
 Browser checked deployed onboarding welcome/agreement/consent and connectionhub cards; Hevy/Apple/MFPnutrition panels open, optionalscopes correct, no app JSerrors. Browserillustration only fictional client data, no accountsconnected. Latest smallfix scopesintakecaption within main card aftersidebarwrap, prefilllegalnamefrom signature. Coach/clientbrowserauthentication not requested; prior user refusal respected.
 
 Final browser verification Oct5: Coach Connections overview → Open client → per-client Connections tab renders without app errors. Onboarding signature prefilled legal name; wrapped consent form and intake Next handlers worked; training→nutrition updates card heading correctly while rail stays intact. Both live preview links verified. Real authenticated provider/account authorization remains untested; no real connection or device upload has been added.
+
+
+## 2026-10-05 Expanded onboarding and simpler device setup
+- 180-day scoped iPhone exporter keys with explicit revocable sharing consent; first-real-upload verification polling; review-stage connection access.
+- Firm-funded enrollment skips personal payment only with coach approval/reference and matching active/invited firm membership. Personal enrollment supports configured Stripe/Revolut URL plus four privately stored existing Stripe offers. No offer prices or checkout settings changed.
+- Stripe webhook deployed with HMAC signature/time validation and service-only matched payment RPC, idempotent event receipts. NOT live: PostWebhookEndpoints denied by Stripe connector key permissions; no signing secret configured. No webhook or redirect changes were made in Stripe. Automatic Revolut events are not configured. Manual coach verified-receipt release remains.
+- Approved privacy notice/version required on new enrollments, snapshot evidence + explicit health-data consent checked in database. Existing enrolled legacy clients preserve their old notice flow. No legal compliance guarantee; approved documents/video still supplied by coach.
+- Five-section intake v3 (health, training, nutrition, lifestyle, goals), private server drafts on Continue. Flagged health answers hold plan publication until assigned coach records review. Not a validated PAR-Q certification or medical clearance.
+- Coach saved intake/consent viewer and authorised copy export. Starter room built-in practical onboarding guides plus reusable coach-authored articles/video/download links; coach create/edit/publish controls.
+- Signature tests and rolled-back private journey/draft/screening/phone key SQL tests passed. Browser/deployment verification pending at this checkpoint. 13 saved clients unchanged.
