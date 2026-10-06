@@ -1,0 +1,12 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+let originalCalls=0;const noop=()=>{};
+const nav={dataset:{clearNavigation:'true'},querySelectorAll:()=>[],classList:{remove:noop}};
+const main={innerHTML:'',querySelectorAll:()=>[]};
+const state={preview:false,clientView:'more',client:{onboarding_status:'pending',plan_status:'published'}};
+const c=vm.createContext({state,document:{addEventListener:noop},simplifyCoachNavigation:noop,renderCoach:noop,renderClientWorkspace:noop,renderClient:()=>{originalCalls++;},$:s=>s==='#clientNav'?nav:s==='#clientMain'?main:null});
+vm.runInContext(fs.readFileSync(__dirname+'/../navigation-clear.js','utf8'),c);
+c.renderClient();assert.equal(originalCalls,1);assert.equal(main.innerHTML,'');
+state.client.onboarding_status='complete';state.client.plan_status='coach_building';c.renderClient();assert.equal(originalCalls,2);assert.equal(main.innerHTML,'');
+state.client.plan_status='published';c.renderClient();assert.equal(originalCalls,2);assert.ok(main.innerHTML.includes('Devices & apps'));
+state.clientView='health';c.renderClient();assert.equal(originalCalls,3);
+console.log('PASS: More cannot bypass onboarding or plan publication; device views retain the original render gates.');
