@@ -2,6 +2,7 @@ const fs=require('fs'),vm=require('vm'),assert=require('assert');
 const context=vm.createContext({window:{supabase:null,addEventListener(){}},location:{hash:'',search:''},URLSearchParams,URL,console,Date,Set,Map,setTimeout,clearTimeout,document:{addEventListener(){}}});
 const app=fs.readFileSync(__dirname+'/../app-v2.js','utf8').split('\nbindShell();')[0];
 vm.runInContext(app+'\n'+fs.readFileSync(__dirname+'/../plan-experience.js','utf8')+'\nfunction nutritionTargets(){return `<div><small>Water</small><strong>To agree</strong></div>`;}\nloadClientData=async function(){};',context);
+vm.runInContext(fs.readFileSync(__dirname+'/../coaching-workspace.js','utf8').split('\n').find(line=>line.startsWith('function finiteRecorded')),context);
 vm.runInContext(fs.readFileSync(__dirname+'/../client-integrity.js','utf8'),context);
 const run=s=>vm.runInContext(s,context);
 run("state.client={id:'own',display_name:'Own Client',weight_unit:'kg'};state.data=emptyData();state.data.programs=[{days:[{id:'move',training_type:'mobility'}]}]");
@@ -11,6 +12,7 @@ assert.doesNotMatch(run("exerciseCard({program_day_id:'move',name:'Mobility'},tr
 const pushup=run("exerciseCard({id:'push',name:'Push-ups',sets:3,reps:'6–12'},true)");assert.match(pushup,/name="reps_1"/);assert.doesNotMatch(pushup,/name="load_|name="rir_/);
 assert.match(run("exerciseCard({id:'press',name:'Bench press',sets:3,reps:'8–12'},true)"),/name="load_1"/);
 run("state.data.mealAssignments=[{nutrition_plan_id:'menu',historical:true,meal:{name:'Total'}},{nutrition_plan_id:'menu',historical:false,meal:{name:'Real meal'}}]");assert.equal(run("assignedMealsForPlan({id:'menu'}).length"),1);
+assert.doesNotMatch(run("nutritionPlanMarkup({id:'menu'})"),/0 kcal · 0 g protein/);
 assert.match(run("consentEvidenceMarkup({source_system:'legacy',signature_name:'Own Client',signature_date:'2026-08-01'})"),/not a verified signed copy/);
 assert.equal(run("legacyIntakeSections({responses:{text:'TRAINING\\n\\nEQUIPMENT\\nNone\\nNUTRITION\\n\\nPREFERENCES\\nChicken'}}).training.EQUIPMENT"),'None');
 (async()=>{run("state.selectedNutritionPlanId='foreign-menu';state.selectedSessionId='foreign-session';state.client={id:'new',weight_unit:'kg'};state.data.legal=[{client_id:'foreign'}]");await run("loadClientData('new')");assert.equal(run('state.data.legal.length'),0);assert.equal(run('state.selectedSessionId'),null);assert.equal(run('state.selectedNutritionPlanId'),null);assert.equal(run('state.foodUnits'),'metric');console.log('PASS: client switches clear records/selections; imported consent is explicit; archived meals excluded; mobility completion and bodyweight rep logging; intake labels.');})().catch(e=>{console.error(e);process.exitCode=1;});
