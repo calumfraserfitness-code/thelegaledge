@@ -1,0 +1,17 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const ctx=vm.createContext({window:{supabase:null,addEventListener(){}},location:{hash:'',search:''},URLSearchParams,URL,console,Date,Set,Map,FormData,setTimeout,clearTimeout,document:{addEventListener(){}}});
+const app=fs.readFileSync(__dirname+'/../app-v2.js','utf8').split('\nbindShell();')[0];
+vm.runInContext(app+'\n'+fs.readFileSync(__dirname+'/../plan-experience.js','utf8')+'\nfunction nutritionTargets(){return "";}',ctx);
+vm.runInContext(fs.readFileSync(__dirname+'/../coaching-workspace.js','utf8').split('\n').find(l=>l.startsWith('function finiteRecorded')),ctx);
+vm.runInContext(fs.readFileSync(__dirname+'/../client-integrity.js','utf8'),ctx);
+vm.runInContext(fs.readFileSync(__dirname+'/../coaching-completion.js','utf8'),ctx);
+const run=s=>vm.runInContext(s,ctx);
+run("var ex={id:'exercise',sets:2},session={id:'workout'},person={id:'own',weight_unit:'kg'},form=new FormData();form.set('reps_1','8');form.set('rir_1','0');");
+const rows=run('workoutSetRows(ex,session,form,person)');assert.equal(rows.length,1);assert.equal(rows[0].rir,0);assert.equal(rows[0].load,null);assert.equal(rows[0].training_session_id,'workout');assert.equal(rows[0].load_unit,'kg');
+run("form.set('reps_1','-1')");assert.throws(()=>run('workoutSetRows(ex,session,form,person)'),/non-negative/);
+run("form.set('reps_1','1.5')");assert.throws(()=>run('workoutSetRows(ex,session,form,person)'),/whole/);
+run("state.client={id:'own',weight_unit:'lbs'};state.selectedSessionId='new';state.data=emptyData();state.data.exerciseLogs=[{program_exercise_id:'exercise',training_session_id:'old',set_number:1,reps:9,load:40,load_unit:'lb'}]");
+assert.match(run("exerciseCard({id:'exercise',name:'Bench press',sets:1,reps:'8–12'},true)"),/name="reps_1"[^>]*value=""/);
+run("state.data.exerciseLogs.unshift({program_exercise_id:'exercise',training_session_id:'new',set_number:1,reps:8,load:50,load_unit:'lb'})");assert.match(run("exerciseCard({id:'exercise',name:'Bench press',sets:1,reps:'8–12'},true)"),/name="reps_1"[^>]*value="8"/);
+console.log('PASS: session-bound actual sets; zero RIR preserved; blanks stay blank; invalid reps rejected; previous workout values are not logged automatically.');
+run("var targetForm=new FormData();for(const [key,value]of Object.entries({name:'Optional menu',day_type:'Busy Day',days_per_week:'0',calories:'2000',protein_g:'150',carbs_g:'200',fat_g:'65'}))targetForm.set(key,value);");assert.equal(run('nutritionTargetPatch(targetForm,{}).days_per_week'),0);run("targetForm.set('calories','')");assert.throws(()=>run('nutritionTargetPatch(targetForm,{})'),/all four/);console.log('PASS: zero-day optional menus retained; incomplete target saves rejected.');

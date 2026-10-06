@@ -55,12 +55,18 @@ const rpTechniqueDemos = [
 {"id": "eFWCn5iEbTU", "seconds": 10, "name": "Dumbbell walking lunge", "aliases": ["dumbbell walking lunge", "walking dumbbell lunge", "walking lunges (db)", "walking lunges (dumbbells)"], "group": "Legs", "cues": ["Set up with secure footing and a controllable load.", "Use the exact movement shown within your prescribed comfortable range.", "Control each repetition without rushing."]},
 {"id": "EF7jXP17DPE", "seconds": 11, "name": "Barbell hip thrust", "aliases": ["barbell hip thrust"], "group": "Legs", "cues": ["Set up with secure footing and a controllable load.", "Use the exact movement shown within your prescribed comfortable range.", "Control each repetition without rushing."]}
 ];
+rpTechniqueDemos.push(
+ {id:'physitrack-bodyweight-squat',name:'Bodyweight squat',aliases:['bodyweight squat','bodyweight squats'],source:'Physitrack',sourceUrl:'https://na.physitrack.com/home-exercise-video/bodyweight-squat',cues:[]},
+ {id:'physitrack-bird-dog',name:'Bird dog',aliases:['bird dog'],source:'Physitrack',sourceUrl:'https://us.physitrack.com/home-exercise-video/superman%252c-4-point-kneeling',cues:[]},
+ {id:'physitrack-bridge',name:'Glute bridge',aliases:['glute bridge','glute bridges'],source:'Physitrack',sourceUrl:'https://ie.physitrack.com/home-exercise-video/bridge-v2',cues:[]},
+ {id:'physitrack-standing-calf-stretch',name:'Standing calf stretch',aliases:['standing calf stretch'],source:'Physitrack',sourceUrl:'https://us.physitrack.com/home-exercise-video/standing-calf-stretch---version-2',cues:[]}
+);
 function rpDemoForExercise(exercise){
  const name=String(exercise.name||'').trim().toLowerCase().replace(/\s+/g,' ');
  return rpTechniqueDemos.find(demo=>demo.aliases.includes(name))||null;
 }
 function rpDemoMarkup(demo){
- if(demo.sourceUrl)return `<section class="rp-demo"><a class="btn ghost small" href="${esc(demo.sourceUrl)}" target="_blank" rel="noopener noreferrer">▶ Watch ${demo.seconds}-second demo ↗</a><p class="muted">${esc(demo.source)} · opens the official demonstration.</p></section>`;
+ if(demo.sourceUrl)return `<section class="rp-demo"><a class="btn ghost small" href="${esc(demo.sourceUrl)}" target="_blank" rel="noopener noreferrer">▶ Watch ${demo.seconds?demo.seconds+"-second ":""}demo ↗</a><p class="muted">${esc(demo.source)} · opens the official demonstration.</p></section>`;
  // Load only after opening: dozens of hidden players must not slow the planner.
  const url='https://www.youtube-nocookie.com/embed/'+demo.id+'?start=0&end=45&rel=0&playsinline=1';
  return `<section class="rp-demo"><details class="rp-video"><summary><span class="rp-play" aria-hidden="true">▶</span><span><b>Watch exercise demo</b><small>Renaissance Periodization · ${demo.seconds?demo.seconds+' seconds':'up to 45-second segment'}</small></span></summary><template><iframe src="${url}" title="${esc(demo.name)} — Renaissance Periodization demonstration" loading="lazy" allow="encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></template><div class="rp-player-slot"></div><p class="muted">Follow your prescribed range and coach instructions.</p></details><h4>How to do it</h4><ol>${demo.cues.map(cue=>`<li>${esc(cue)}</li>`).join('')}</ol></section>`;
@@ -92,3 +98,4 @@ if(typeof exerciseBankMarkup==='function'){
 
 document.addEventListener('toggle',event=>{const details=event.target;if(!details.matches?.('details.rp-video'))return;const slot=details.querySelector('.rp-player-slot');if(details.open&&!slot.childElementCount)slot.append(details.querySelector('template').content.cloneNode(true));if(!details.open)slot.replaceChildren();},true);
 document.addEventListener('input',event=>{if(!event.target.matches?.('[data-rp-search]'))return;const term=event.target.value.trim().toLowerCase();event.target.closest('.panel').querySelectorAll('[data-rp-name]').forEach(card=>card.hidden=!card.dataset.rpName.includes(term));});
+
