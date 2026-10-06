@@ -56,6 +56,11 @@ const rpTechniqueDemos = [
 {"id": "EF7jXP17DPE", "seconds": 11, "name": "Barbell hip thrust", "aliases": ["barbell hip thrust"], "group": "Legs", "cues": ["Set up with secure footing and a controllable load.", "Use the exact movement shown within your prescribed comfortable range.", "Control each repetition without rushing."]}
 ];
 rpTechniqueDemos.push(
+ {id:'physitrack-straight-push-up',name:'Push-up',aliases:['push-up','push-ups','push up','push ups'],source:'Physitrack',sourceUrl:'https://ca.physitrack.com/home-exercise-video/push-up-with-straight-body',cues:[]},
+ {id:'physitrack-supported-reverse-lunge',name:'Supported reverse lunge',aliases:['supported reverse lunge'],source:'Physitrack',sourceUrl:'https://us.physitrack.com/home-exercise-video/alternating-reverse-lunge-with-support',cues:[]},
+ {id:'physitrack-supine-dead-bug',name:'Dead bug',aliases:['dead bug'],source:'Physitrack',sourceUrl:'https://us.physitrack.com/home-exercise-video/supine-dead-bugs',cues:[]},
+ {id:'physitrack-shoulder-circles',name:'Shoulder circles',aliases:['shoulder circles','gentle shoulder circles'],source:'Physitrack',sourceUrl:'https://us.physitrack.com/home-exercise-video/standing-shoulder-circles',cues:[]},
+ {id:'2o9zkR0hMB8',name:'Sit-up',aliases:['sit-up','sit-ups','sit up','sit ups'],source:'Catalyst Athletics',group:'Core',cues:['Begin lying down, with knees bent and feet planted.','Raise your trunk with control; keep your hands from pulling your neck.','Return smoothly and follow your prescribed comfortable range.']},
  {id:'physitrack-bodyweight-squat',name:'Bodyweight squat',aliases:['bodyweight squat','bodyweight squats'],source:'Physitrack',sourceUrl:'https://na.physitrack.com/home-exercise-video/bodyweight-squat',cues:[]},
  {id:'physitrack-bird-dog',name:'Bird dog',aliases:['bird dog'],source:'Physitrack',sourceUrl:'https://us.physitrack.com/home-exercise-video/superman%252c-4-point-kneeling',cues:[]},
  {id:'physitrack-bridge',name:'Glute bridge',aliases:['glute bridge','glute bridges'],source:'Physitrack',sourceUrl:'https://ie.physitrack.com/home-exercise-video/bridge-v2',cues:[]},
@@ -69,7 +74,7 @@ function rpDemoMarkup(demo){
  if(demo.sourceUrl)return `<section class="rp-demo"><a class="btn ghost small" href="${esc(demo.sourceUrl)}" target="_blank" rel="noopener noreferrer">▶ Watch ${demo.seconds?demo.seconds+"-second ":""}demo ↗</a><p class="muted">${esc(demo.source)} · opens the official demonstration.</p></section>`;
  // Load only after opening: dozens of hidden players must not slow the planner.
  const url='https://www.youtube-nocookie.com/embed/'+demo.id+'?start=0&end=45&rel=0&playsinline=1';
- return `<section class="rp-demo"><details class="rp-video"><summary><span class="rp-play" aria-hidden="true">▶</span><span><b>Watch exercise demo</b><small>Renaissance Periodization · ${demo.seconds?demo.seconds+' seconds':'up to 45-second segment'}</small></span></summary><template><iframe src="${url}" title="${esc(demo.name)} — Renaissance Periodization demonstration" loading="lazy" allow="encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></template><div class="rp-player-slot"></div><p class="muted">Follow your prescribed range and coach instructions.</p></details><h4>How to do it</h4><ol>${demo.cues.map(cue=>`<li>${esc(cue)}</li>`).join('')}</ol></section>`;
+ return `<section class="rp-demo"><details class="rp-video"><summary><span class="rp-play" aria-hidden="true">▶</span><span><b>Watch exercise demo</b><small>${esc(demo.source||'Renaissance Periodization')} · ${demo.seconds?demo.seconds+' seconds':'up to 45-second segment'}</small></span></summary><template><iframe src="${url}" title="${esc(demo.name)} — ${esc(demo.source||'Renaissance Periodization')} demonstration" loading="lazy" allow="encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></template><div class="rp-player-slot"></div><p class="muted">Follow your prescribed range and coach instructions.</p></details><h4>How to do it</h4><ol>${demo.cues.map(cue=>`<li>${esc(cue)}</li>`).join('')}</ol></section>`;
 }
 const exerciseCardBeforeDemos=exerciseCard;
 exerciseCard=function(exercise,loggable=false){
@@ -98,4 +103,3 @@ if(typeof exerciseBankMarkup==='function'){
 
 document.addEventListener('toggle',event=>{const details=event.target;if(!details.matches?.('details.rp-video'))return;const slot=details.querySelector('.rp-player-slot');if(details.open&&!slot.childElementCount)slot.append(details.querySelector('template').content.cloneNode(true));if(!details.open)slot.replaceChildren();},true);
 document.addEventListener('input',event=>{if(!event.target.matches?.('[data-rp-search]'))return;const term=event.target.value.trim().toLowerCase();event.target.closest('.panel').querySelectorAll('[data-rp-name]').forEach(card=>card.hidden=!card.dataset.rpName.includes(term));});
-

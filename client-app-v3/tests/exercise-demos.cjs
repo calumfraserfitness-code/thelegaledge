@@ -11,8 +11,9 @@ console.log('PASS: exact equipment/variant matching, bounded 45-second embed req
 assert.equal(vm.runInContext("rpDemoForExercise({name:'Neutral-Grip Lat Pulldown'}).id",ctx),'--utaPT7XYQ');
 assert.ok(vm.runInContext('rpTechniqueDemos.length',ctx)>=35);
 
-assert.ok(vm.runInContext('rpTechniqueDemos.every(d=>d.sourceUrl&&d.seconds===undefined||Number.isFinite(d.seconds)&&d.seconds>0&&d.seconds<=45)',ctx));
+assert.ok(vm.runInContext('rpTechniqueDemos.every(d=>d.sourceUrl&&d.seconds===undefined||!d.sourceUrl&&d.seconds===undefined&&/^[A-Za-z0-9_-]{11}$/.test(d.id)||Number.isFinite(d.seconds)&&d.seconds>0&&d.seconds<=45)',ctx));
 assert.equal(vm.runInContext('new Set(rpTechniqueDemos.map(d=>d.id)).size===rpTechniqueDemos.length',ctx),true);
 
 
 assert.doesNotMatch(vm.runInContext("rpDemoMarkup(rpDemoForExercise({name:'Bird dog'}))",ctx),/undefined-second|45-second/);
+const situp=vm.runInContext("rpDemoMarkup(rpDemoForExercise({name:'Sit-ups'}))",ctx);assert.match(situp,/2o9zkR0hMB8\?start=0&end=45/);assert.match(situp,/Catalyst Athletics/);assert.doesNotMatch(situp,/Renaissance Periodization/);

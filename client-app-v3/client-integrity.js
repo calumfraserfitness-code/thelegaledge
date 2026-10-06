@@ -39,7 +39,7 @@ const integrityExerciseCard=exerciseCard;
 function exerciseTrackingMode(ex){
  const day=state.data.programs.flatMap(p=>p.days||[]).find(d=>d.id===ex.program_day_id);
  if(['mobility','recovery'].includes(day?.training_type)||ex.tracking_type==='completion')return 'completion';
- if(ex.tracking_type==='duration'||/seconds|minutes|breaths|hold/i.test(ex.reps||''))return 'duration';
+ if(ex.tracking_type==='duration'||/\b(?:sec(?:ond)?s?|min(?:ute)?s?|breaths?|hold)\b|\d\s*s\b/i.test(ex.reps||''))return 'duration';
  return 'reps';
 }
 exerciseCard=function(ex,loggable=false){

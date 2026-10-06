@@ -14,4 +14,11 @@ run("state.client={id:'own',weight_unit:'lbs'};state.selectedSessionId='new';sta
 assert.match(run("exerciseCard({id:'exercise',name:'Bench press',sets:1,reps:'8–12'},true)"),/name="reps_1"[^>]*value=""/);
 run("state.data.exerciseLogs.unshift({program_exercise_id:'exercise',training_session_id:'new',set_number:1,reps:8,load:50,load_unit:'lb'})");assert.match(run("exerciseCard({id:'exercise',name:'Bench press',sets:1,reps:'8–12'},true)"),/name="reps_1"[^>]*value="8"/);
 console.log('PASS: session-bound actual sets; zero RIR preserved; blanks stay blank; invalid reps rejected; previous workout values are not logged automatically.');
+run("state.data.exerciseLogs=[];var timed=new FormData();timed.set('duration_1','27');");
+const holds=run('workoutSetRows(ex,session,timed,person)');assert.equal(holds[0].duration_seconds,27);assert.equal(holds[0].reps,null);assert.equal(holds[0].load,null);
+assert.equal(run("exerciseTrackingMode({reps:'20–30 sec'})"),'duration');assert.equal(run("exerciseTrackingMode({reps:'30s'})"),'duration');
+const holdCard=run("exerciseCard({id:'exercise',name:'Front plank',sets:2,reps:'30 seconds'},true)");assert.match(holdCard,/Actual seconds/);assert.doesNotMatch(holdCard,/name="reps_1"|name="load_1"/);assert.match(holdCard,/name="duration_1"[^>]*value=""/);
+const mobilityCard=run("exerciseCard({id:'exercise',name:'Mobility',tracking_type:'completion',reps:'30 seconds'},true)");assert.doesNotMatch(mobilityCard,/duration_1|reps_1/);
+run("timed.set('duration_1','0')");assert.throws(()=>run('workoutSetRows(ex,session,timed,person)'),/actual seconds/);
+console.log('PASS timed strength sets store seconds, common time prescriptions recognized, mobility remains completion-only.');
 run("var targetForm=new FormData();for(const [key,value]of Object.entries({name:'Optional menu',day_type:'Busy Day',days_per_week:'0',calories:'2000',protein_g:'150',carbs_g:'200',fat_g:'65'}))targetForm.set(key,value);");assert.equal(run('nutritionTargetPatch(targetForm,{}).days_per_week'),0);run("targetForm.set('calories','')");assert.throws(()=>run('nutritionTargetPatch(targetForm,{})'),/all four/);console.log('PASS: zero-day optional menus retained; incomplete target saves rejected.');
