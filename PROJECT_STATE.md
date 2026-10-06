@@ -482,3 +482,7 @@ Four everyday coach destinations; setup tools grouped under a collapsed Setup me
 
 
 - Additional nutrition persistence migration applied: assigned-coach-only save_client_nutrition_plan atomically updates selected menu and upcoming uncompleted dated targets, retaining past/completed target records. Optional zero-day menus stay zero; invalid/unknown fields rejected. Calculator saves the selected menu through this workflow, not invisible client-only targets. Assigned-coach persistence/invalid-value tests passed in rollback.
+
+
+### Production browser verification, 6 October 2026
+Release b794ed4d49093ed7561f9fd03a0d88fbc2b1d961 confirmed READY on the existing production alias. Fictional client browser flow verified missed-week selection opens a form for that date, blank session actuals remain blank, and editing saved reps replaces one history row rather than duplicating it. Coach calculator labels use client units. Browser found kg-to-lb prefill precision violated the number input step; follow-up rounds displayed weight to one decimal. Database tests already verified session ownership, cross-client rejection, zero RIR, zero optional menu days, and atomic future planner target updates under real authenticated roles with transaction rollback. No real client test workouts or check-ins were inserted. Integration approvals, physical phone permissions, original legal document versions, welcome video and outbound signed-copy email remain unresolved; no complete-integration claim.
