@@ -1,0 +1,45 @@
+begin;
+create temp table delivery_test(client_id uuid,profile_id uuid,coach_id uuid,consent_id uuid);
+insert into delivery_test select gen_random_uuid(),gen_random_uuid(),id,gen_random_uuid() from public.profiles where role='coach' limit 1;
+insert into auth.users(id,email,email_confirmed_at,raw_user_meta_data) select profile_id,'signed-copy-rollback@example.invalid',now(),'{"full_name":"Rollback Client"}'::jsonb from delivery_test;
+insert into public.profiles(id,role,full_name,email) select profile_id,'client','Rollback Client','signed-copy-rollback@example.invalid' from delivery_test on conflict(id) do nothing;
+insert into public.clients(id,profile_id,coach_id,display_name,onboarding_status,plan_status) select client_id,profile_id,coach_id,'Rollback Client','pending_legal','awaiting_onboarding' from delivery_test;
+grant select on delivery_test to authenticated;
+select set_config('request.jwt.claim.sub',(select coach_id::text from delivery_test),true);
+set local role authenticated;
+select public.journey_action(client_id,'enroll','{"welcome_url":"https://example.invalid/welcome.mp4","contract_title":"Rollback Agreement","contract_version":"ROLLBACK","contract_body":"Frozen rollback agreement only; no actual contract.","privacy_version":"ROLLBACK","privacy_body":"Frozen rollback privacy notice only. This is a synthetic database test, never a real notice or signed client record.","payment_url":"https://buy.stripe.com/test","stripe_payment_link_id":"plink_test"}'::jsonb) is not null from delivery_test;
+select public.journey_action(client_id,'payment','{"reference":"rollback-receipt"}') is not null from delivery_test;
+select set_config('request.jwt.claim.sub',(select profile_id::text from delivery_test),true);
+select public.journey_action(client_id,'welcome','{}') is not null from delivery_test;
+select public.journey_action(client_id,'sign','{"name":"Rollback Client","address":"Synthetic address only","consent":true}') is not null from delivery_test;
+do $$ begin begin insert into public.legal_consents(client_id,document_version,signature_name,consent_type,visible_content,details) select client_id,'ROLLBACK','Different Person','coaching_privacy_health','Frozen rollback privacy notice only. This is a synthetic database test, never a real notice or signed client record.','{"health_data_explicit_consent":true}'::jsonb from delivery_test;raise exception 'TEST FAILED mismatched legal name';exception when others then if sqlerrm='TEST FAILED mismatched legal name' then raise;end if;end;end $$;
+insert into public.legal_consents(id,client_id,document_version,signature_name,consent_type,visible_content,signed_at,accepted_at,details)
+select consent_id,client_id,'ROLLBACK','Rollback Client','coaching_privacy_health','Frozen rollback privacy notice only. This is a synthetic database test, never a real notice or signed client record.',now(),now(),'{"health_data_explicit_consent":true}'::jsonb from delivery_test;
+do $$ begin
+ if (select count(*) from public.document_copy_deliveries where client_id=(select client_id from delivery_test))<>1 then raise exception 'Client must see only own copy status';end if;
+ begin perform public.claim_document_copies();raise exception 'TEST FAILED client claimed copies';exception when insufficient_privilege then null;end;
+ begin perform public.onboarding_email_config((select coach_id from delivery_test),'status');raise exception 'TEST FAILED client read sender';exception when insufficient_privilege then null;end;
+ begin insert into public.coaching_onboarding_settings(coach_id) select profile_id from delivery_test;raise exception 'TEST FAILED client saved coach settings';exception when insufficient_privilege then null;end;
+end $$;
+select set_config('request.jwt.claim.sub',gen_random_uuid()::text,true);
+do $$ begin if exists(select 1 from public.document_copy_deliveries) then raise exception 'Unrelated user saw a copy';end if;end $$;
+select set_config('request.jwt.claim.sub',(select coach_id::text from delivery_test),true);
+do $$ begin if (select count(*) from public.document_copy_deliveries where client_id=(select client_id from delivery_test))<>2 then raise exception 'Coach must see both copy statuses';end if;end $$;
+reset role;
+do $$ declare jobs jsonb;row_id uuid;lease uuid; begin
+ if public.claim_document_copies()<>'[]'::jsonb then raise exception 'Unconfigured sender claimed jobs';end if;
+ perform public.onboarding_email_config((select coach_id from delivery_test),'save','re_rollbacktestonly123','coach@example.invalid',true);
+ jobs:=public.claim_document_copies();if jsonb_array_length(jobs)<>2 then raise exception 'Expected two separate claimed copies';end if;
+ if public.claim_document_copies()<>'[]'::jsonb then raise exception 'Concurrent claim duplicated jobs';end if;
+ if jobs->0->'bundle'->>'contract_body'<>'Frozen rollback agreement only; no actual contract.' then raise exception 'Incorrect frozen agreement';end if;
+ if jobs->0->'bundle'->>'privacy_body'<>'Frozen rollback privacy notice only. This is a synthetic database test, never a real notice or signed client record.' then raise exception 'Incorrect privacy copy';end if;
+ row_id:=(jobs->0->>'id')::uuid;lease:=(jobs->0->>'lease_token')::uuid;
+ perform public.finish_document_copy(row_id,gen_random_uuid(),'wrong-lease');
+ if (select status from public.document_copy_deliveries where id=row_id)<>'sending' then raise exception 'Wrong lease changed status';end if;
+ perform public.finish_document_copy(row_id,lease,'mock-provider-receipt');
+ if (select status from public.document_copy_deliveries where id=row_id)<>'accepted' then raise exception 'Receipt not saved';end if;
+ perform public.onboarding_email_config((select coach_id from delivery_test),'disable');
+ if public.onboarding_email_worker_allowed('wrong-token') then raise exception 'Wrong worker token accepted';end if;
+end $$;
+rollback;
+select 'PASS rollback only: official payment link accepted; authenticated client copy scope; unrelated isolation; client settings and worker denied; missing sender idle; two separate jobs; stable lease; frozen documents; worker key rejected.' as result;

@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {signedCopyText,sendSignedCopy,verifiedSender} from '../../supabase/functions/_shared/onboarding-mail.mjs';
+const bundle={contract_title:'Agreement',contract_version:'V1',contract_body:'Frozen agreement',privacy_body:'Frozen privacy',privacy_version:'P1',signature_name:'Example Person',address:'Example address',signed_at:'2026-10-06',privacy_accepted_at:'2026-10-06',client_id:'own-client',record_hash:'hash'};
+assert.match(signedCopyText(bundle),/Frozen agreement/);assert.match(signedCopyText(bundle),/Frozen privacy/);assert.throws(()=>signedCopyText({...bundle,signed_at:null}),/Incomplete/);
+let calls=[];const fake=async(url,init)=>{calls.push({url,init});return Response.json({id:'provider-receipt'});};
+const job={id:'delivery-one',api_key:'test-secret',sender:'coach@example.test',recipient:'client@example.test',bundle};
+assert.equal(await sendSignedCopy(job,fake),'provider-receipt');await sendSignedCopy(job,fake);
+assert.equal(calls[0].init.headers['Idempotency-Key'],calls[1].init.headers['Idempotency-Key']);
+assert.deepEqual(JSON.parse(calls[0].init.body).to,['client@example.test']);assert.equal(JSON.parse(calls[0].init.body).bcc,undefined);
+await assert.rejects(()=>sendSignedCopy(job,async()=>new Response('private provider detail',{status:403})),/returned 403/);
+await assert.rejects(()=>verifiedSender('re_exampletest123','coach@example.test',async()=>Response.json({data:[{name:'other.test',status:'verified'}]})),/Verify this sender domain/);
+await verifiedSender('re_exampletest123','coach@example.test',async()=>Response.json({data:[{name:'example.test',status:'verified',capabilities:{sending:'enabled'}}]}));
+console.log('PASS frozen agreement and privacy copy, one recipient per message, stable retry key, missing signature and unverified sender rejected. No real emails sent.');
