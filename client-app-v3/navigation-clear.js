@@ -3,11 +3,13 @@ function clearCoachNav(){
  const nav=document.querySelector('#coachNav');if(!nav)return;
  const names={dashboard:['⌂','Home'],clients:['◉','Clients'],firms:['▤','Firm programmes'],reviews:['✓','Check-ins']};
  for(const [key,[icon,label]] of Object.entries(names)){
-  const b=nav.querySelector(`[data-coach-view="${key}"]`);if(b&&b.dataset.clearName!==label){b.innerHTML=`<span>${icon}</span>${label}`;b.title=label;b.dataset.clearName=label;}
+  const b=nav.querySelector(`[data-coach-view="${key}"]`);if(b&&b.innerHTML!==`<span>${icon}</span>${label}`){b.innerHTML=`<span>${icon}</span>${label}`;b.title=label;b.dataset.clearName=label;}
  }
  const old=nav.querySelector('.coach-setup-nav');if(old)old.hidden=true;
  let settings=nav.querySelector('#clearCoachSettings');
  if(!settings){settings=document.createElement('button');settings.id='clearCoachSettings';settings.className='side-link';settings.innerHTML='<span>⚙</span>Settings';settings.onclick=e=>{e.stopPropagation();state.client=null;state.coachView='settings';renderCoach();};nav.append(settings);}
+ const ordered=[...Object.keys(names).map(key=>nav.querySelector(`[data-coach-view="${key}"]`)),settings].filter(Boolean);
+ let anchor=old||null;for(const b of ordered.reverse()){if(b.nextElementSibling!==anchor)nav.insertBefore(b,anchor);anchor=b;}
  settings.classList.toggle('active',!state.client&&['settings','my-health','connections','onboarding-journeys'].includes(state.coachView));
  clearSettingsBack();
 }

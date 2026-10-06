@@ -13,7 +13,7 @@ function simplifyCoachNavigation(){
  }
  if(['onboarding-journeys','connections','my-health'].includes(state.coachView))setup.open=true;
  // Keep the four everyday destinations above Setup, even if added by another module.
- for(const key of ['dashboard','clients','firms','reviews']){const b=nav.querySelector(`[data-coach-view="${key}"]`);if(b&&b.parentElement===nav)nav.insertBefore(b,setup);}
+ let anchor=nav.querySelector('#clearCoachSettings')||setup;for(const key of ['reviews','firms','clients','dashboard']){const b=nav.querySelector(`[data-coach-view="${key}"]`);if(b&&b.parentElement===nav){if(b.nextElementSibling!==anchor)nav.insertBefore(b,anchor);anchor=b;}}
 }
 function simplifyCoachOnboarding(){
  const host=document.querySelector('#coachMain'),form=host?.querySelector('#journeyEnroll');if(!form||form.dataset.simplified)return;form.dataset.simplified='true';host.classList.add('coach-onboarding-simple');
@@ -42,3 +42,4 @@ document.addEventListener('DOMContentLoaded',()=>{
  const observe=()=>{if(queued)return;queued=true;requestAnimationFrame(run);};
  for(const id of ['coachNav','coachMain']){const el=document.getElementById(id);if(el)new MutationObserver(observe).observe(el,{childList:true,subtree:true});}run();
 });
+
