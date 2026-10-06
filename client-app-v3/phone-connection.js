@@ -7,7 +7,7 @@ function phonePlatform(ua=navigator.userAgent,touch=navigator.maxTouchPoints){
 }
 function phoneSetupUrl(preview=false){
  const url=new URL(location.pathname,location.origin);
- if(preview){url.searchParams.set('workspace','demo');url.searchParams.set('section','client');}
+ if(preview){url.searchParams.set('workspace','demo');url.searchParams.set('view','client');url.searchParams.set('tab','health');}
  url.searchParams.set('setup','health');return url.href;
 }
 function phoneMetricLabel(key){return {steps:'Steps',sleep_minutes:'Sleep',weight_kg:'Weight',resting_heart_rate:'Resting heart rate',consumed_calories:'Logged calories',protein_g:'Protein',carbs_g:'Carbohydrates',fat_g:'Fat',water_ml:'Water'}[key]||key;}
