@@ -1,0 +1,16 @@
+begin;
+create temp table technique_test as select c.id as client_id,c.profile_id,c.coach_id,w.id as week_id,gen_random_uuid() as stranger from public.clients c join public.program_weeks w on w.client_id=c.id where c.profile_id is not null and c.source_system is distinct from 'coach_health_test' and w.week_start='2026-10-05' limit 1;
+grant select on technique_test to authenticated;
+select set_config('request.jwt.claim.sub',(select coach_id::text from technique_test),true);
+set local role authenticated;
+select public.import_client_training((select client_id from technique_test),'{"programme_name":"Disposable technique QA","days":[{"title":"Full body","training_type":"weights","exercises":[{"name":"Press","sets":3,"reps":"8-12","superset_group":"A","combination_type":"superset","drop_sets":1,"drop_reps":"10-15","drop_percent":20},{"name":"Row","sets":3,"reps":"8-12","superset_group":"A","combination_type":"superset"},{"name":"Curl","sets":2,"reps":"10-15","superset_group":"B","combination_type":"triset"},{"name":"Raise","sets":2,"reps":"12-20","superset_group":"B","combination_type":"triset"},{"name":"Pushdown","sets":2,"reps":"10-15","superset_group":"B","combination_type":"triset"}]}]}'::jsonb);
+do $$ begin if not exists(select 1 from public.program_exercises e join public.training_program_days d on d.id=e.program_day_id join public.training_programs p on p.id=d.program_id where p.name='Disposable technique QA' and e.drop_sets=1 and e.drop_percent=20 and e.combination_type='superset') then raise exception 'Technique fields not saved by importer';end if;end $$;
+insert into public.training_sessions(week_id,programme_day_id,session_date,training_type,title) select t.week_id,d.id,'2026-10-07','weights','Disposable technique QA' from technique_test t join public.training_programs p on p.client_id=t.client_id and p.name='Disposable technique QA' join public.training_program_days d on d.program_id=p.id;
+select set_config('request.jwt.claim.sub',(select profile_id::text from technique_test),true);
+insert into public.exercise_set_logs(client_id,training_session_id,program_exercise_id,set_number,reps,load,load_unit,notes,completed) select t.client_id,s.id,e.id,4,12,16,'kg','Drop 1 after working set 3',true from technique_test t join public.training_sessions s on s.week_id=t.week_id and s.title='Disposable technique QA' join public.program_exercises e on e.program_day_id=s.programme_day_id and e.name='Press';
+do $$ begin if not exists(select 1 from public.exercise_set_logs where notes='Drop 1 after working set 3' and reps=12 and load=16) then raise exception 'Own drop log not saved';end if;end $$;
+select set_config('request.jwt.claim.sub',(select stranger::text from technique_test),true);
+do $$ begin if exists(select 1 from public.exercise_set_logs where client_id=(select client_id from technique_test)) then raise exception 'Other user can read workout logs';end if;end $$;
+reset role;
+rollback;
+select 'PASS rollback only: structured prescriptions imported, client drop log saved, unrelated account denied, no real records retained.' as result;
