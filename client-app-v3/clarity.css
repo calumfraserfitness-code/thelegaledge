@@ -7,3 +7,6 @@
 [hidden]{display:none!important}
 @media(max-width:700px){.le-preview-bar{flex-wrap:wrap;padding:8px 12px!important}.le-preview-bar small{width:100%}.le-preview-bar select{max-width:210px}.le-fold>summary{padding:16px}.client-head{flex-wrap:wrap;gap:10px}.le-more-tabs>div{right:0}}
 @media(min-width:901px){body:has(#coachApp:not(.hidden)) .le-preview-bar{margin-left:248px;width:calc(100% - 248px)}}
+
+
+.le-preview-bar nav{display:flex;flex-wrap:wrap;gap:6px}.le-preview-bar [data-preview-scene]{min-height:44px;padding:9px 14px;border:1px solid #7c8795;border-radius:7px;background:transparent;color:#fff;font:inherit;cursor:pointer}.le-preview-bar [data-preview-scene][aria-pressed="true"]{background:#d5b975;color:#0b1929;border-color:#d5b975;font-weight:700}.le-preview-bar [data-preview-scene]:focus-visible{outline:3px solid #fff;outline-offset:2px}@media(max-width:700px){.le-preview-bar nav{width:100%;display:grid;grid-template-columns:1fr 1fr}.le-preview-bar [data-preview-scene]{padding:10px 8px}}

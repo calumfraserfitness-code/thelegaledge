@@ -44,12 +44,25 @@ paintFirmPilots=async function(){await firmsBeforeClarity();const main=$('#coach
   else if(node.matches('.panel'))foldCoachContent(node,heading||'Programme details');
  }
 };
+function selectPreviewScene(scene){
+ const banner=$('.le-preview-bar');if(!banner)return;
+ banner.querySelectorAll('[data-preview-scene]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.previewScene===scene)));
+}
 function refreshPreviewControl(){
  const banner=$('.cw-demo-banner');if(!banner)return;
- banner.classList.add('le-preview-bar');banner.innerHTML='<span>Sample preview</span><label>Viewing <select aria-label="Preview view"><option value="firms">Coach · Corporate</option><option value="clients">Coach · 1-to-1</option><option value="participant">Client</option><option value="sponsor">CEO / HR</option></select></label><small>Fictional data · resets on reload</small>';
- const select=banner.querySelector('select');select.value=new URLSearchParams(location.search).get('view')==='client'?'participant':state.coachView==='firms'?'firms':'clients';select.onchange=()=>openSampleScene(select.value);
+ banner.classList.add('le-preview-bar');
+ banner.innerHTML='<span>App preview</span><nav aria-label="Preview workspaces">'+[['firms','Corporate coach'],['participant','Employee'],['sponsor','CEO / HR'],['clients','1-to-1 coach']].map(([scene,label])=>`<button type="button" data-preview-scene="${scene}" aria-pressed="false">${label}</button>`).join('')+'</nav><small>Fictional data · resets on reload</small>';
+ banner.querySelectorAll('[data-preview-scene]').forEach(button=>button.onclick=()=>{
+  const scene=button.dataset.previewScene;openSampleScene(scene);selectPreviewScene(scene);
+  const url=new URL(location.href);url.searchParams.set('scene',scene);history.replaceState(null,'',url);
+ });
+ selectPreviewScene(new URLSearchParams(location.search).get('view')==='client'?'participant':state.coachView==='firms'?'firms':'clients');
 }
-document.addEventListener('DOMContentLoaded',()=>{refreshPreviewControl();const params=new URLSearchParams(location.search),tab=params.get('tab');if(state.preview&&params.get('view')==='client'&&['today','planner','training','nutrition','checkin','progress','health','support'].includes(tab)){state.clientView=tab;renderClient();}});
+document.addEventListener('DOMContentLoaded',()=>{
+ refreshPreviewControl();const params=new URLSearchParams(location.search),tab=params.get('tab'),scene=params.get('scene');
+ if(state.preview&&['firms','clients','participant','sponsor'].includes(scene)){openSampleScene(scene);selectPreviewScene(scene);}
+ if(state.preview&&(scene==='participant'||(!scene&&params.get('view')==='client'))&&['today','planner','training','nutrition','checkin','progress','health','support'].includes(tab)){state.clientView=tab;renderClient();}
+});
 // Clear client prescriptions: sets, repetitions and rest first. Advanced fields stay coach-side.
 const cardBeforeClarity=exerciseCard;
 exerciseCard=function(exercise,loggable=false){let html=cardBeforeClarity(exercise,loggable);
@@ -99,6 +112,7 @@ async function checkFitbitAvailability(main){
 }
 
 const clientRenderBeforeClarity=renderClient;
-renderClient=function(){clientRenderBeforeClarity();const select=$('.le-preview-bar select');if(select)select.value='participant';};
+renderClient=function(){clientRenderBeforeClarity();selectPreviewScene('participant');};
 const coachRenderBeforeClarity=renderCoach;
-renderCoach=function(){coachRenderBeforeClarity();const select=$('.le-preview-bar select');if(select)select.value=state.coachView==='firms'?'firms':'clients';};
+renderCoach=function(){coachRenderBeforeClarity();selectPreviewScene(state.coachView==='firms'?'firms':'clients');};
+
