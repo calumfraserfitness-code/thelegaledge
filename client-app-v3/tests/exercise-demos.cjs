@@ -21,6 +21,6 @@ assert.equal(vm.runInContext("rpDemoForExercise({name:'Kneeling Push Ups'}).id",
 assert.equal(vm.runInContext("rpDemoForExercise({name:'Wall Sit'}).id",ctx),'physitrack-wall-sit');
 assert.equal(vm.runInContext("rpDemoForExercise({name:'Seated upper-back rotation'}).id",ctx),'physitrack-seated-thoracic');
 assert.equal(vm.runInContext("rpDemoForExercise({name:'Front Plank'}).id",ctx),'physitrack-front-plank');
-assert.equal(vm.runInContext("rpDemoForExercise({name:'Side Plank'})",ctx),null);
+assert.equal(vm.runInContext("rpDemoForExercise({name:'Side Plank'}).source",ctx),'Muscle & Strength');
 assert.equal(vm.runInContext("rpTechniqueDemos.flatMap(d=>d.aliases).length===new Set(rpTechniqueDemos.flatMap(d=>d.aliases)).size",ctx),true);
 console.log('PASS additional home/mobility movements, exact aliases and no ambiguous side-plank substitution.');

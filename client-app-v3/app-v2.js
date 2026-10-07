@@ -142,7 +142,7 @@ async function loadClientData(clientId) {
     query('Imported workouts', db.from('client_health_workouts').select('*').eq('client_id', clientId).order('started_at', { ascending: false }).limit(100)),
     query('Health imports', db.from('client_health_imports').select('*').eq('client_id', clientId).order('imported_at', { ascending: false }).limit(20)),
     state.role === 'coach' ? query('Exercise Bank', db.from('exercise_bank').select('*').order('name').limit(1000)) : Promise.resolve([]),
-    state.role === 'coach' ? query('Meal Bank', db.from('meal_bank').select('*').order('name').limit(1000)) : Promise.resolve([])
+    Promise.resolve([]) // Meal bank is searched on demand by meal-library.js.
   ]);
   if (state.client?.id !== clientAtStart) return;
   const [weeks, programs, nutritionPlans, habits, steps, checkins, progress, onboarding, legal, diagnostics, files, mealAssignments, exerciseLogs, healthConnections, healthDaily, healthWorkouts, healthImports, exerciseBank, mealBank] = requests;
@@ -1075,7 +1075,7 @@ async function assignMealFromBank(event,plan){
   const row={meal_id:mealId,client_id:state.client.id,nutrition_plan_id:plan.id,historical:false,sort_order:assignedMealsForPlan(plan).length};
   if(state.preview){state.data.mealAssignments.push({...row,id:`preview-assignment-${Date.now()}`,meal});toast('Meal assigned in preview');return coachNutrition();}
   setBusy(event.submitter,true);
-  try{const [saved]=await query('Meal assignment',db.from('meal_assignments').insert(row).select());state.data.mealAssignments.push({...saved,meal});toast(`${meal.name} assigned`);coachNutrition();}
+  try{const [saved]=await query('Meal assignment',db.from('meal_assignments').insert(row).select());if(state.client?.id!==row.client_id)return;state.data.mealAssignments.push({...saved,meal});toast(`${meal.name} assigned`);coachNutrition();}
   catch(error){toast(error.message,'error');setBusy(event.submitter,false);}
 }
 
@@ -1702,3 +1702,4 @@ db?.auth.onAuthStateChange((event) => {
   }
 });
 boot();
+
