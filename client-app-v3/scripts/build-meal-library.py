@@ -32,7 +32,7 @@ FR=[('Banana',173944),('Blueberries',171711),('Strawberries',167762),('Raspberri
 T=[('Walnuts',170187),('Pistachios',170184),('Chia seeds',170554),('Almonds',170567),('Sunflower seeds',170562)]
 for b,f,t in itertools.product(B,FR,T):
  bn,bi,bg,allergen=b;fn,fi=f;tn,ti=t
- ing=[item(bi,bg,bn,'as sold'),item(169705,40,'Oats','dry'),item(fi,80,fn,'raw'),item(ti,10,tn,'as sold')]
+ ing=[item(bi,bg,'Unsweetened soy milk' if bi==175215 else 'Skim milk' if bi==169868 else bn,'as sold'),item(169705,40,'Oats','dry'),item(fi,80,fn,'raw'),item(ti,10,tn,'as sold')]
  tags=['breakfast','contains-'+allergen,'contains-oats'];tags+=['contains-tree-nuts'] if ti in [170187,170184,170567] else []
  tags+=['vegan','vegetarian'] if allergen=='soy' else ['vegetarian']
  steps='1. Weigh the fruit after peeling where needed; wash and chop it.\n'
