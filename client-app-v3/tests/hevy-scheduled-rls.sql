@@ -1,7 +1,7 @@
 begin;
 create temporary table scheduled_test(client_id uuid,coach_id uuid);
 insert into scheduled_test select gen_random_uuid(),id from public.profiles where role='coach' limit 1;
-insert into public.clients(id,profile_id,coach_id,display_name,source_system) select client_id,coach_id,coach_id,'Scheduled rollback fixture','coach_health_test' from scheduled_test;
+insert into public.clients(id,profile_id,coach_id,display_name,source_system) select client_id,null,coach_id,'Scheduled rollback fixture','coach_health_test' from scheduled_test;
 insert into public.hevy_connections(client_id,status,key_ciphertext,key_iv,next_sync_at) select client_id,'connected','fixture-not-a-real-key','fixture-iv',now()-interval '1 day' from scheduled_test;
 grant select on scheduled_test to authenticated,service_role;
 select set_config('request.jwt.claim.sub',(select coach_id::text from scheduled_test),true);
@@ -27,3 +27,4 @@ end $$;
 reset role;
 select 'PASS: private credential denial, coach metadata, worker-only claims, invalid worker token, lease isolation and disconnect exclusion' as result;
 rollback;
+
