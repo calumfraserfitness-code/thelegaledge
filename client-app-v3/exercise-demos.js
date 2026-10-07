@@ -108,7 +108,7 @@ exerciseCard=function(exercise,loggable=false){
  if(!demo&&/^(?:steps|daily steps|brisk walk|walking|treadmill or outdoor walk|incline treadmill walk|easy run|comfortable bike|bike intervals)$/i.test(exercise.name||''))return html.replace('<span class="pill">NO VIDEO</span>','');
  if(!demo&&(exercise.video_url||exercise.bank?.video_url))return html;
  if(!demo)return html.replace('<span class="pill">NO VIDEO</span>','<span class="pill">Demo not yet added</span>');
- html=html.replace(/<a class="btn ghost small"[^>]*>Watch video<\/a>|<span class="pill">NO VIDEO<\/span>/,`<span class="pill">${demo.source||'RP'} technique demo</span>`);
+ html=html.replace(/<span class="pill">NO VIDEO<\/span>/,`<span class="pill">${demo.source||'RP'} technique demo</span>`);
  return html.replace('<div class="prescription-grid">',rpDemoMarkup(demo)+'<div class="prescription-grid">');
 };
 // The sample's shoulder press is explicitly seated to match the demonstration.

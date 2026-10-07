@@ -13,7 +13,7 @@ saveExerciseLog=async function(event){
 const completionExerciseCard=exerciseCard;
 exerciseCard=function(ex,loggable=false){
  let html=completionExerciseCard(ex,loggable),mode=exerciseTrackingMode(ex);
- if(mode==='completion'&&typeof rpDemoForExercise==='function'){const demo=rpDemoForExercise(ex);if(demo)html=html.replace('</article>',rpDemoMarkup(demo)+'</article>');}
+ if(mode==='completion'&&typeof rpDemoForExercise==='function'){const demo=rpDemoForExercise(ex);if(demo)html=html.replace('</article>',rpDemoMarkup(demo)+'</article>');else if(typeof safeMediaUrl==='function'&&safeMediaUrl(ex.video_url||ex.bank?.video_url))html=html.replace('</article>',`<a class="btn ghost small" href="${esc(ex.video_url||ex.bank.video_url)}" target="_blank" rel="noopener noreferrer">Watch coach video ↗</a></article>`);}
  if(loggable&&mode==='duration'&&!/breaths/i.test(ex.reps||'')){
   html=html.replace('<span>REPS</span>','<span>TIME</span>').replace(/<p class="previous">[\s\S]*?<\/p><details class="exercise-history">[\s\S]*?<\/details>/,'');
   const logs=(state.data.exerciseLogs||[]).filter(l=>l.training_session_id===state.selectedSessionId&&l.program_exercise_id===ex.id);
