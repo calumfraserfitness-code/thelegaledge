@@ -1,0 +1,26 @@
+begin;
+create temp table trend_test as select id as coach_id,gen_random_uuid() as organization_id,gen_random_uuid() as pilot_id,gen_random_uuid() as employer_id,gen_random_uuid() as stranger from public.profiles where role='coach' limit 1;
+insert into auth.users(id,email,raw_user_meta_data) select employer_id,'firm-trend-qa@example.invalid','{}'::jsonb from trend_test;
+insert into public.profiles(id,role,full_name,email) select employer_id,'client','Disposable firm trend QA','firm-trend-qa@example.invalid' from trend_test on conflict(id) do nothing;
+insert into public.firm_organizations(id,coach_id,name) select organization_id,coach_id,'Disposable firm trend QA' from trend_test;
+insert into public.firm_pilots(id,organization_id,coach_id,name,start_date,end_date,status) select pilot_id,organization_id,coach_id,'Disposable trend pilot','2026-09-01','2026-12-01','active' from trend_test;
+insert into public.firm_employer_access(organization_id,user_id,coach_id,display_name) select organization_id,employer_id,coach_id,'Disposable sponsor' from trend_test;
+do $$ declare t record; cid uuid; pid uuid; i int; begin select * into t from trend_test;for i in 1..5 loop
+ cid:=gen_random_uuid();pid:=gen_random_uuid();insert into public.clients(id,coach_id,display_name) values(cid,t.coach_id,'Disposable trend client '||i);
+ insert into public.firm_participants(id,pilot_id,client_id,joined_at) values(pid,t.pilot_id,cid,'2026-09-01');
+ insert into public.firm_consents(participant_id,client_id,accepted_at,statement_version,include_weekly_ratings) values(pid,cid,'2026-09-01','QA',true);
+ insert into public.checkins(client_id,period_start,submitted_at,energy,sleep,stress,workload,training_adherence,nutrition_adherence) values(cid,'2026-09-28','2026-10-02',5,6,7,8,60,65),(cid,'2026-10-05','2026-10-07',case when i=5 then null else 7 end,7,5,7,80,85);
+ end loop;end $$;
+grant select on trend_test to authenticated;
+select set_config('request.jwt.claim.sub',(select employer_id::text from trend_test),true);
+set local role authenticated;
+do $$ declare a jsonb;b jsonb;begin a:=public.employer_weekly_report((select pilot_id from trend_test),'2026-09-28');b:=public.employer_weekly_report((select pilot_id from trend_test),'2026-10-05');
+ if (a->>'energy')::numeric<>5 or (b->>'sleep')::numeric<>7 or (b->>'coverage_pct')::numeric<>100 or b->>'energy' is not null then raise exception 'Trend aggregation, coverage or metric-level suppression failed';end if;
+ if b?'client_id' or b?'wins' or b?'weight_kg' then raise exception 'Private fields appeared in sponsor output';end if;
+ if exists(select 1 from public.checkins where client_id in(select client_id from public.firm_participants where pilot_id=(select pilot_id from trend_test))) then raise exception 'Employer can read raw check-ins';end if;
+ end $$;
+select set_config('request.jwt.claim.sub',(select stranger::text from trend_test),true);
+do $$ begin begin perform public.employer_weekly_report((select pilot_id from trend_test),'2026-10-05');raise exception 'Stranger can read firm report';exception when insufficient_privilege then null;end;end $$;
+reset role;
+rollback;
+select 'PASS rollback only: employer trends, metric-level suppression, coverage and firm isolation; no client health rows exposed.' as result;
