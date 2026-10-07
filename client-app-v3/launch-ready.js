@@ -18,7 +18,7 @@ saveClientControls=async function(event){
 const launchOverview=coachOverview;
 coachOverview=function(){
  launchOverview();const client=state.client,form=$('#clientSettings');if(!form)return;
- form.elements.status.insertAdjacentHTML('beforeend','<option value="ending">Ending soon</option><option value="past">Past client</option>');form.elements.status.value=client.status||'active';
+ form.elements.status.querySelector('[value="inactive"]').textContent='Inactive';form.elements.status.insertAdjacentHTML('beforeend','<option value="ending">Ending soon</option><option value="past">Past client</option>');form.elements.status.value=client.status||'active';
  form.querySelector('button[type="submit"],button.btn.primary').insertAdjacentHTML('beforebegin',`<label class="field"><input name="weekly_checkin_enabled" type="checkbox" ${client.weekly_checkin_enabled!==false?'checked':''}> Weekly check-ins</label><label class="field"><input name="midweek_checkin_enabled" type="checkbox" ${client.midweek_checkin_enabled?'checked':''}> Midweek check-ins</label><p class="muted">Publishing still requires this client's completed onboarding and any required health review.</p>`);
  $('#clientWorkspaceBody').insertAdjacentHTML('beforeend',`<section class="panel"><div class="panel-head"><h3>Client details & goals</h3></div><form id="launchProfile" class="editor-grid"><label>Name<input name="display_name" required value="${esc(client.display_name||'')}"></label><label>Phone<input name="phone" type="tel" value="${esc(client.phone||'')}"></label><label>Region<select name="market_region"><option value="us">United States</option><option value="ireland">Ireland</option></select></label><label>Weight display<select name="weight_unit"><option value="lbs">Pounds (lb)</option><option value="kg">Kilograms (kg)</option></select></label><label>Time zone<input name="timezone" required value="${esc(client.timezone||'UTC')}"></label><label>Start date<input name="start_date" type="date" value="${esc(client.start_date||'')}"></label><label class="wide">Agreed goals<textarea name="goal_summary" rows="3">${esc(client.goal_summary||'')}</textarea></label><label class="wide">Private coach notes<textarea name="coach_notes" rows="3">${esc(cleanCoachingText(client.coach_notes))}</textarea></label><p class="muted wide">Login email: ${esc(client.email||'Not linked')}. Saved signatures and logged weights retain their original records. Coach notes stay in the coach workspace.</p><button class="btn primary">Save client details</button></form></section>`);
  const profile=$('#launchProfile');profile.elements.market_region.value=client.market_region||'us';profile.elements.weight_unit.value=client.weight_unit||'lbs';
@@ -38,6 +38,14 @@ savePlannerSession=async function(event){
 linkSavedClientAccount=async function(event){
  event.preventDefault();const clientId=state.client.id,fd=new FormData(event.target);setBusy(event.submitter,true);
  try{const saved=state.preview?{id:clientId,profile_id:'preview-linked'}:await provisionClientAccount({client_id:clientId,email:String(fd.get('email')).trim(),password:String(fd.get('password'))});if(saved.id!==clientId)throw Error('Login link was not confirmed.');launchApplyClient(clientId,saved);toast(state.preview?'Example login linked locally':'Login linked to this saved client');if(state.client?.id===clientId)coachOverview();}catch(e){toast(e.message,'error');}finally{setBusy(event.submitter,false);}
+};
+const launchWorkoutRows=workoutSetRows;
+workoutSetRows=function(...args){return launchWorkoutRows(...args).filter(r=>r.reps!==null||r.duration_seconds!==null);};
+storeProgressPhoto=async function(file,view,week,checkinId=null){
+ if(!file?.size)return null;if(file.size>10*1024*1024)throw Error('Each photo must be under 10 MB.');
+ const clientId=state.client.id,userId=state.user.id,path=`${clientId}/${Date.now()}-${view}-${String(file.name).replace(/[^a-z0-9._-]/gi,'-')}`;
+ const {error}=await db.storage.from('client-files').upload(path,file,{contentType:file.type,upsert:false});if(error)throw error;
+ try{const rows=await query('Photo record',db.from('client_files').insert({client_id:clientId,uploaded_by:userId,file_type:'progress_photo',storage_path:path,original_name:file.name,mime_type:file.type,week_number:week||null,photo_view:view,notes:checkinId?`Weekly check-in ${checkinId}`:null}).select());if(rows.length!==1)throw Error('Photo record was not confirmed.');if(state.client?.id===clientId)state.data.files.unshift(rows[0]);return rows[0];}catch(e){await db.storage.from('client-files').remove([path]);throw e;}
 };
 deletePlannerSession=async function(id){
  const clientId=state.client.id,session=state.data.sessions.find(s=>s.id===id);if(!session)return;

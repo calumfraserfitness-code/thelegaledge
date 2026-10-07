@@ -1,5 +1,5 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert');
-const ctx=vm.createContext({FormData,Date,Intl,console,state:{preview:false,clients:[],data:{sessions:[]}},coachOverview(){},saveClientControls(){},saveWeekDetails(){},savePlannerSession(){},linkSavedClientAccount(){},deletePlannerSession(){},coachPlanner(){},setBusy(){},toast(message){ctx.messages.push(message)},messages:[],query:async(label,request)=>request,db:{from(){return{update(patch){ctx.lastPatch=patch;return{eq(key,id){ctx.lastId=id;return{select(){return ctx.result}}}}}}}}});
+const ctx=vm.createContext({FormData,Date,Intl,console,workoutSetRows(){return []},state:{preview:false,clients:[],data:{sessions:[]}},coachOverview(){},saveClientControls(){},saveWeekDetails(){},savePlannerSession(){},linkSavedClientAccount(){},deletePlannerSession(){},coachPlanner(){},setBusy(){},toast(message){ctx.messages.push(message)},messages:[],query:async(label,request)=>request,db:{from(){return{update(patch){ctx.lastPatch=patch;return{eq(key,id){ctx.lastId=id;return{select(){return ctx.result}}}}}}}}});
 vm.runInContext(fs.readFileSync(__dirname+'/../launch-ready.js','utf8'),ctx);
 async function main(){
  const client={id:'first',status:'active',weight_unit:'kg',plan_status:'published'},other={id:'second',status:'active'};ctx.state.client=client;ctx.state.clients=[client,other];
