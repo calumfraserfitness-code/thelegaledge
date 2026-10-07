@@ -54,11 +54,9 @@ function clearWorkspaceTabs(){
 const clearWorkspaceBefore=renderClientWorkspace;
 renderClientWorkspace=function(){const result=clearWorkspaceBefore();clearWorkspaceTabs();return result;};
 const clearClientDestinations=[
- ['planner','Weekly schedule','Move sessions around your working week.'],
  ['support','Your coach','Messages, voice notes and coaching calls.'],
  ['progress','Your progress','Measurements, goals and recorded readings.'],
  ['health','Devices & apps','Connect your phone, watch readings or Hevy.'],
- ['legal','Agreement & consent','Review your saved coaching and privacy records.'],
  ['diagnostics','Bloods & genetics','View reports shared with your coach.']
 ];
 function clearClientMore(){
@@ -69,10 +67,10 @@ function clearClientMore(){
 function updateClientNav(){
  const nav=$('#clientNav');if(!nav)return;
  if(!nav.dataset.clearNavigation){
-  nav.dataset.clearNavigation='true';nav.innerHTML=[['today','⌂','Today'],['training','◇','Training'],['nutrition','○','Nutrition'],['checkin','✓','Check-in']].map(([key,icon,label])=>`<button data-client-view="${key}"><span>${icon}</span>${label}</button>`).join('')+'<button type="button" id="clearClientMore"><span>☰</span>More</button>';
+  nav.dataset.clearNavigation='true';nav.innerHTML=[['today','⌂','Today'],['planner','▦','Schedule'],['training','◇','Training'],['nutrition','○','Nutrition'],['checkin','✓','Check-in']].map(([key,icon,label])=>`<button data-client-view="${key}"><span>${icon}</span>${label}</button>`).join('')+'<button type="button" id="clearClientMore"><span>☰</span>More</button>';
   nav.querySelector('#clearClientMore').onclick=e=>{e.stopPropagation();state.clientView='more';renderClient();};
  }
- nav.querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.clientView===state.clientView||(b.id==='clearClientMore'&&!['today','training','nutrition','checkin'].includes(state.clientView))));
+ nav.querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.clientView===state.clientView||(b.id==='clearClientMore'&&!['today','planner','training','nutrition','checkin'].includes(state.clientView))));
 }
 const clearClientRenderBefore=renderClient;
 renderClient=function(){
