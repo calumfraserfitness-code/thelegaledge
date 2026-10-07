@@ -34,7 +34,7 @@ clientTraining=function(){
  if(state.client?.id!==client.id)return;
  const keys=new Set(saved.map(r=>r.training_session_id+'|'+r.program_exercise_id+'|'+r.set_number));state.data.exerciseLogs=[...saved,...(state.data.exerciseLogs||[]).filter(r=>!keys.has(r.training_session_id+'|'+r.program_exercise_id+'|'+r.set_number))];
  if(status&&form.isConnected)status.textContent='Saved ✓';
- }catch(error){if(status&&form.isConnected)status.textContent='Not saved. Use Save workout sets to retry. '+error.message;}finally{pending--;if(manual&&pending===0)manual.disabled=false;}
+ }catch(error){toast('Workout set not saved. Return to Training and retry. '+error.message,'error');if(status&&form.isConnected)status.textContent='Not saved. Use Save workout sets to retry. '+error.message;}finally{pending--;if(manual&&pending===0)manual.disabled=false;}
  });
  });
  });
