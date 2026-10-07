@@ -13,6 +13,9 @@ assert.equal(run("weeklyShoppingData(days).items.find(i=>i.name==='Milk').quanti
 assert.equal(run('weeklyShoppingData(days).missing.length'),2);
 assert.match(run('shoppingListMarkup(days)'),/Missing food|Invalid food/);
 assert.match(run('shoppingListMarkup(days)'),/0.6 g/);
+run("state.data.mealAssignments[0].meal.ingredients.push({name:'Converted food',quantity:1,unit:'oz'})");
+assert.match(run('shoppingListMarkup(days)'),/56.7 g/);
+assert.doesNotMatch(run('shoppingListMarkup(days)'),/56.699/);
 const original=run('shoppingDownloadText(weeklyShoppingData(days))');run('state.mealBatchPortions=7');assert.equal(run('shoppingDownloadText(weeklyShoppingData(days))'),original);
 run("weeklyShoppingData(days).checks.selected.add(weeklyShoppingData(days).items[0].key)");assert.equal(run('weeklyShoppingData(days).checks.selected.size'),1);
 run("state.client.id='other'");assert.equal(run('weeklyShoppingData(days).checks.selected.size'),0);
