@@ -22,7 +22,7 @@ const rpTechniqueDemos = [
  {"id":"JFm8KbhjibM","seconds":17,"name":"Flat dumbbell fly","group":"Chest","aliases":["flat dumbbell fly","flat dumbbell flye"],"cues":["Set the bench or seat and keep your body supported.","Lower under control through the range agreed with your coach.","Press or bring your arms together without bouncing or swinging."]},
  {"id":"FDay9wFe5uE","seconds":16,"name":"Machine fly","group":"Chest","aliases":["machine fly","machine flye"],"cues":["Set the bench or seat and keep your body supported.","Lower under control through the range agreed with your coach.","Press or bring your arms together without bouncing or swinging."]},
  {"id":"O-OBCfyh9Fw","seconds":12,"name":"Pec deck fly","group":"Chest","aliases":["pec deck fly","pec deck flye"],"cues":["Set the bench or seat and keep your body supported.","Lower under control through the range agreed with your coach.","Press or bring your arms together without bouncing or swinging."]},
- {"id":"mm6_WcoCVTA","seconds":10,"name":"Push-up","group":"Chest","aliases":["push-up","push-ups","pushup","pushups"],"cues":["Set the bench or seat and keep your body supported.","Lower under control through the range agreed with your coach.","Press or bring your arms together without bouncing or swinging."]},
+ {"id":"mm6_WcoCVTA","seconds":10,"name":"Push-up","group":"Chest","aliases":["push-up","push-ups","pushup","pushups","push up","push ups"],"cues":["Set the bench or seat and keep your body supported.","Lower under control through the range agreed with your coach.","Press or bring your arms together without bouncing or swinging."]},
  {"id":"DMo3HJoawrU","seconds":13,"name":"Single-arm dumbbell row","group":"Back","aliases":["single arm dumbbell row","single-arm dumbbell row","1-arm db row"],"cues":["Secure your position and use the grip shown for this movement.","Pull with controlled elbows while keeping your torso steady.","Return slowly without jerking or using momentum."]},
  {"id":"_FrrYQxA6kc","seconds":14,"name":"Machine chest-supported row","group":"Back","aliases":["chest supported row machine","machine chest supported row"],"cues":["Secure your position and use the grip shown for this movement.","Pull with controlled elbows while keeping your torso steady.","Return slowly without jerking or using momentum."]},
  {"id":"tZUYS7X50so","seconds":17,"name":"Incline dumbbell row","group":"Back","aliases":["incline dumbbell row"],"cues":["Secure your position and use the grip shown for this movement.","Pull with controlled elbows while keeping your torso steady.","Return slowly without jerking or using momentum."]},
@@ -56,7 +56,6 @@ const rpTechniqueDemos = [
 {"id": "EF7jXP17DPE", "seconds": 11, "name": "Barbell hip thrust", "aliases": ["barbell hip thrust"], "group": "Legs", "cues": ["Set up with secure footing and a controllable load.", "Use the exact movement shown within your prescribed comfortable range.", "Control each repetition without rushing."]}
 ];
 rpTechniqueDemos.push(
- {id:'physitrack-straight-push-up',name:'Push-up',aliases:['push-up','push-ups','push up','push ups'],source:'Physitrack',sourceUrl:'https://ca.physitrack.com/home-exercise-video/push-up-with-straight-body',cues:[]},
  {id:'physitrack-supported-reverse-lunge',name:'Supported reverse lunge',aliases:['supported reverse lunge'],source:'Physitrack',sourceUrl:'https://us.physitrack.com/home-exercise-video/alternating-reverse-lunge-with-support',cues:[]},
  {id:'physitrack-supine-dead-bug',name:'Dead bug',aliases:['dead bug'],source:'Physitrack',sourceUrl:'https://us.physitrack.com/home-exercise-video/supine-dead-bugs',cues:[]},
  {id:'physitrack-shoulder-circles',name:'Shoulder circles',aliases:['shoulder circles','gentle shoulder circles'],source:'Physitrack',sourceUrl:'https://us.physitrack.com/home-exercise-video/standing-shoulder-circles',cues:[]},
@@ -64,8 +63,14 @@ rpTechniqueDemos.push(
  {id:'physitrack-bodyweight-squat',name:'Bodyweight squat',aliases:['bodyweight squat','bodyweight squats'],source:'Physitrack',sourceUrl:'https://na.physitrack.com/home-exercise-video/bodyweight-squat',cues:[]},
  {id:'physitrack-bird-dog',name:'Bird dog',aliases:['bird dog'],source:'Physitrack',sourceUrl:'https://us.physitrack.com/home-exercise-video/superman%252c-4-point-kneeling',cues:[]},
  {id:'physitrack-bridge',name:'Glute bridge',aliases:['glute bridge','glute bridges'],source:'Physitrack',sourceUrl:'https://ie.physitrack.com/home-exercise-video/bridge-v2',cues:[]},
- {id:'physitrack-standing-calf-stretch',name:'Standing calf stretch',aliases:['standing calf stretch'],source:'Physitrack',sourceUrl:'https://us.physitrack.com/home-exercise-video/standing-calf-stretch---version-2',cues:[]}
+ {id:'physitrack-wall-sit',name:'Wall sit',aliases:['wall sit'],source:'Physitrack',sourceUrl:'https://us.physitrack.com/home-exercise-video/isometric-wall-sit',group:'Legs',cues:[]},
+ {id:'physitrack-kneeling-push-up',name:'Kneeling push-up',aliases:['kneeling push up','kneeling push ups','kneeling push-up','kneeling push-ups'],source:'Physitrack',sourceUrl:'https://ca.physitrack.com/home-exercise-video/kneeling-push-up---version-2',group:'Chest',cues:[]},
+ {id:'physitrack-seated-thoracic',name:'Seated thoracic rotation',aliases:['seated thoracic rotation','seated upper-back rotation'],source:'Physitrack',sourceUrl:'https://uk.physitrack.com/home-exercise-video/thoracic-rotation-stretch-sitting',group:'Mobility',cues:[]},
+ {id:'physitrack-front-plank',name:'Front plank',aliases:['front plank','plank'],source:'Physitrack',sourceUrl:'https://au.physitrack.com/home-exercise-video/plank-for-core',group:'Core',cues:[]}
 );
+// Synonyms only: no equipment, stance or assistance substitutions.
+rpTechniqueDemos.find(d=>d.name==='Incline dumbbell curl').aliases.push('seated incline dumbbell curl');
+rpTechniqueDemos.find(d=>d.name==='Side-lying thoracic rotation').aliases.push('thoracic spine rotations (open books)');
 function rpDemoForExercise(exercise){
  const name=String(exercise.name||'').trim().toLowerCase().replace(/\s+/g,' ');
  return rpTechniqueDemos.find(demo=>demo.aliases.includes(name))||null;
@@ -80,7 +85,7 @@ const exerciseCardBeforeDemos=exerciseCard;
 exerciseCard=function(exercise,loggable=false){
  const demo=rpDemoForExercise(exercise);
  let html=exerciseCardBeforeDemos(exercise,loggable);
- if(!demo&&/^(?:steps|daily steps|brisk walk|walking)$/i.test(exercise.name||''))return html.replace('<span class="pill">NO VIDEO</span>','');
+ if(!demo&&/^(?:steps|daily steps|brisk walk|walking|treadmill or outdoor walk|incline treadmill walk|easy run|comfortable bike|bike intervals)$/i.test(exercise.name||''))return html.replace('<span class="pill">NO VIDEO</span>','');
  if(!demo)return html.replace('<span class="pill">NO VIDEO</span>','<span class="pill">Demo not yet added</span>');
  html=html.replace(/<a class="btn ghost small"[^>]*>Watch video<\/a>|<span class="pill">NO VIDEO<\/span>/,`<span class="pill">${demo.source||'RP'} technique demo</span>`);
  return html.replace('<div class="prescription-grid">',rpDemoMarkup(demo)+'<div class="prescription-grid">');
