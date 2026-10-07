@@ -51,7 +51,7 @@ function selectPreviewScene(scene){
 function refreshPreviewControl(){
  const banner=$('.cw-demo-banner');if(!banner)return;
  banner.classList.add('le-preview-bar');
- banner.innerHTML='<span>App preview</span><nav aria-label="Preview workspaces">'+[['firms','Corporate coach'],['participant','Employee'],['sponsor','CEO / HR'],['clients','1-to-1 coach']].map(([scene,label])=>`<button type="button" data-preview-scene="${scene}" aria-pressed="false">${label}</button>`).join('')+'</nav><small>Fictional data · resets on reload</small>';
+ banner.innerHTML='<span>App preview</span><nav aria-label="Preview workspaces">'+[['firms','Corporate coach'],['participant','Employee'],['sponsor','CEO / HR'],['clients','1-to-1 coach']].map(([scene,label])=>`<button type="button" data-preview-scene="${scene}" aria-pressed="false">${label}</button>`).join('')+'</nav><a class="le-real-workspace" href="./?section=clients">My saved clients</a><small>Fictional data · resets on reload</small>';
  banner.querySelectorAll('[data-preview-scene]').forEach(button=>button.onclick=()=>{
   const scene=button.dataset.previewScene;openSampleScene(scene);selectPreviewScene(scene);
   const url=new URL(location.href);url.searchParams.set('scene',scene);history.replaceState(null,'',url);

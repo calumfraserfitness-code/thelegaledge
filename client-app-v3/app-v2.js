@@ -28,7 +28,7 @@ const state = {
   profile: null,
   role: null,
   preview: false,
-  coachView: 'dashboard',
+  coachView: 'clients',
   clientView: 'today',
   hasPilot: false,
   selectedSessionId: null,
@@ -199,6 +199,7 @@ async function boot() {
     state.role = state.profile.role;
     if (state.role === 'coach') {
       await loadCoach();
+      state.coachView = new URLSearchParams(location.search).get('section') === 'corporate' ? 'firms' : 'clients';
       $('#coachName').textContent = state.profile.full_name || 'Coach';
       show('#coachApp');
       renderCoach();
@@ -315,10 +316,18 @@ function directCoachingClients() {
 
 function renderRoster() {
   const clients = directCoachingClients();
-  $('#coachMain').innerHTML = pageHead('1-TO-1 COACHING', '1-to-1 Clients', '<input id="clientSearch" class="search" placeholder="Search your clients…"><button class="btn primary" data-add-client>+ Add client</button>') + `<section class="panel"><div class="panel-head"><div><h3>Your saved roster · ${clients.length}</h3><p class="muted">Current and past personal clients. Firm participants are managed in Corporate.</p></div></div>${clientRows(clients)}</section>`;
+  const past = client => ['past','inactive'].includes(client.status) || Boolean(client.archived_at);
+  const current = clients.filter(client => !past(client));
+  const historical = clients.filter(past);
+  $('#coachMain').innerHTML = pageHead('1-TO-1 COACHING', '1-to-1 Clients', '<input id="clientSearch" class="search" placeholder="Search your clients…"><button class="btn primary" data-add-client>+ Add client</button>') + `<section class="panel"><div class="panel-head"><div><h3>Current clients · ${current.length}</h3><p class="muted">Your personal coaching roster. Firm participants are managed in Corporate.</p></div></div>${clientRows(current)}</section>${historical.length ? `<details class="le-fold" id="pastClientRoster"><summary>Past clients · ${historical.length}</summary><section class="panel">${clientRows(historical)}</section></details>` : ''}`;
   bindAddClient();
   bindClientRows();
-  $('#clientSearch').oninput = (event) => $$('[data-client-id]').forEach((row) => row.classList.toggle('hidden', !row.innerText.toLowerCase().includes(event.target.value.toLowerCase())));
+  $('#clientSearch').oninput = (event) => {
+    const term = event.target.value.trim().toLowerCase();
+    $$('[data-client-id]').forEach(row => row.classList.toggle('hidden', !row.innerText.toLowerCase().includes(term)));
+    const history = $('#pastClientRoster');
+    if(history && term)history.open = [...history.querySelectorAll('[data-client-id]')].some(row => !row.classList.contains('hidden'));
+  };
 }
 
 function bindAddClient() { $$('[data-add-client]').forEach((button) => button.onclick = showAddClient); }

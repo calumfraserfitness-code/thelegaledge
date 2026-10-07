@@ -1,7 +1,7 @@
 /* Names and destinations only. Existing authentication and onboarding gates remain in force. */
 function clearCoachNav(){
  const nav=document.querySelector('#coachNav');if(!nav)return;
- const names={dashboard:['⌂','Home'],clients:['◉','Clients'],firms:['▤','Corporate'],reviews:['✓','Check-ins']};
+ const names={dashboard:['⌂','Home'],clients:['◉','1-to-1 Clients'],firms:['▤','Corporate'],reviews:['✓','Check-ins']};
  for(const [key,[icon,label]] of Object.entries(names)){
   const b=nav.querySelector(`[data-coach-view="${key}"]`);if(b&&b.innerHTML!==`<span>${icon}</span>${label}`){b.innerHTML=`<span>${icon}</span>${label}`;b.title=label;b.dataset.clearName=label;}
  }
