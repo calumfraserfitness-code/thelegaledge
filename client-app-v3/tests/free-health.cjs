@@ -1,0 +1,10 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const code=fs.readFileSync(__dirname+'/../free-health.js','utf8');
+const ctx=vm.createContext({console,Date,Intl,Map,Set,FormData,JSON,Number,window:{},document:{addEventListener(){}},state:{data:{files:[]}},clientCheckin(){},healthSummaryMarkup(){return ''},hubProviders:[{id:'apple_health'}]});vm.runInContext(code,ctx);
+let r=ctx.parseWeeklyHealthText('Average daily steps: 8,200\nAverage sleep: 7h 30m\nResting heart rate: 58 bpm\nWeight: 176 lb\nWorkouts: 3');assert.equal(r.average_steps,8200);assert.equal(r.sleep_hours,7.5);assert.equal(r.resting_heart_rate,58);assert.equal(r.workouts,3);assert(Math.abs(r.weight_kg-79.832)<.01);
+r=ctx.parseWeeklyHealthText('Total steps: 52,000\nCalories: 1950\nWeight: 80');assert.equal(r.average_steps,null);assert.equal(r.weight_kg,null);assert.equal(r.sleep_hours,null);
+r=ctx.parseWeeklyHealthText('{"summary":{"average_steps":0,"sleep_hours":7.2,"resting_heart_rate":60,"weight_kg":80}}');assert.equal(r.average_steps,0);assert.equal(r.sleep_hours,7.2);assert.equal(r.weight_kg,80);
+r=ctx.parseWeeklyHealthText('average_steps,sleep_hours,resting_heart_rate\n8600,7.5,58');assert.equal(r.average_steps,8600);assert.equal(r.sleep_hours,7.5);
+r=ctx.parseWeeklyHealthText('Average steps: 999999\nAverage sleep: 450\nResting heart rate: 2\nWorkouts: 3.5');assert(Object.values(r).every(v=>v===null));
+assert(!code.includes("from('client_health_daily')"));assert(code.includes("file_type:'health_weekly_report'"));assert(code.includes('createSignedUrl(f.storage_path,300)'));assert(code.includes('client_id:client.id'));assert(code.includes('if(state.client?.id===client.id)'));assert(code.includes('await worker.terminate()'));
+console.log('PASS: free weekly report parsing, hours/minutes, explicit units, zero values, JSON/CSV, range checks, weekly averages kept separate and client-bound private report storage.');
