@@ -1,7 +1,7 @@
 name: Apple Health companion validation
 on:
   push:
-    branches: [fix/client-experience-apple-20261008]
+    branches: [fix/client-experience-apple-20261008, fix/apple-health-validation-20261008]
   workflow_dispatch:
 permissions:
   contents: read
@@ -19,6 +19,4 @@ jobs:
           xcodebuild -project LegalEdgeHealth.xcodeproj -scheme LegalEdgeHealth -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO build
       - name: Test date and sleep calculations
         working-directory: client-app-v3/native-ios
-        run: |
-          DEVICE_ID=$(xcrun simctl list devices available --json | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(x["udid"] for group in d["devices"].values() for x in group if x["name"].startswith("iPhone")))')
-          xcodebuild -project LegalEdgeHealth.xcodeproj -scheme LegalEdgeHealth -destination "platform=iOS Simulator,id=$DEVICE_ID" CODE_SIGNING_ALLOWED=NO test
+        run: swift test
