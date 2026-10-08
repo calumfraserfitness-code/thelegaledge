@@ -113,12 +113,25 @@ async function query(label, promise) {
 }
 
 async function loadCoach() {
-  const [clients, qaRows, memberships] = await Promise.all([query('Clients', db.from('clients')
+  const [clients, memberships] = await Promise.all([query('Clients', db.from('clients')
     .select('*,profile:profiles!clients_profile_id_fkey(full_name,email)')
-    .order('start_date')), query('Client QA', db.from('client_qa_summary').select('*')), query('Corporate memberships', db.from('firm_participants').select('client_id'))]);
+    .order('start_date')), query('Corporate memberships', db.from('firm_participants').select('client_id'))]);
   state.clients = clients.filter(c => c.source_system !== 'coach_health_test').map(normalizeClient);
-  state.qaRows = qaRows.filter(row => state.clients.some(c => c.id === row.client_id));
+  state.qaRows = [];
+  state.qaStatus = 'loading';
   state.corporateMemberships = memberships;
+  // Completeness reporting is optional and must never gate successful sign-in.
+  const coachId = state.user?.id;
+  query('Client QA', db.from('client_qa_summary').select('*')).then(rows => {
+    if (state.user?.id !== coachId || state.preview || state.role !== 'coach') return;
+    state.qaRows = rows.filter(row => state.clients.some(c => c.id === row.client_id));
+    state.qaStatus = 'ready';
+    if (!$('#coachApp').classList.contains('hidden')) renderCoach();
+  }).catch(() => {
+    if (state.user?.id !== coachId || state.preview || state.role !== 'coach') return;
+    state.qaStatus = 'unavailable';
+    if (!$('#coachApp').classList.contains('hidden')) renderCoach();
+  });
 }
 
 async function loadClientData(clientId) {
@@ -304,6 +317,7 @@ function renderDashboard() {
 
 function qaDashboard(active) {
   if (state.preview) return '';
+  if (state.qaStatus !== 'ready') return `<section class="panel"><h3>Plan completeness</h3><p class="muted">${state.qaStatus === 'loading' ? 'Loading plan checks…' : 'Plan checks are temporarily unavailable. Your clients and plans are still accessible.'}</p></section>`;
   const rows=active.map(client=>state.qaRows.find(row=>row.client_id===client.id)||{display_name:client.display_name});
   return `<section class="panel"><div class="panel-head"><div><h3>Client plan QA</h3><span class="sub">Coach-only completeness checks. Clients never see this.</span></div></div><div class="qa-table"><div class="qa-head"><span>Client</span><span>Nutrition</span><span>Training</span><span>Planner</span><span>Progress</span><span>Health</span></div>${rows.map(row=>{const nutrition=Number(row.nutrition_days)>=3&&Number(row.assigned_meals)>=9&&Number(row.complete_meals)===Number(row.assigned_meals);const training=Number(row.active_programmes)>0&&Number(row.programme_days)>0&&Number(row.prescribed_exercises)>0;return `<div class="qa-row"><b>${esc(row.display_name)}</b><span class="${nutrition?'pass':'fail'}">${nutrition?'PASS':`${row.nutrition_days||0} days · ${row.complete_meals||0}/${row.assigned_meals||0} meals`}</span><span class="${training?'pass':'fail'}">${training?'PASS':`${row.programme_days||0} days · ${row.prescribed_exercises||0} exercises`}</span><span class="${Number(row.published_weeks)>0?'pass':'fail'}">${Number(row.published_weeks)>0?'PASS':'NOT PUBLISHED'}</span><span class="${Number(row.progress_entries)>0?'pass':'fail'}">${row.progress_entries||0} entries</span><span>${Number(row.health_connections)>0?'CONNECTED':'Not connected'}</span></div>`}).join('')}</div></section>`;
 }
