@@ -1,0 +1,29 @@
+/* A focused client experience. Graphics show actual readings, never made-up device data. */
+function calmSparkline(rows,key,label){
+ const ordered=[...rows].sort((a,b)=>a.date.localeCompare(b.date)),valid=ordered.filter(r=>finiteRecorded(r[key]));
+ if(valid.length<2)return '<div class="calm-chart-empty">'+(valid.length?'One recorded day':'Awaiting readings')+'</div>';
+ const values=valid.map(r=>Number(r[key])),low=Math.min(...values),high=Math.max(...values),span=high-low||1;
+ const start=Date.parse(ordered[0].date+'T12:00:00Z'),end=Date.parse(ordered.at(-1).date+'T12:00:00Z'),days=Math.max(1,(end-start)/864e5);
+ let paths=[],current=[];let prior=null;
+ for(const r of ordered){if(!finiteRecorded(r[key])){if(current.length)paths.push(current);current=[];prior=null;continue;}if(prior&&(Date.parse(r.date)-Date.parse(prior))/864e5>1){if(current.length)paths.push(current);current=[];}
+ const x=8+(Date.parse(r.date+'T12:00:00Z')-start)/864e5/days*204,y=60-(Number(r[key])-low)/span*46;current.push([x,y]);prior=r.date;}if(current.length)paths.push(current);
+ return '<svg class="calm-sparkline" viewBox="0 0 220 72" role="img" aria-label="'+esc(label+'; '+valid.length+' recorded days')+'"><path class="calm-chart-baseline" d="M8 64H212"/>'+paths.map(p=>'<path d="'+p.map(([x,y],i)=>(i?'L':'M')+x.toFixed(2)+' '+y.toFixed(2)).join(' ')+'"/>').join('')+paths.flatMap(p=>p.map(([x,y])=>'<circle cx="'+x.toFixed(2)+'" cy="'+y.toFixed(2)+'" r="2.4"/>')).join('')+'</svg>';
+}
+healthSummaryMarkup=function(){
+ const rows=recentHealthRows(7),latest=[...rows].sort((a,b)=>b.date.localeCompare(a.date))[0],reports=weeklyReports(),avg=k=>{const v=rows.filter(r=>finiteRecorded(r[k])).map(r=>Number(r[k]));return v.length?v.reduce((a,b)=>a+b,0)/v.length:null;},steps=avg('steps'),sleep=avg('sleep_minutes'),heart=avg('resting_heart_rate');
+ const weight=[...rows].sort((a,b)=>b.date.localeCompare(a.date)).find(r=>finiteRecorded(r.weight_kg));
+ const metrics=[['steps','Steps',steps===null?'—':Math.round(steps).toLocaleString(),'daily average'],['sleep_minutes','Sleep',sleep===null?'—':Math.floor(Math.round(sleep)/60)+'h '+(Math.round(sleep)%60)+'m','daily average'],['resting_heart_rate','Resting heart rate',heart===null?'—':Math.round(heart)+' bpm','daily average']];
+ return `<section class="calm-health health-summary"><header><div><span class="eyebrow">YOUR HEALTH AT A GLANCE</span><h2>Small steps. Clear progress.</h2></div><span class="calm-source">${state.preview?'Fictional example':latest?'Latest reading '+esc(fmt(latest.date)):'No device readings yet'}</span></header><div class="calm-metric-grid">${metrics.map(([key,label,value,unit])=>`<article><span>${label}</span><strong>${value}</strong><small>${value==='—'?'Not recorded':unit}</small>${calmSparkline(rows,key,label)}</article>`).join('')}</div><footer><span>${weight?'Latest weight '+esc(displayWeight(weight.weight_kg))+' · '+esc(fmt(weight.date)):'Weight not recorded'}</span><span>${rows.length?rows.length+' recorded days · missing readings stay blank':'Your readings appear after a confirmed upload'}</span></footer>${reports.length?`<details class="calm-reports"><summary>Weekly watch reports · ${reports.length}</summary>${reports.slice(0,6).map(weeklyReportCard).join('')}</details>`:''}</section>`;
+};
+const calmClientToday=clientToday;
+clientToday=function(){calmClientToday();const host=$('#clientMain');host.classList.add('calm-today');const lead=host.querySelector('.client-page-head,.client-heading,.client-header');if(lead)lead.classList.add('calm-welcome');
+ // Extra guidance remains accessible without dominating today's prescribed actions.
+ for(const selector of ['.milestone-strip','.cw-goals','#cwTimingPanel']){const node=host.querySelector(selector);if(node&&node.tagName!=='DETAILS'){const target=selector==='.cw-goals'?node.closest('section'):node;const detail=document.createElement('details');detail.className='calm-more';const summary=document.createElement('summary');summary.textContent=selector==='.milestone-strip'?'Your progress milestones':selector==='.cw-goals'?'Your agreed goals':'Adjust this week';target.replaceWith(detail);detail.append(summary,target);}}
+};
+function calmConnectionsPaint(host){if(!host.isConnected)return;host.classList.add('calm-connections');const hero=host.querySelector('.hub-hero');if(hero){hero.querySelector('h1').textContent='Your health, in one place.';hero.querySelector('p').textContent='See the readings you share with your coach. Manage your phone or add a weekly report.';}
+ const phone=host.querySelector('.hub-phone-start');if(phone){phone.querySelector('h2').textContent='iPhone & Apple Watch';phone.querySelector('p').textContent='Weekly reports work now. Automatic Health sharing is being prepared in the iPhone companion.';phone.querySelector('.hub-phone-actions small').textContent='Native companion: not available to install yet.';phone.querySelector('[data-hub-provider="apple_health"]').textContent='View Apple Health options';}
+ const recent=host.querySelector('.hub-recent');if(recent)recent.replaceWith(document.createRange().createContextualFragment(healthSummaryMarkup()));
+ const grid=host.querySelector('.hub-strength-only');if(grid){const heading=grid.previousElementSibling;if(heading?.classList.contains('hub-section-title'))heading.remove();const extra=document.createElement('details');extra.className='calm-more';extra.innerHTML='<summary>Garmin options</summary>';grid.replaceWith(extra);extra.append(grid);}
+ const others=host.querySelector('.hub-other-apps summary');if(others)others.textContent='Other apps and connections';
+ const foot=host.querySelector('.hub-footer');if(foot)foot.innerHTML='<p>Private to you and your coach. Individual health readings stay out of employer reports.</p>';
+};

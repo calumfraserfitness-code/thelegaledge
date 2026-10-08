@@ -1,0 +1,31 @@
+name: LegalEdgeHealth
+options:
+  bundleIdPrefix: com.calumfraserfitness
+  deploymentTarget:
+    iOS: '17.0'
+targets:
+  LegalEdgeHealth:
+    type: application
+    platform: iOS
+    sources: Sources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.calumfraserfitness.legaledgehealth
+        SWIFT_VERSION: '5.0'
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_NSHealthShareUsageDescription: Share the readings you choose with your private Legal Edge coaching account.
+        INFOPLIST_KEY_NSHealthUpdateUsageDescription: Legal Edge only reads your selected health data and does not write Health records.
+        CODE_SIGN_ENTITLEMENTS: LegalEdgeHealth.entitlements
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+    scheme:
+      testTargets:
+        - LegalEdgeHealthTests
+  LegalEdgeHealthTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: Tests
+    dependencies:
+      - target: LegalEdgeHealth
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
