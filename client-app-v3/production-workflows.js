@@ -19,7 +19,7 @@ function todayCoachingModel(date = localCoachingDate()) {
   return {date,week,published,sessions,nutritionDay,mealPlan,actualSteps,weeklySessions,checkin};
 }
 clientToday = function() {
-  const m = todayCoachingModel(), goal = safeStepGoal();
+  const m = todayCoachingModel(), goal = typeof plannerDaySteps === 'function' ? (plannerDaySteps({date:m.date}).goal || safeStepGoal()) : safeStepGoal();
   const meals = m.mealPlan ? assignedMealsForPlan(m.mealPlan) : [];
   const completed = m.weeklySessions.filter(s => s.status === 'completed').length;
   const nextCall = (state.data.coachingCalls || []).filter(c => c.status === 'scheduled' && c.scheduled_at >= new Date().toISOString()).sort((a,b) => a.scheduled_at.localeCompare(b.scheduled_at))[0];
@@ -130,4 +130,5 @@ document.addEventListener('DOMContentLoaded',()=>{
   $('#coachNav')?.addEventListener('click',()=>{if(state.preview&&state.client)state.sampleClientData.set(state.client.id,state.data);},{capture:true});
   $('#coachNav')?.insertAdjacentHTML('beforeend','<button class="side-link" data-coach-view="reviews"><span>✓</span>Review queue</button>');
 });
+
 

@@ -80,6 +80,7 @@ rpTechniqueDemos.push(...[{"id":"verified-0","name":"Seated Resistance Band Row"
  ['Half-kneeling hip flexor stretch',['hip flexor stretch','kneeling hip flexor stretch']],
  ['Supported 90/90 hip rotations',['90/90 hip rotations']]
 ].forEach(([name,aliases])=>rpTechniqueDemos.find(d=>d.name===name).aliases.push(...aliases));
+rpTechniqueDemos.push({id:'ms-cable-lateral',name:'Cable lateral raise',aliases:['cable lateral raise'],source:'Muscle & Strength',sourceUrl:'https://www.muscleandstrength.com/exercises/two-arm-cable-lateral-raise.html',group:'Shoulders',cues:[]});
 const rpDemoOptions = [
  {name:'Flat Machine Press or Flat Dumbbell Press',parts:['Machine chest press','Flat dumbbell bench press']},
  {name:'Chest Supported Row',parts:['Machine chest-supported row','Chest Supported Dumbbell Row']},
@@ -91,7 +92,7 @@ const rpDemoOptions = [
 ];
 function rpDemoForExercise(exercise){
  const name=String(exercise.name||'').trim().toLowerCase().replace(/\s+/g,' ');
- return rpTechniqueDemos.find(demo=>demo.aliases.includes(name))||rpDemoOptions.find(d=>d.name.toLowerCase()===name)||null;
+ return rpTechniqueDemos.find(demo=>demo.name.toLowerCase()===name||demo.aliases.includes(name))||rpDemoOptions.find(d=>d.name.toLowerCase()===name)||null;
 }
 function rpDemoMarkup(demo){
  if(demo.parts)return `<section class="rp-demo"><p class="muted">Use the equipment and variation prescribed by your coach. These are separate technique examples.</p>${[...demo.parts.map(name=>rpTechniqueDemos.find(d=>d.name===name)),...(demo.links||[])].filter(Boolean).map(d=>`<h4>${esc(d.name)}</h4>${rpDemoMarkup(d)}`).join('')}</section>`;
@@ -129,3 +130,4 @@ if(typeof exerciseBankMarkup==='function'){
 
 document.addEventListener('toggle',event=>{const details=event.target;if(!details.matches?.('details.rp-video'))return;const slot=details.querySelector('.rp-player-slot');if(details.open&&!slot.childElementCount)slot.append(details.querySelector('template').content.cloneNode(true));if(!details.open)slot.replaceChildren();},true);
 document.addEventListener('input',event=>{if(!event.target.matches?.('[data-rp-search]'))return;const term=event.target.value.trim().toLowerCase();event.target.closest('.panel').querySelectorAll('[data-rp-name]').forEach(card=>card.hidden=!card.dataset.rpName.includes(term));});
+

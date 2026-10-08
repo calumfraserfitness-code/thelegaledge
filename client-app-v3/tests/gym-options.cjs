@@ -1,0 +1,16 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert'),noop=()=>{};
+const state={preview:false,client:{id:'c'},selectedSessionId:'s',data:{sessions:[],exerciseLogs:[{program_exercise_id:'e',exercise_name:'Machine chest press',training_session_id:'past',load:80},{program_exercise_id:'e',exercise_name:'Flat dumbbell bench press',training_session_id:'past2',load:30}],exerciseChoices:[{client_id:'c',training_session_id:'s',program_exercise_id:'e',exercise_name:'Machine chest press'}]}};
+const ctx=vm.createContext({state,loadClientData:noop,workoutSetRows:()=>[{set_number:4,notes:'Drop 1'}],exerciseCard:(e)=>'<article><h3>'+e.name+'</h3><p class="history">'+state.data.exerciseLogs.map(l=>l.load).join(',')+'</p><div class="prescription-grid"></div></article>',clientTraining:noop,clientToday:noop,clientSteps:noop,programDayBuilderMarkup:noop,trainingPrompt:()=>'',exerciseEditorMarkup:()=>'</div><div class="editor-actions">',esc:String,$:()=>null,$$:()=>[],document:{addEventListener:noop},exerciseBankMarkup:noop,fullCoachingSample:noop});
+vm.runInContext(fs.readFileSync(__dirname+'/../exercise-demos.js','utf8'),ctx);
+vm.runInContext(fs.readFileSync(__dirname+'/../gym-options.js','utf8'),ctx);
+const ex={id:'e',name:'Flat dumbbell bench press',alternatives:' Machine chest press | Flat dumbbell bench press ',sets:3};
+assert.equal(ctx.currentExerciseChoice(ex),'Machine chest press');assert.equal(ctx.currentExerciseChoice(ex,'other'),ex.name);
+assert.deepEqual([...ctx.approvedExerciseOptions(ex)],['Flat dumbbell bench press','Machine chest press']);
+const html=ctx.exerciseCard(ex,true);assert(html.includes('<h3>Machine chest press</h3>'));assert(html.includes('80'));assert(!html.includes('30'));assert(html.includes('data-exercise-choice="e"'));assert.equal(state.data.exerciseLogs.length,2);assert.equal(ex.name,'Flat dumbbell bench press');
+const row=ctx.workoutSetRows(ex,{id:'s'},null,state.client)[0];assert.equal(row.exercise_name,'Machine chest press');assert.equal(row.notes,'Drop 1');
+state.data.exerciseLogs.push({training_session_id:'s',program_exercise_id:'e',exercise_name:'Machine chest press'});assert(ctx.swapChoiceMarkup(ex).includes('disabled'));
+state.client.id='foreign';assert.equal(ctx.currentExerciseChoice(ex),ex.name);state.client.id='c';
+for(const group of vm.runInContext('equipmentAlternatives',ctx))for(const name of group.options)assert(ctx.rpDemoForExercise({name}),'Alternative lacks demo: '+name);
+for(const kind of ['superset','triset','drop'])assert(ctx.techniqueVideoMarkup(kind).includes('https://www.muscleandstrength.com/videos/'));
+assert(!fs.readFileSync(__dirname+'/../app-v2.js','utf8').includes("['steps', 'Steps', 7]"));
+console.log('PASS: saved session choices, different-exercise history isolation, drop labels, logged-set swap lock and video coverage for alternatives.');
