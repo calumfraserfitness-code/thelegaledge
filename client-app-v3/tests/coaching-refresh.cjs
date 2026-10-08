@@ -3,3 +3,18 @@ const ctx=vm.createContext({state:{client:{},data:{files:[]}},$:()=>null,$$:()=>
 assert.equal(vm.runInContext("shortUSAmount({quantity:0.5,unit:'cup'})",ctx),'½ cup');assert.equal(vm.runInContext("shortUSAmount({quantity:10,unit:'g',name:'olive oil'})",ctx),'2.2 tsp');assert.equal(vm.runInContext("shoppingPurchase({quantity:350,unit:'g',name:'Banana'})",ctx),'3 medium bananas');assert.equal(vm.runInContext("shoppingPurchase({quantity:13,unit:'count',name:'Eggs'})",ctx),'2 dozen eggs');assert.equal(vm.runInContext('individualStepGoal()',ctx),null);
 const t=vm.runInContext("estimatedNutritionTargets({weightKg:80,heightCm:180,age:35,sex:'male',factor:1.375,adjustment:0,proteinPerKg:1.6})",ctx);assert.equal(t.calorie_goal,2400);assert.equal(t.protein_goal_g,128);assert(Math.abs(t.calorie_goal-(t.protein_goal_g*4+t.carbs_goal_g*4+t.fat_goal_g*9))<10);assert.throws(()=>vm.runInContext("estimatedNutritionTargets({weightKg:80,heightCm:180,age:16,sex:'male',factor:1.375,adjustment:0,proteinPerKg:1.6})",ctx));assert.throws(()=>vm.runInContext("estimatedNutritionTargets({weightKg:80,heightCm:180,age:35,sex:'',factor:1.375,adjustment:0,proteinPerKg:1.6})",ctx));
 console.log('PASS: missing individual goals stay unknown; US fractions, whole purchasing quantities and reviewed adult calorie estimates.');
+
+ctx.state.client.daily_steps_goal=8000;ctx.state.data.steps=[{entry_date:'2026-10-08',target_steps:6000,actual_steps:0},{entry_date:'2026-10-09',target_steps:10000,actual_steps:12000}];
+ctx.preferredHealthDays=()=>[{date:'2026-10-08',steps:null}];
+assert.equal(vm.runInContext("plannerDaySteps({date:'2026-10-08'}).goal",ctx),6000);
+assert.equal(vm.runInContext("plannerDaySteps({date:'2026-10-08'}).steps",ctx),0);
+assert.equal(vm.runInContext("plannerDaySteps({date:'2026-10-09'}).goal",ctx),10000);
+assert.equal(vm.runInContext("plannerDaySteps({date:'2026-10-10'}).goal",ctx),8000);
+assert.equal(vm.runInContext("plannerDaySteps({date:'2026-10-10'}).steps",ctx),null);
+const main={},form={};ctx.$=s=>s==='#clientMain'?main:s==='#refreshSteps'?form:null;
+ctx.currentWeek=()=>({id:'week',published:true});ctx.localCoachingDate=()=> '2026-10-08';ctx.state.data.sessions=[{id:'mobility',week_id:'week',title:'Daily mobility',training_type:'mobility',session_date:'2026-10-08'}];
+ctx.weekDays=()=>[{date:'2026-10-08',dateObject:new Date('2026-10-08'),sessions:ctx.state.data.sessions,nutrition:{name:'Unrelated meals'}}];ctx.clientHeader=()=>'';ctx.DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];ctx.fmt=x=>x;ctx.esc=x=>String(x);ctx.title=x=>x;ctx.bindCompletionActions=ctx.bindOpenSessions=noop;
+vm.runInContext('clientPlanner()',ctx);
+assert(main.innerHTML.includes('6,000 steps'));assert(main.innerHTML.includes('0 recorded'));assert(main.innerHTML.includes('Daily mobility'));assert(!main.innerHTML.includes('See meals'));assert(!main.innerHTML.includes('data-day-food'));
+assert.equal(ctx.state.data.steps[0].target_steps,6000);assert.equal(ctx.weekDays()[0].nutrition.name,'Unrelated meals');
+console.log('PASS: dated step targets, zero/missing readings, mobility and meal-free weekly schedule preserve stored plans.');
