@@ -9,7 +9,8 @@ final class HealthCoreTests: XCTestCase {
         XCTAssertNil(sleepMinutes([],from:start,to:start.addingTimeInterval(7200)))
     }
     func testDateUsesDeviceTimeZone() {
-        let date = Date(timeIntervalSince1970: 1791415800)
-        XCTAssertNotEqual(localHealthDate(date,timeZone:TimeZone(secondsFromGMT:0)!),localHealthDate(date,timeZone:TimeZone(secondsFromGMT:-18000)!))
+        let date = Date(timeIntervalSince1970: 1791423000)
+        XCTAssertEqual(localHealthDate(date,timeZone:TimeZone(secondsFromGMT:0)!),"2026-10-08")
+        XCTAssertEqual(localHealthDate(date,timeZone:TimeZone(secondsFromGMT:-18000)!),"2026-10-07")
     }
 }
