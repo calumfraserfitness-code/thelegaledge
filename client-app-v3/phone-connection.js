@@ -20,7 +20,7 @@ function phoneMetricValue(key,value){
 }
 function openPhoneConnection(target,options){
  phoneFlowDispose?.();
- const {owner,preview,keys,daily,createConnection,readKey,refreshData,revokeConnection,isActive,nutrition=false}=options;
+ const {owner,preview,keys,daily=[],createConnection,readKey,refreshData,revokeConnection,isActive,nutrition=false}=options;
  const platform=phonePlatform(),canPrepare=owner&&platform==='ios';
  let step=0,scopes=nutrition?['consumed_calories','protein_g','carbs_g','fat_g']:['steps','sleep_minutes'],credential=null,keyId=null,timer=null,inFlight=false,disposed=false;
  const validKeys=keys.filter(k=>k.provider==='apple_health'&&!k.revoked_at&&Date.parse(k.expires_at)>Date.now());
@@ -67,7 +67,7 @@ function openPhoneConnection(target,options){
  }
  async function check(){
   if(!live()){stop();return;}if(document.hidden||inFlight||!keyId)return;
-  inFlight=true;try{const key=await readKey(keyId);if(!live())return;if(key.revoked_at||Date.parse(key.expires_at)<=Date.now()){clearInterval(timer);credential=null;target.querySelector('#phoneReceipt').innerHTML='<strong>Sharing ended</strong><p>Prepare a new setup to continue sharing.</p>';return;}if(key.last_received_at){existing={...existing,...key};const result=await refreshData();if(live())paintReceipt(existing,result.daily);}else paintReceipt(key);}
+  inFlight=true;try{const key=await readKey(keyId);if(!live())return;if(key.revoked_at||Date.parse(key.expires_at)<=Date.now()){clearInterval(timer);credential=null;target.querySelector('#phoneReceipt').innerHTML='<strong>Sharing ended</strong><p>Prepare a new setup to continue sharing.</p>';return;}if(key.last_received_at){existing={...existing,...key};const result=await refreshData();if(live())paintReceipt(existing,result?.daily||daily);}else paintReceipt(key);}
   catch{if(live()){const el=target.querySelector('#phoneReceipt');if(el)el.innerHTML='<strong>Unable to check receipt right now</strong><p>We will retry automatically. A connection has not been confirmed.</p>';}}finally{inFlight=false;}
  }
  function startPolling(){clearInterval(timer);if(preview||!keyId)return;timer=setInterval(check,10000);}
