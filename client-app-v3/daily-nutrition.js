@@ -50,7 +50,7 @@
   const m=current(),today=localCoachingDate(),consumed=loaded?M.totals(m.rows,true):Object.fromEntries(M.fields.map(k=>[k,null])),planned=M.totals(m.rows),eaten=m.rows.filter(r=>r.eaten).length;
   state.foodUnits=state.foodUnits||(state.client?.weight_unit==='kg'?'metric':'us');
   host().innerHTML=`<div class="dn-page"><header class="dn-heading"><div><span class="eyebrow">YOUR NUTRITION</span><h1>Food that fits your day.</h1><p>Choose your meals. Keep it simple.</p></div><button class="btn ghost small" id="dnLibrary">Recipe library</button></header>
-   <div class="dn-date-row"><div><span class="dn-dot"></span><strong>${m.date===today?'Today':fmt(m.date,{weekday:'long'})}</strong><span>${fmt(m.date,{day:'numeric',month:'long'})}</span></div><label class="dn-date-label">View date<input id="dnDate" type="date" value="${m.date}"></label>${m.date!==today?'<button class="text-btn" id="dnToday">Back to today</button>':''}</div>
+   <div class="dn-date-row"><div><span class="dn-dot"></span><strong>${m.date===today?'Today':fmt(m.date,{weekday:'long'})}</strong><span>${fmt(m.date,{day:'numeric',month:'long'})}</span></div><details class="dn-history"><summary>Past logs & another date</summary><label class="dn-date-label">View date<input id="dnDate" type="date" value="${m.date}"></label></details>${m.date!==today?'<button class="text-btn" id="dnToday">Back to today</button>':''}</div>
    <section class="dn-target-panel" aria-label="Daily targets"><div class="dn-target-intro"><span class="eyebrow">YOUR DAILY TARGETS</span><span>${m.plan?esc(m.plan.day_type||'Assigned plan'):'Coach targets'}</span></div><div class="dn-targets">${M.fields.map((k,i)=>`<div><small>${['Calories','Protein','Carbs','Fat'][i]}</small><strong>${m.targets[k]===null?'To agree':Math.round(m.targets[k]).toLocaleString()}<em>${m.targets[k]===null?'':['kcal','g','g','g'][i]}</em></strong></div>`).join('')}</div></section>
    <section class="dn-intake"><div><span class="eyebrow">LOGGED SO FAR</span><strong>${value(consumed.calories,' kcal')} <small>${m.targets.calories===null?'':`of ${Math.round(m.targets.calories).toLocaleString()} kcal`}</small></strong><p>${eaten} ${eaten===1?'meal':'meals'} logged${m.rows.length?` · ${m.rows.length-eaten} still to go`:''}</p></div><div class="dn-progress-bars">${M.fields.slice(1).map((k,i)=>{const ratio=m.targets[k]>0&&consumed[k]!==null?Math.min(100,consumed[k]/m.targets[k]*100):0;return `<div><span>${['Protein','Carbs','Fat'][i]}</span><b>${value(consumed[k],'g')} ${m.targets[k]===null?'':`/ ${Math.round(m.targets[k])}g`}</b><div class="dn-track"><span style="width:${ratio}%"></span></div></div>`;}).join('')}</div></section>
    ${loadError?`<div class="dn-notice" role="status">${esc(loadError)} <button class="text-btn" id="dnRetry">Retry</button></div>`:!loaded?'<p class="muted" role="status">Loading your saved food log…</p>':''}
@@ -59,7 +59,8 @@
    <div class="dn-daily-actions"><button class="btn ghost" id="dnQuickLog" ${!loaded?'disabled':''}>+ Quick food log</button><span>Only logged food counts towards your intake.</span></div>
    <details class="dn-details"><summary>Chosen meal totals</summary><p>${value(planned.calories,' kcal')} · ${value(planned.protein_g,'g protein')} · ${value(planned.carbs_g,'g carbs')} · ${value(planned.fat_g,'g fat')}</p><p>Estimates from your saved recipes. Choosing a meal does not mark it eaten. Missing nutrients keep the relevant total unknown.</p></details>
    ${m.plan?.coach_notes?`<aside class="dn-coach-note"><span class="eyebrow">FROM YOUR COACH</span><p>${esc(m.plan.coach_notes)}</p></aside>`:''}
-   <details class="dn-details dn-week"><summary>Optional weekly overview & shopping</summary><div class="dn-week-days">${weekDays().map(d=>{const p=state.data.nutritionPlans.find(p=>p.id===d.nutrition?.nutrition_plan_id);const published=state.preview||currentWeek()?.published;return `<button type="button" data-dn-date="${d.date}"><strong>${DAYS[d.dateObject.getDay()].slice(0,3)}</strong><span>${published&&p?`${mealsForNutritionPlan(p).length} meals`:'Awaiting plan'}</span></button>`;}).join('')}</div>${shoppingListMarkup(weeklyNutritionSelection().days)}</details>
+   <details class="dn-details dn-week"><summary>Shopping list</summary>${shoppingListMarkup(weeklyNutritionSelection().days)}</details>
+
    <div id="dnSheetHost"></div></div>`;
   $('#dnLibrary').onclick=()=>openLibrary();$('#dnEmptyLibrary')?.addEventListener('click',()=>openLibrary());
   $('#dnDate').onchange=e=>{if(!e.target.value)return;dateChoice=e.target.value;state.selectedNutritionDate=null;sheet=null;paint();};
@@ -131,6 +132,7 @@
  }
  // The outer renderer still enforces the existing account, consent and plan gates.
  renderWeeklyNutrition=function(){if(owner!==ownerKey())reset();if(!dateChoice&&state.selectedNutritionDate&&state.selectedNutritionDate!==localCoachingDate())dateChoice=state.selectedNutritionDate;paint();load();};
+ window.openDailyNutritionDate=function(d){if(owner!==ownerKey())reset();dateChoice=d||null;state.selectedNutritionDate=null;renderClient();};
  const previousRender=renderClient;
  renderClient=function(){
   if(owner!==ownerKey())reset();
