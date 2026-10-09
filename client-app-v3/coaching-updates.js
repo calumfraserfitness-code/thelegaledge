@@ -14,9 +14,10 @@
  async function reviewScreen(){
    const ticket=++generation,host=$('#coachMain');
    $$('#coachNav button').forEach(b=>b.classList.toggle('active',b.dataset.coachView===state.coachView));
-   host.innerHTML=pageHead('PRIVATE COACH WORKSPACE','Coaching Updates','')+'<section class="panel cu-status"><strong>Automatic connection awaiting activation</strong><p>Saved recordings and draft actions appear below. Fathom credential replacement, webhook registration and scheduled Loom ingestion still need completion.</p></section><section class="panel"><div class="cu-controls"><label>Find a recording<input id="cuSearch" type="search" placeholder="Client, summary or recording title"></label><label>Client<select id="cuClient"><option value="">All clients</option>'+state.clients.map(c=>`<option value="${esc(c.id)}">${esc(c.display_name)}</option>`).join('')+'</select></label><button class="btn ghost" id="cuRefresh">Refresh</button></div><div id="cuResults" aria-live="polite">Loading private coaching history…</div></section>';
+   host.innerHTML=pageHead('PRIVATE COACH WORKSPACE','Coaching Updates','')+'<section class="panel cu-status"><h2>Connect Fathom</h2><p id="cuConnectionStatus" aria-live="polite">Checking connection…</p><form id="cuConnect"><label>Replacement Fathom API key<input name="api_key" type="password" autocomplete="off" required minlength="10" maxlength="1024" placeholder="Enter your regenerated key securely"></label><button class="btn primary">Save and connect Fathom</button></form><p class="cu-muted">Your key is stored securely on the server and is never displayed here. Saving registers signed delivery of your recordings automatically.</p><p class="cu-muted">Detailed automatic analysis, Loom polling and pre-call briefs are still being completed. Existing client plans remain in place.</p></section><section class="panel"><div class="cu-controls"><label>Find a recording<input id="cuSearch" type="search" placeholder="Client, summary or recording title"></label><label>Client<select id="cuClient"><option value="">All clients</option>'+state.clients.map(c=>`<option value="${esc(c.id)}">${esc(c.display_name)}</option>`).join('')+'</select></label><button class="btn ghost" id="cuRefresh">Refresh</button></div><div id="cuResults" aria-live="polite">Loading private coaching history…</div></section>';
    $('#cuRefresh').onclick=()=>reviewScreen();
-   if(state.preview){$('#cuResults').textContent='Sign in as the coach to review real recordings. This preview contains no client recordings.';return;}
+   if(state.preview){$('#cuConnect').querySelector('button').disabled=true;$('#cuConnectionStatus').textContent='Sign in as coach to connect Fathom.';$('#cuResults').textContent='Sign in as the coach to review real recordings. This preview contains no client recordings.';return;}
+   connectScreen(ticket);
    try{
      const [events,proposals]=await Promise.all([
        query('Coaching recordings',db.from('coaching_recording_events').select('id,client_id,source,source_url,source_title,occurred_at,matching_status,processing_status,summary,analysis,last_error').order('occurred_at',{ascending:false}).limit(150)),
@@ -34,6 +35,13 @@
      };
      $('#cuSearch').oninput=draw;$('#cuClient').onchange=draw;draw();
    }catch(error){if(ticket===generation&&state.coachView==='coaching-updates')$('#cuResults').textContent=error.message;}
+ }
+ async function connectScreen(ticket){
+   const form=$('#cuConnect'),status=$('#cuConnectionStatus');
+   const invoke=async body=>{const {data,error}=await db.functions.invoke('coaching-connect',{body});let message=data?.error;if(error&&!message){try{message=(await error.context.json()).error;}catch{}}if(error||message)throw Error(message||'Connection request failed. Please try again.');return data;};
+   const paint=value=>{if(ticket!==generation||!status.isConnected)return;status.textContent=value.enabled?'Fathom webhook registered.'+(value.last_received_at?' Last delivery: '+fmt(value.last_received_at):' Waiting for the first signed recording delivery.'):value.configured?'Key saved. Save again to finish webhook registration.':'Enter your regenerated key below to activate Fathom.';};
+   form.onsubmit=async event=>{event.preventDefault();const button=event.submitter;setBusy(button,true);const field=form.elements.api_key,key=field.value;field.value='';try{paint(await invoke({action:'save',api_key:key}));if(status.isConnected)toast('Fathom webhook registered. New recordings will arrive privately for review.');}catch(error){if(status.isConnected)status.textContent=error.message;}finally{setBusy(button,false);}};
+   try{paint(await invoke({action:'status'}));}catch(error){if(ticket===generation&&status.isConnected)status.textContent=error.message;}
  }
  function proposalForm(p,e){
    if(p.status!=='pending')return `<div class="cu-reviewed"><strong>${esc(title(p.status))}</strong><p>${esc(p.description)}</p></div>`;
