@@ -32,8 +32,8 @@ state.data.mealAssignments=[{id:'a',nutrition_plan_id:'p',meal:{id:'m',name:'Egg
 async function tick(){await new Promise(r=>setTimeout(r,0));}
 (async()=>{
  await tick();
- assert.equal(doc.querySelectorAll('#clientNav button').length,6);
- assert.deepEqual([...doc.querySelectorAll('#clientNav button')].map(b=>b.dataset.clientView),['today','training','nutrition','checkin','progress','support']);
+ assert.equal(doc.querySelectorAll('#clientNav button').length,7);
+ assert.deepEqual([...doc.querySelectorAll('#clientNav button')].map(b=>b.dataset.clientView),['today','training','nutrition','checkin','progress','support','playbook']);
  assert.ok(doc.querySelector('.dn-target-panel'));assert.ok(!doc.querySelector('.dn-week').open);
  assert.ok(!doc.querySelector('.dn-meals .ingredient-list'),'Recipes collapsed initially');
  doc.querySelector('[data-dn-recipe]').click();assert.ok(doc.querySelector('[role="dialog"]'));assert.ok(doc.querySelector('.dn-ingredients').textContent.includes('Eggs'));

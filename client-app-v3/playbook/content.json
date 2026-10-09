@@ -1,0 +1,803 @@
+[
+  {
+    "slug": "missed-workout",
+    "title": "What if I miss a workout?",
+    "description": "Leave the missed session behind and choose the next realistic slot.",
+    "category": "Training",
+    "action_kind": "planner",
+    "quick_answer": "Leave the missed session behind and choose the next realistic slot. Do not squeeze two hard sessions into one day to catch up. Keep the remaining week manageable; if this keeps happening, ask your coach to adjust the schedule.",
+    "body": "Open your weekly planner. Identify one session you can actually attend, then discuss moving the missed session with your coach. A missed session is useful information about your schedule, not a debt. Tell your coach which deadline, commute or family commitment got in the way so the next week can be more realistic.",
+    "video_script": "HOOK (5–10s): What if I miss a workout?\nEXPLANATION (30–90s): Leave the missed session behind and choose the next realistic slot. Do not squeeze two hard sessions into one day to catch up. Keep the remaining week manageable; if this keeps happening, ask your coach to adjust the schedule. Open your weekly planner. Identify one session you can actually attend, then discuss moving the missed session with your coach. A missed session is useful information about your schedule, not a debt. Tell your coach which deadline, commute or family commitment got in the way so the next week can be more realistic.\nACTION (10–20s): Open your weekly planner. Bring the recurring obstacle to your next check-in.",
+    "slide_outline": [
+      "What if I miss a workout?",
+      "The practical principle",
+      "What the evidence can and cannot tell us",
+      "Open your weekly planner",
+      "Your decision: Open your weekly planner",
+      "Check your context and safety",
+      "One next step"
+    ],
+    "evidence": [
+      {
+        "title": "WHO physical activity guidance (general context)",
+        "url": "https://www.who.int/news-room/fact-sheets/detail/physical-activity"
+      }
+    ],
+    "safety": "Use your individual plan and coach advice. Stop training if unwell or in pain; seek appropriate assessment. For food, check allergens and safe preparation. Persistent or concerning symptoms need clinical advice.",
+    "related_slugs": [
+      "emergency-workout",
+      "travel-training"
+    ],
+    "keywords": "Training What if I miss a workout? busy work travel time",
+    "review_status": "reviewed",
+    "published": true
+  },
+  {
+    "slug": "emergency-workout",
+    "title": "The 20-minute emergency workout",
+    "description": "Use a shorter version of your assigned session, approved by your coach.",
+    "category": "Training",
+    "action_kind": "workout",
+    "quick_answer": "Use a shorter version of your assigned session, approved by your coach. Keep the warm-up and the important movements. Reduce extra work before rushing rests or technique. Preview the option before accepting; if none is approved, ask your coach.",
+    "body": "A time limit does not mean you need a new workout. Your coach can choose which assigned movements to retain and how many sets to perform. The tool shows that exact option, keeps your original session and records your choice. The displayed time is a planning window, not a promise that every person will finish at the same pace.",
+    "video_script": "HOOK (5–10s): The 20-minute emergency workout\nEXPLANATION (30–90s): Use a shorter version of your assigned session, approved by your coach. Keep the warm-up and the important movements. Reduce extra work before rushing rests or technique. Preview the option before accepting; if none is approved, ask your coach. A time limit does not mean you need a new workout. Your coach can choose which assigned movements to retain and how many sets to perform. The tool shows that exact option, keeps your original session and records your choice. The displayed time is a planning window, not a promise that every person will finish at the same pace.\nACTION (10–20s): Preview a coach-approved workout option. Bring the recurring obstacle to your next check-in.",
+    "slide_outline": [
+      "The 20-minute emergency workout",
+      "The practical principle",
+      "What the evidence can and cannot tell us",
+      "A time limit does not mean you need a new workout",
+      "Your decision: Preview a coach-approved workout option",
+      "Check your context and safety",
+      "One next step"
+    ],
+    "evidence": [
+      {
+        "title": "WHO physical activity guidance (general context)",
+        "url": "https://www.who.int/news-room/fact-sheets/detail/physical-activity"
+      }
+    ],
+    "safety": "Use your individual plan and coach advice. Stop training if unwell or in pain; seek appropriate assessment. For food, check allergens and safe preparation. Persistent or concerning symptoms need clinical advice.",
+    "related_slugs": [
+      "missed-workout",
+      "travel-training"
+    ],
+    "keywords": "Training The 20-minute emergency workout busy work travel time",
+    "review_status": "reviewed",
+    "published": true
+  },
+  {
+    "slug": "demanding-week",
+    "title": "Training during a 60–70-hour work week",
+    "description": "Plan around the week you have, not your ideal week.",
+    "category": "Training",
+    "action_kind": "planner",
+    "quick_answer": "Plan around the week you have, not your ideal week. Protect the most reliable training slot first, then a second if it fits. Ask your coach which sessions matter most. A short approved session is more useful than a plan you cannot attend.",
+    "body": "Look at your calendar before booking training. Court dates, travel and late meetings are constraints the programme should accommodate. Choose a realistic location and leave time for travel and changing. If even the reduced week is not workable, message your coach instead of repeatedly moving sessions without review.",
+    "video_script": "HOOK (5–10s): Training during a 60–70-hour work week\nEXPLANATION (30–90s): Plan around the week you have, not your ideal week. Protect the most reliable training slot first, then a second if it fits. Ask your coach which sessions matter most. A short approved session is more useful than a plan you cannot attend. Look at your calendar before booking training. Court dates, travel and late meetings are constraints the programme should accommodate. Choose a realistic location and leave time for travel and changing. If even the reduced week is not workable, message your coach instead of repeatedly moving sessions without review.\nACTION (10–20s): Open your weekly planner. Bring the recurring obstacle to your next check-in.",
+    "slide_outline": [
+      "Training during a 60–70-hour work week",
+      "The practical principle",
+      "What the evidence can and cannot tell us",
+      "Look at your calendar before booking training",
+      "Your decision: Open your weekly planner",
+      "Check your context and safety",
+      "One next step"
+    ],
+    "evidence": [
+      {
+        "title": "WHO physical activity guidance (general context)",
+        "url": "https://www.who.int/news-room/fact-sheets/detail/physical-activity"
+      }
+    ],
+    "safety": "Use your individual plan and coach advice. Stop training if unwell or in pain; seek appropriate assessment. For food, check allergens and safe preparation. Persistent or concerning symptoms need clinical advice.",
+    "related_slugs": [
+      "missed-workout",
+      "emergency-workout",
+      "travel-training"
+    ],
+    "keywords": "Training Training during a 60–70-hour work week busy work travel time",
+    "review_status": "reviewed",
+    "published": true
+  },
+  {
+    "slug": "three-sessions",
+    "title": "Making progress with three sessions per week",
+    "description": "Three consistent sessions can give your coach plenty to work with.",
+    "category": "Training",
+    "action_kind": "training",
+    "quick_answer": "Three consistent sessions can give your coach plenty to work with. Follow the assigned movements, record the work and recover between sessions. Judge progress across weeks rather than adding extra sessions because one day felt easy.",
+    "body": "Frequency is one part of a programme alongside exercise selection, effort, volume and recovery. Your assigned three-session plan should reflect your goals and experience. Use the training log to show your coach what happened. If attendance is reliable but progress is unclear, review the plan together before increasing workload.",
+    "video_script": "HOOK (5–10s): Making progress with three sessions per week\nEXPLANATION (30–90s): Three consistent sessions can give your coach plenty to work with. Follow the assigned movements, record the work and recover between sessions. Judge progress across weeks rather than adding extra sessions because one day felt easy. Frequency is one part of a programme alongside exercise selection, effort, volume and recovery. Your assigned three-session plan should reflect your goals and experience. Use the training log to show your coach what happened. If attendance is reliable but progress is unclear, review the plan together before increasing workload.\nACTION (10–20s): Open your training. Bring the recurring obstacle to your next check-in.",
+    "slide_outline": [
+      "Making progress with three sessions per week",
+      "The practical principle",
+      "What the evidence can and cannot tell us",
+      "Frequency is one part of a programme alongside exercise selection, effort, volume and recovery",
+      "Your decision: Open your training",
+      "Check your context and safety",
+      "One next step"
+    ],
+    "evidence": [
+      {
+        "title": "WHO physical activity guidance (general context)",
+        "url": "https://www.who.int/news-room/fact-sheets/detail/physical-activity"
+      }
+    ],
+    "safety": "Use your individual plan and coach advice. Stop training if unwell or in pain; seek appropriate assessment. For food, check allergens and safe preparation. Persistent or concerning symptoms need clinical advice.",
+    "related_slugs": [
+      "missed-workout",
+      "emergency-workout",
+      "travel-training"
+    ],
+    "keywords": "Training Making progress with three sessions per week busy work travel time",
+    "review_status": "reviewed",
+    "published": false
+  },
+  {
+    "slug": "busy-gym",
+    "title": "What to do when the gym is busy",
+    "description": "Check the alternatives your coach attached to the exercise.",
+    "category": "Training",
+    "action_kind": "training",
+    "quick_answer": "Check the alternatives your coach attached to the exercise. Use an approved option with equipment you can access. If there is no suitable alternative, move to another assigned movement or ask your coach; do not copy the original load onto unfamiliar equipment.",
+    "body": "A substitute should preserve the intent of the movement and suit your experience and limitations. Machines, cables and free weights can feel very different. Read the saved instructions and record the equipment you used so the coach can interpret your performance. Your existing exercise-options controls hold approved substitutions.",
+    "video_script": "HOOK (5–10s): What to do when the gym is busy\nEXPLANATION (30–90s): Check the alternatives your coach attached to the exercise. Use an approved option with equipment you can access. If there is no suitable alternative, move to another assigned movement or ask your coach; do not copy the original load onto unfamiliar equipment. A substitute should preserve the intent of the movement and suit your experience and limitations. Machines, cables and free weights can feel very different. Read the saved instructions and record the equipment you used so the coach can interpret your performance. Your existing exercise-options controls hold approved substitutions.\nACTION (10–20s): Open your training. Bring the recurring obstacle to your next check-in.",
+    "slide_outline": [
+      "What to do when the gym is busy",
+      "The practical principle",
+      "What the evidence can and cannot tell us",
+      "A substitute should preserve the intent of the movement and suit your experience and limitations",
+      "Your decision: Open your training",
+      "Check your context and safety",
+      "One next step"
+    ],
+    "evidence": [
+      {
+        "title": "WHO physical activity guidance (general context)",
+        "url": "https://www.who.int/news-room/fact-sheets/detail/physical-activity"
+      }
+    ],
+    "safety": "Use your individual plan and coach advice. Stop training if unwell or in pain; seek appropriate assessment. For food, check allergens and safe preparation. Persistent or concerning symptoms need clinical advice.",
+    "related_slugs": [
+      "missed-workout",
+      "emergency-workout",
+      "travel-training"
+    ],
+    "keywords": "Training What to do when the gym is busy busy work travel time",
+    "review_status": "reviewed",
+    "published": false
+  },
+  {
+    "slug": "travel-training",
+    "title": "Training while travelling",
+    "description": "Check the hotel equipment before you leave.",
+    "category": "Training",
+    "action_kind": "travel",
+    "quick_answer": "Check the hotel equipment before you leave. Use an existing assigned travel session or a coach-approved hotel option. If the equipment does not fit, ask for an alternative rather than inventing a circuit. Put one realistic training slot into your travel calendar.",
+    "body": "Send your coach the hotel equipment list or a photo before the trip. Discuss which session can move and which shorter option is useful. Walking and mobility can help keep a routine, but do not treat them as a replacement prescription without agreeing it. Travel mode links to your programme and planner, rather than creating a second schedule.",
+    "video_script": "HOOK (5–10s): Training while travelling\nEXPLANATION (30–90s): Check the hotel equipment before you leave. Use an existing assigned travel session or a coach-approved hotel option. If the equipment does not fit, ask for an alternative rather than inventing a circuit. Put one realistic training slot into your travel calendar. Send your coach the hotel equipment list or a photo before the trip. Discuss which session can move and which shorter option is useful. Walking and mobility can help keep a routine, but do not treat them as a replacement prescription without agreeing it. Travel mode links to your programme and planner, rather than creating a second schedule.\nACTION (10–20s): Open travel support. Bring the recurring obstacle to your next check-in.",
+    "slide_outline": [
+      "Training while travelling",
+      "The practical principle",
+      "What the evidence can and cannot tell us",
+      "Send your coach the hotel equipment list or a photo before the trip",
+      "Your decision: Open travel support",
+      "Check your context and safety",
+      "One next step"
+    ],
+    "evidence": [
+      {
+        "title": "WHO physical activity guidance (general context)",
+        "url": "https://www.who.int/news-room/fact-sheets/detail/physical-activity"
+      }
+    ],
+    "safety": "Use your individual plan and coach advice. Stop training if unwell or in pain; seek appropriate assessment. For food, check allergens and safe preparation. Persistent or concerning symptoms need clinical advice.",
+    "related_slugs": [
+      "missed-workout",
+      "emergency-workout"
+    ],
+    "keywords": "Training Training while travelling busy work travel time",
+    "review_status": "reviewed",
+    "published": true
+  },
+  {
+    "slug": "late-office",
+    "title": "Eating well during late office nights",
+    "description": "Choose the next practical meal from your assigned options.",
+    "category": "Nutrition",
+    "action_kind": "meal",
+    "quick_answer": "Choose the next practical meal from your assigned options. Look for a familiar protein source, a carbohydrate you enjoy and vegetables where available. Keep a reliable backup at work. An imperfect dinner is usually easier to recover from than abandoning your routine.",
+    "body": "Before a predictable late night, decide where food will come from and when you can take a break. Use an assigned portable meal if its storage and ingredients suit you. When ordering out, choose foods you recognise and check ingredients and allergens with the seller. Restaurant portions and nutritional values are uncertain; the app will not make them up.",
+    "video_script": "HOOK (5–10s): Eating well during late office nights\nEXPLANATION (30–90s): Choose the next practical meal from your assigned options. Look for a familiar protein source, a carbohydrate you enjoy and vegetables where available. Keep a reliable backup at work. An imperfect dinner is usually easier to recover from than abandoning your routine. Before a predictable late night, decide where food will come from and when you can take a break. Use an assigned portable meal if its storage and ingredients suit you. When ordering out, choose foods you recognise and check ingredients and allergens with the seller. Restaurant portions and nutritional values are uncertain; the app will not make them up.\nACTION (10–20s): Choose from your assigned meals. Bring the recurring obstacle to your next check-in.",
+    "slide_outline": [
+      "Eating well during late office nights",
+      "The practical principle",
+      "What the evidence can and cannot tell us",
+      "Before a predictable late night, decide where food will come from and when you can take a break",
+      "Your decision: Choose from your assigned meals",
+      "Check your context and safety",
+      "One next step"
+    ],
+    "evidence": [
+      {
+        "title": "NHS balanced eating guidance (general context)",
+        "url": "https://www.nhs.uk/live-well/eat-well/how-to-eat-a-balanced-diet/eating-a-balanced-diet/"
+      }
+    ],
+    "safety": "Use your individual plan and coach advice. Stop training if unwell or in pain; seek appropriate assessment. For food, check allergens and safe preparation. Persistent or concerning symptoms need clinical advice.",
+    "related_slugs": [
+      "restaurants",
+      "meal-prep"
+    ],
+    "keywords": "Nutrition Eating well during late office nights busy work travel time",
+    "review_status": "reviewed",
+    "published": true
+  },
+  {
+    "slug": "restaurants",
+    "title": "Ordering food at restaurants",
+    "description": "Choose a meal you enjoy with a recognisable protein source and a portion that feels comfortable.",
+    "category": "Nutrition",
+    "action_kind": "meal",
+    "quick_answer": "Choose a meal you enjoy with a recognisable protein source and a portion that feels comfortable. Ask about ingredients and allergens. Use your plan as a guide, not a requirement to calculate every bite during a client dinner.",
+    "body": "Review the actual menu when you can. Preparation, sauces and portions vary, so an app cannot guarantee a restaurant meal matches a saved recipe. If you have an allergy, speak to the restaurant directly about preparation and cross-contact. A busy dinner can still fit your routine; tell your coach about repeated situations that need a practical strategy.",
+    "video_script": "HOOK (5–10s): Ordering food at restaurants\nEXPLANATION (30–90s): Choose a meal you enjoy with a recognisable protein source and a portion that feels comfortable. Ask about ingredients and allergens. Use your plan as a guide, not a requirement to calculate every bite during a client dinner. Review the actual menu when you can. Preparation, sauces and portions vary, so an app cannot guarantee a restaurant meal matches a saved recipe. If you have an allergy, speak to the restaurant directly about preparation and cross-contact. A busy dinner can still fit your routine; tell your coach about repeated situations that need a practical strategy.\nACTION (10–20s): Choose from your assigned meals. Bring the recurring obstacle to your next check-in.",
+    "slide_outline": [
+      "Ordering food at restaurants",
+      "The practical principle",
+      "What the evidence can and cannot tell us",
+      "Review the actual menu when you can",
+      "Your decision: Choose from your assigned meals",
+      "Check your context and safety",
+      "One next step"
+    ],
+    "evidence": [
+      {
+        "title": "NHS balanced eating guidance (general context)",
+        "url": "https://www.nhs.uk/live-well/eat-well/how-to-eat-a-balanced-diet/eating-a-balanced-diet/"
+      }
+    ],
+    "safety": "Use your individual plan and coach advice. Stop training if unwell or in pain; seek appropriate assessment. For food, check allergens and safe preparation. Persistent or concerning symptoms need clinical advice.",
+    "related_slugs": [
+      "late-office",
+      "meal-prep"
+    ],
+    "keywords": "Nutrition Ordering food at restaurants busy work travel time",
+    "review_status": "reviewed",
+    "published": true
+  },
+  {
+    "slug": "protein-portions",
+    "title": "Protein without weighing everything",
+    "description": "Use the protein foods and portions already shown in your plan as a reference.",
+    "category": "Nutrition",
+    "action_kind": "nutrition",
+    "quick_answer": "Use the protein foods and portions already shown in your plan as a reference. Repeating a few familiar breakfasts and lunches makes this easier. If weighing is getting in the way, ask your coach for household measures that fit those meals.",
+    "body": "A portion guide is a practical approximation, not a precise nutrient calculation. Different foods and serving sizes vary. Your coach can translate assigned recipes into everyday measures and decide how much precision your goal needs. Do not increase protein targets yourself or assume a general recommendation fits a medical condition.",
+    "video_script": "HOOK (5–10s): Protein without weighing everything\nEXPLANATION (30–90s): Use the protein foods and portions already shown in your plan as a reference. Repeating a few familiar breakfasts and lunches makes this easier. If weighing is getting in the way, ask your coach for household measures that fit those meals. A portion guide is a practical approximation, not a precise nutrient calculation. Different foods and serving sizes vary. Your coach can translate assigned recipes into everyday measures and decide how much precision your goal needs. Do not increase protein targets yourself or assume a general recommendation fits a medical condition.\nACTION (10–20s): Open your meal plan. Bring the recurring obstacle to your next check-in.",
+    "slide_outline": [
+      "Protein without weighing everything",
+      "The practical principle",
+      "What the evidence can and cannot tell us",
+      "A portion guide is a practical approximation, not a precise nutrient calculation",
+      "Your decision: Open your meal plan",
+      "Check your context and safety",
+      "One next step"
+    ],
+    "evidence": [
+      {
+        "title": "NHS balanced eating guidance (general context)",
+        "url": "https://www.nhs.uk/live-well/eat-well/how-to-eat-a-balanced-diet/eating-a-balanced-diet/"
+      }
+    ],
+    "safety": "Use your individual plan and coach advice. Stop training if unwell or in pain; seek appropriate assessment. For food, check allergens and safe preparation. Persistent or concerning symptoms need clinical advice.",
+    "related_slugs": [
+      "late-office",
+      "restaurants",
+      "meal-prep"
+    ],
+    "keywords": "Nutrition Protein without weighing everything busy work travel time",
+    "review_status": "reviewed",
+    "published": false
+  },
+  {
+    "slug": "travel-food",
+    "title": "Nutrition during business travel",
+    "description": "Pick one dependable breakfast and a portable backup before travelling.",
+    "category": "Nutrition",
+    "action_kind": "meal",
+    "quick_answer": "Pick one dependable breakfast and a portable backup before travelling. Plan where the next meal is likely to come from. Choose familiar ingredients and check allergens. Return to your normal plan at the next convenient meal, without trying to compensate for the whole trip.",
+    "body": "Look at travel timing: early departure, airport wait, hotel arrival and client dinners. Where permitted and safely stored, an assigned portable meal can bridge a long gap. At an airport, assess actual options rather than relying on a fictional menu. Keep the trip workable and bring the recurring obstacles to your next check-in.",
+    "video_script": "HOOK (5–10s): Nutrition during business travel\nEXPLANATION (30–90s): Pick one dependable breakfast and a portable backup before travelling. Plan where the next meal is likely to come from. Choose familiar ingredients and check allergens. Return to your normal plan at the next convenient meal, without trying to compensate for the whole trip. Look at travel timing: early departure, airport wait, hotel arrival and client dinners. Where permitted and safely stored, an assigned portable meal can bridge a long gap. At an airport, assess actual options rather than relying on a fictional menu. Keep the trip workable and bring the recurring obstacles to your next check-in.\nACTION (10–20s): Choose from your assigned meals. Bring the recurring obstacle to your next check-in.",
+    "slide_outline": [
+      "Nutrition during business travel",
+      "The practical principle",
+      "What the evidence can and cannot tell us",
+      "Look at travel timing: early departure, airport wait, hotel arrival and client dinners",
+      "Your decision: Choose from your assigned meals",
+      "Check your context and safety",
+      "One next step"
+    ],
+    "evidence": [
+      {
+        "title": "NHS balanced eating guidance (general context)",
+        "url": "https://www.nhs.uk/live-well/eat-well/how-to-eat-a-balanced-diet/eating-a-balanced-diet/"
+      }
+    ],
+    "safety": "Use your individual plan and coach advice. Stop training if unwell or in pain; seek appropriate assessment. For food, check allergens and safe preparation. Persistent or concerning symptoms need clinical advice.",
+    "related_slugs": [
+      "late-office",
+      "restaurants",
+      "meal-prep"
+    ],
+    "keywords": "Nutrition Nutrition during business travel busy work travel time",
+    "review_status": "reviewed",
+    "published": true
+  },
+  {
+    "slug": "overeating",
+    "title": "What to do after overeating",
+    "description": "Return to your usual next meal.",
+    "category": "Nutrition",
+    "action_kind": "nutrition",
+    "quick_answer": "Return to your usual next meal. Avoid skipping food or adding punishment exercise to compensate. Notice what led up to it: a long gap, stress, alcohol or an unusually large portion. One meal does not require rewriting your targets.",
+    "body": "Review the circumstances without turning one event into a judgement about yourself. A practical change might be eating before a long meeting or keeping a backup meal available. If eating feels out of control, repeatedly distressing or involves compensatory behaviours, tell your coach and seek support from a qualified clinician. The app is not an eating-disorder treatment.",
+    "video_script": "HOOK (5–10s): What to do after overeating\nEXPLANATION (30–90s): Return to your usual next meal. Avoid skipping food or adding punishment exercise to compensate. Notice what led up to it: a long gap, stress, alcohol or an unusually large portion. One meal does not require rewriting your targets. Review the circumstances without turning one event into a judgement about yourself. A practical change might be eating before a long meeting or keeping a backup meal available. If eating feels out of control, repeatedly distressing or involves compensatory behaviours, tell your coach and seek support from a qualified clinician. The app is not an eating-disorder treatment.\nACTION (10–20s): Open your meal plan. Bring the recurring obstacle to your next check-in.",
+    "slide_outline": [
+      "What to do after overeating",
+      "The practical principle",
+      "What the evidence can and cannot tell us",
+      "Review the circumstances without turning one event into a judgement about yourself",
+      "Your decision: Open your meal plan",
+      "Check your context and safety",
+      "One next step"
+    ],
+    "evidence": [
+      {
+        "title": "NHS balanced eating guidance (general context)",
+        "url": "https://www.nhs.uk/live-well/eat-well/how-to-eat-a-balanced-diet/eating-a-balanced-diet/"
+      }
+    ],
+    "safety": "Use your individual plan and coach advice. Stop training if unwell or in pain; seek appropriate assessment. For food, check allergens and safe preparation. Persistent or concerning symptoms need clinical advice.",
+    "related_slugs": [
+      "late-office",
+      "restaurants",
+      "meal-prep"
+    ],
+    "keywords": "Nutrition What to do after overeating busy work travel time",
+    "review_status": "reviewed",
+    "published": true
+  },
+  {
+    "slug": "meal-prep",
+    "title": "Meal preparation for busy professionals",
+    "description": "Prepare one or two useful meals rather than an entire perfect week.",
+    "category": "Nutrition",
+    "action_kind": "nutrition",
+    "quick_answer": "Prepare one or two useful meals rather than an entire perfect week. Use your assigned recipes, make a realistic number of servings and plan safe storage. A reliable lunch and backup dinner can solve more problems than a complicated Sunday cooking session.",
+    "body": "Choose recipes you already enjoy and check your shopping list before cooking. Batch preparation changes the number of portions, not the serving size in your daily log. Label leftovers and follow local food-safety guidance for refrigeration, reheating and transport. If facilities are limited, ask for meals that fit those constraints.",
+    "video_script": "HOOK (5–10s): Meal preparation for busy professionals\nEXPLANATION (30–90s): Prepare one or two useful meals rather than an entire perfect week. Use your assigned recipes, make a realistic number of servings and plan safe storage. A reliable lunch and backup dinner can solve more problems than a complicated Sunday cooking session. Choose recipes you already enjoy and check your shopping list before cooking. Batch preparation changes the number of portions, not the serving size in your daily log. Label leftovers and follow local food-safety guidance for refrigeration, reheating and transport. If facilities are limited, ask for meals that fit those constraints.\nACTION (10–20s): Open your meal plan. Bring the recurring obstacle to your next check-in.",
+    "slide_outline": [
+      "Meal preparation for busy professionals",
+      "The practical principle",
+      "What the evidence can and cannot tell us",
+      "Choose recipes you already enjoy and check your shopping list before cooking",
+      "Your decision: Open your meal plan",
+      "Check your context and safety",
+      "One next step"
+    ],
+    "evidence": [
+      {
+        "title": "NHS balanced eating guidance (general context)",
+        "url": "https://www.nhs.uk/live-well/eat-well/how-to-eat-a-balanced-diet/eating-a-balanced-diet/"
+      }
+    ],
+    "safety": "Use your individual plan and coach advice. Stop training if unwell or in pain; seek appropriate assessment. For food, check allergens and safe preparation. Persistent or concerning symptoms need clinical advice.",
+    "related_slugs": [
+      "late-office",
+      "restaurants"
+    ],
+    "keywords": "Nutrition Meal preparation for busy professionals busy work travel time",
+    "review_status": "reviewed",
+    "published": true
+  },
+  {
+    "slug": "poor-sleep",
+    "title": "What to do after a poor night’s sleep",
+    "description": "Check how you feel before training.",
+    "category": "Recovery",
+    "action_kind": "workout",
+    "quick_answer": "Check how you feel before training. Use an approved tired-day option if appropriate, or ask your coach about moving the session. Avoid chasing a personal best when alertness or technique is poor. Protect your next sleep opportunity rather than trying to solve the day with more stimulants.",
+    "body": "One poor night and persistent sleep problems need different responses. Consider whether you can work, drive and train safely today. Tell your coach if fatigue is changing technique or recovery. Persistent unexplained tiredness, snoring with breathing pauses or repeated sleep disruption deserves medical advice, not a wearable-based diagnosis.",
+    "video_script": "HOOK (5–10s): What to do after a poor night’s sleep\nEXPLANATION (30–90s): Check how you feel before training. Use an approved tired-day option if appropriate, or ask your coach about moving the session. Avoid chasing a personal best when alertness or technique is poor. Protect your next sleep opportunity rather than trying to solve the day with more stimulants. One poor night and persistent sleep problems need different responses. Consider whether you can work, drive and train safely today. Tell your coach if fatigue is changing technique or recovery. Persistent unexplained tiredness, snoring with breathing pauses or repeated sleep disruption deserves medical advice, not a wearable-based diagnosis.\nACTION (10–20s): Preview a coach-approved workout option. Bring the recurring obstacle to your next check-in.",
+    "slide_outline": [
+      "What to do after a poor night’s sleep",
+      "The practical principle",
+      "What the evidence can and cannot tell us",
+      "One poor night and persistent sleep problems need different responses",
+      "Your decision: Preview a coach-approved workout option",
+      "Check your context and safety",
+      "One next step"
+    ],
+    "evidence": [
+      {
+        "title": "NHS tiredness and fatigue",
+        "url": "https://www.nhs.uk/symptoms/tiredness-and-fatigue/"
+      }
+    ],
+    "safety": "Use your individual plan and coach advice. Stop training if unwell or in pain; seek appropriate assessment. For food, check allergens and safe preparation. Persistent or concerning symptoms need clinical advice.",
+    "related_slugs": [
+      "stress",
+      "recovery"
+    ],
+    "keywords": "Recovery What to do after a poor night’s sleep busy work travel time",
+    "review_status": "reviewed",
+    "published": true
+  },
+  {
+    "slug": "caffeine",
+    "title": "Caffeine and energy management",
+    "description": "Notice when and how much caffeine you use, especially later in the day.",
+    "category": "Recovery",
+    "action_kind": "bookmark",
+    "quick_answer": "Notice when and how much caffeine you use, especially later in the day. If it disrupts sleep, move the last serving earlier and review the pattern. Do not use escalating caffeine to push through persistent fatigue.",
+    "body": "Sensitivity and sleep timing differ between people. Track the practical pattern rather than assuming a universal cut-off suits you. Consider caffeine in tea, coffee, energy drinks and some supplements. If reducing a large habitual intake, a gradual change may be easier. Pregnancy, medicines and heart symptoms need advice tailored by a qualified professional.",
+    "video_script": "HOOK (5–10s): Caffeine and energy management\nEXPLANATION (30–90s): Notice when and how much caffeine you use, especially later in the day. If it disrupts sleep, move the last serving earlier and review the pattern. Do not use escalating caffeine to push through persistent fatigue. Sensitivity and sleep timing differ between people. Track the practical pattern rather than assuming a universal cut-off suits you. Consider caffeine in tea, coffee, energy drinks and some supplements. If reducing a large habitual intake, a gradual change may be easier. Pregnancy, medicines and heart symptoms need advice tailored by a qualified professional.\nACTION (10–20s): Save this guide. Bring the recurring obstacle to your next check-in.",
+    "slide_outline": [
+      "Caffeine and energy management",
+      "The practical principle",
+      "What the evidence can and cannot tell us",
+      "Sensitivity and sleep timing differ between people",
+      "Your decision: Save this guide",
+      "Check your context and safety",
+      "One next step"
+    ],
+    "evidence": [
+      {
+        "title": "NHS tiredness and fatigue",
+        "url": "https://www.nhs.uk/symptoms/tiredness-and-fatigue/"
+      }
+    ],
+    "safety": "Use your individual plan and coach advice. Stop training if unwell or in pain; seek appropriate assessment. For food, check allergens and safe preparation. Persistent or concerning symptoms need clinical advice.",
+    "related_slugs": [
+      "poor-sleep",
+      "stress",
+      "recovery"
+    ],
+    "keywords": "Recovery Caffeine and energy management busy work travel time",
+    "review_status": "reviewed",
+    "published": false
+  },
+  {
+    "slug": "stress",
+    "title": "Managing stress during demanding weeks",
+    "description": "Choose one small action you can do today: a short break, a walk, a regular meal or an earlier finish.",
+    "category": "Recovery",
+    "action_kind": "support",
+    "quick_answer": "Choose one small action you can do today: a short break, a walk, a regular meal or an earlier finish. Tell your coach what the week actually looks like. Coaching can help adjust routines, but persistent distress needs appropriate professional support.",
+    "body": "When everything feels urgent, reduce the number of decisions. Decide the next meal and the next achievable activity instead of redesigning the entire week. Use a check-in to describe the constraint and the support you need. Breathing or relaxation practices may help some people, but are optional and not a substitute for mental-health care.",
+    "video_script": "HOOK (5–10s): Managing stress during demanding weeks\nEXPLANATION (30–90s): Choose one small action you can do today: a short break, a walk, a regular meal or an earlier finish. Tell your coach what the week actually looks like. Coaching can help adjust routines, but persistent distress needs appropriate professional support. When everything feels urgent, reduce the number of decisions. Decide the next meal and the next achievable activity instead of redesigning the entire week. Use a check-in to describe the constraint and the support you need. Breathing or relaxation practices may help some people, but are optional and not a substitute for mental-health care.\nACTION (10–20s): Ask your coach. Bring the recurring obstacle to your next check-in.",
+    "slide_outline": [
+      "Managing stress during demanding weeks",
+      "The practical principle",
+      "What the evidence can and cannot tell us",
+      "When everything feels urgent, reduce the number of decisions",
+      "Your decision: Ask your coach",
+      "Check your context and safety",
+      "One next step"
+    ],
+    "evidence": [
+      {
+        "title": "NHS tiredness and fatigue",
+        "url": "https://www.nhs.uk/symptoms/tiredness-and-fatigue/"
+      }
+    ],
+    "safety": "Use your individual plan and coach advice. Stop training if unwell or in pain; seek appropriate assessment. For food, check allergens and safe preparation. Persistent or concerning symptoms need clinical advice.",
+    "related_slugs": [
+      "poor-sleep",
+      "recovery"
+    ],
+    "keywords": "Recovery Managing stress during demanding weeks busy work travel time",
+    "review_status": "reviewed",
+    "published": false
+  },
+  {
+    "slug": "recovery",
+    "title": "Recovery when work and training are demanding",
+    "description": "Bring persistent fatigue or falling performance to your coach before adding more work.",
+    "category": "Recovery",
+    "action_kind": "support",
+    "quick_answer": "Bring persistent fatigue or falling performance to your coach before adding more work. Protect regular meals, adequate sleep opportunity and planned easier days. Use how you feel and your training log together; a single wearable score should not dictate the programme.",
+    "body": "Review the recent pattern: attendance, effort, work demands, sleep and food availability. Your coach can decide whether volume or scheduling needs to change. Avoid treating soreness as a target or buying supplements to rescue an unworkable routine. Pain, illness or ongoing unexplained fatigue requires appropriate assessment.",
+    "video_script": "HOOK (5–10s): Recovery when work and training are demanding\nEXPLANATION (30–90s): Bring persistent fatigue or falling performance to your coach before adding more work. Protect regular meals, adequate sleep opportunity and planned easier days. Use how you feel and your training log together; a single wearable score should not dictate the programme. Review the recent pattern: attendance, effort, work demands, sleep and food availability. Your coach can decide whether volume or scheduling needs to change. Avoid treating soreness as a target or buying supplements to rescue an unworkable routine. Pain, illness or ongoing unexplained fatigue requires appropriate assessment.\nACTION (10–20s): Ask your coach. Bring the recurring obstacle to your next check-in.",
+    "slide_outline": [
+      "Recovery when work and training are demanding",
+      "The practical principle",
+      "What the evidence can and cannot tell us",
+      "Review the recent pattern: attendance, effort, work demands, sleep and food availability",
+      "Your decision: Ask your coach",
+      "Check your context and safety",
+      "One next step"
+    ],
+    "evidence": [
+      {
+        "title": "NHS tiredness and fatigue",
+        "url": "https://www.nhs.uk/symptoms/tiredness-and-fatigue/"
+      }
+    ],
+    "safety": "Use your individual plan and coach advice. Stop training if unwell or in pain; seek appropriate assessment. For food, check allergens and safe preparation. Persistent or concerning symptoms need clinical advice.",
+    "related_slugs": [
+      "poor-sleep",
+      "stress"
+    ],
+    "keywords": "Recovery Recovery when work and training are demanding busy work travel time",
+    "review_status": "reviewed",
+    "published": false
+  },
+  {
+    "slug": "weight-fluctuations",
+    "title": "Why body weight fluctuates",
+    "description": "A single weigh-in is not a verdict on your progress.",
+    "category": "Progress",
+    "action_kind": "progress",
+    "quick_answer": "A single weigh-in is not a verdict on your progress. Food, fluid, bowel contents and measurement timing can change the reading. If weighing is appropriate for you, compare measurements taken in similar conditions and discuss the longer pattern with your coach.",
+    "body": "Do not change targets because of one higher reading. Use the measurements already agreed with your coach and consider attendance, performance and how the routine is working too. If weighing creates distress, discuss another way to review progress. Rapid unexplained changes, swelling or other symptoms should be assessed by a clinician.",
+    "video_script": "HOOK (5–10s): Why body weight fluctuates\nEXPLANATION (30–90s): A single weigh-in is not a verdict on your progress. Food, fluid, bowel contents and measurement timing can change the reading. If weighing is appropriate for you, compare measurements taken in similar conditions and discuss the longer pattern with your coach. Do not change targets because of one higher reading. Use the measurements already agreed with your coach and consider attendance, performance and how the routine is working too. If weighing creates distress, discuss another way to review progress. Rapid unexplained changes, swelling or other symptoms should be assessed by a clinician.\nACTION (10–20s): Review your progress. Bring the recurring obstacle to your next check-in.",
+    "slide_outline": [
+      "Why body weight fluctuates",
+      "The practical principle",
+      "What the evidence can and cannot tell us",
+      "Do not change targets because of one higher reading",
+      "Your decision: Review your progress",
+      "Check your context and safety",
+      "One next step"
+    ],
+    "evidence": [
+      {
+        "title": "NHS healthy weight guidance (general context)",
+        "url": "https://www.nhs.uk/live-well/healthy-weight/"
+      }
+    ],
+    "safety": "Use your individual plan and coach advice. Stop training if unwell or in pain; seek appropriate assessment. For food, check allergens and safe preparation. Persistent or concerning symptoms need clinical advice.",
+    "related_slugs": [
+      "progress-review",
+      "wearables"
+    ],
+    "keywords": "Progress Why body weight fluctuates busy work travel time",
+    "review_status": "reviewed",
+    "published": true
+  },
+  {
+    "slug": "fat-loss-stall",
+    "title": "What to do when fat loss stalls",
+    "description": "Review several weeks with your coach before changing food targets.",
+    "category": "Progress",
+    "action_kind": "support",
+    "quick_answer": "Review several weeks with your coach before changing food targets. Check whether meals, activity and measurements have been consistent enough to interpret. Bring travel, missed logs and schedule changes into the discussion. Avoid aggressive cuts based on a few readings.",
+    "body": "A plateau cannot be diagnosed from a single chart. Missing information can look like stalled progress, and measurement conditions can obscure a trend. Your coach should review goals, adherence, recovery and whether the plan remains appropriate. The Playbook explains the review process; it does not automatically reduce calories or add exercise.",
+    "video_script": "HOOK (5–10s): What to do when fat loss stalls\nEXPLANATION (30–90s): Review several weeks with your coach before changing food targets. Check whether meals, activity and measurements have been consistent enough to interpret. Bring travel, missed logs and schedule changes into the discussion. Avoid aggressive cuts based on a few readings. A plateau cannot be diagnosed from a single chart. Missing information can look like stalled progress, and measurement conditions can obscure a trend. Your coach should review goals, adherence, recovery and whether the plan remains appropriate. The Playbook explains the review process; it does not automatically reduce calories or add exercise.\nACTION (10–20s): Ask your coach. Bring the recurring obstacle to your next check-in.",
+    "slide_outline": [
+      "What to do when fat loss stalls",
+      "The practical principle",
+      "What the evidence can and cannot tell us",
+      "A plateau cannot be diagnosed from a single chart",
+      "Your decision: Ask your coach",
+      "Check your context and safety",
+      "One next step"
+    ],
+    "evidence": [
+      {
+        "title": "NHS healthy weight guidance (general context)",
+        "url": "https://www.nhs.uk/live-well/healthy-weight/"
+      }
+    ],
+    "safety": "Use your individual plan and coach advice. Stop training if unwell or in pain; seek appropriate assessment. For food, check allergens and safe preparation. Persistent or concerning symptoms need clinical advice.",
+    "related_slugs": [
+      "weight-fluctuations",
+      "progress-review",
+      "wearables"
+    ],
+    "keywords": "Progress What to do when fat loss stalls busy work travel time",
+    "review_status": "reviewed",
+    "published": false
+  },
+  {
+    "slug": "progress-review",
+    "title": "Understanding your progress",
+    "description": "Use the measures that match your goal.",
+    "category": "Progress",
+    "action_kind": "progress",
+    "quick_answer": "Use the measures that match your goal. Attendance, strength, routine and recorded measurements can tell different parts of the story. Look for a repeatable pattern over time and ask your coach what matters most for the next phase.",
+    "body": "A chart is only as useful as the observations behind it. Check dates, missing entries and measurement conditions before comparing values. Do not compare your response with someone else’s highlight reel. Use your next check-in to agree one or two meaningful indicators instead of collecting every available number.",
+    "video_script": "HOOK (5–10s): Understanding your progress\nEXPLANATION (30–90s): Use the measures that match your goal. Attendance, strength, routine and recorded measurements can tell different parts of the story. Look for a repeatable pattern over time and ask your coach what matters most for the next phase. A chart is only as useful as the observations behind it. Check dates, missing entries and measurement conditions before comparing values. Do not compare your response with someone else’s highlight reel. Use your next check-in to agree one or two meaningful indicators instead of collecting every available number.\nACTION (10–20s): Review your progress. Bring the recurring obstacle to your next check-in.",
+    "slide_outline": [
+      "Understanding your progress",
+      "The practical principle",
+      "What the evidence can and cannot tell us",
+      "A chart is only as useful as the observations behind it",
+      "Your decision: Review your progress",
+      "Check your context and safety",
+      "One next step"
+    ],
+    "evidence": [
+      {
+        "title": "NHS healthy weight guidance (general context)",
+        "url": "https://www.nhs.uk/live-well/healthy-weight/"
+      }
+    ],
+    "safety": "Use your individual plan and coach advice. Stop training if unwell or in pain; seek appropriate assessment. For food, check allergens and safe preparation. Persistent or concerning symptoms need clinical advice.",
+    "related_slugs": [
+      "weight-fluctuations",
+      "wearables"
+    ],
+    "keywords": "Progress Understanding your progress busy work travel time",
+    "review_status": "reviewed",
+    "published": false
+  },
+  {
+    "slug": "wearables",
+    "title": "Understanding wearable information",
+    "description": "Treat your watch as one source of context.",
+    "category": "Progress",
+    "action_kind": "health",
+    "quick_answer": "Treat your watch as one source of context. Check when it last synced and whether readings are missing. Estimated calories and recovery scores are not exact measurements or diagnoses. Pair trends with how you feel and what your coach sees in the programme.",
+    "body": "Device brands calculate scores differently. Missing data is not zero, and combining overlapping step sources can double-count activity. Share only the readings you want your coach to see and check the actual receipt time in Devices & apps. A score cannot clear you to train through illness or pain; concerning symptoms need appropriate assessment.",
+    "video_script": "HOOK (5–10s): Understanding wearable information\nEXPLANATION (30–90s): Treat your watch as one source of context. Check when it last synced and whether readings are missing. Estimated calories and recovery scores are not exact measurements or diagnoses. Pair trends with how you feel and what your coach sees in the programme. Device brands calculate scores differently. Missing data is not zero, and combining overlapping step sources can double-count activity. Share only the readings you want your coach to see and check the actual receipt time in Devices & apps. A score cannot clear you to train through illness or pain; concerning symptoms need appropriate assessment.\nACTION (10–20s): Open Devices & apps. Bring the recurring obstacle to your next check-in.",
+    "slide_outline": [
+      "Understanding wearable information",
+      "The practical principle",
+      "What the evidence can and cannot tell us",
+      "Device brands calculate scores differently",
+      "Your decision: Open Devices & apps",
+      "Check your context and safety",
+      "One next step"
+    ],
+    "evidence": [
+      {
+        "title": "NHS healthy weight guidance (general context)",
+        "url": "https://www.nhs.uk/live-well/healthy-weight/"
+      }
+    ],
+    "safety": "Use your individual plan and coach advice. Stop training if unwell or in pain; seek appropriate assessment. For food, check allergens and safe preparation. Persistent or concerning symptoms need clinical advice.",
+    "related_slugs": [
+      "weight-fluctuations",
+      "progress-review"
+    ],
+    "keywords": "Progress Understanding wearable information busy work travel time",
+    "review_status": "reviewed",
+    "published": false
+  },
+  {
+    "slug": "strength-aging",
+    "title": "Why strength matters as you age",
+    "description": "A consistent strength routine can support everyday function as you get older.",
+    "category": "Health",
+    "action_kind": "training",
+    "quick_answer": "A consistent strength routine can support everyday function as you get older. Start from the programme your coach assigned and progress at a manageable pace. The best starting point reflects your experience, health and equipment, rather than your age alone.",
+    "body": "Strength training involves learning movements and gradually practising them with appropriate resistance. It should be adapted around existing limitations and recovery. Your coach can review technique, attendance and progression. New pain or a medical restriction needs individual assessment; general guidance is not medical clearance.",
+    "video_script": "HOOK (5–10s): Why strength matters as you age\nEXPLANATION (30–90s): A consistent strength routine can support everyday function as you get older. Start from the programme your coach assigned and progress at a manageable pace. The best starting point reflects your experience, health and equipment, rather than your age alone. Strength training involves learning movements and gradually practising them with appropriate resistance. It should be adapted around existing limitations and recovery. Your coach can review technique, attendance and progression. New pain or a medical restriction needs individual assessment; general guidance is not medical clearance.\nACTION (10–20s): Open your training. Bring the recurring obstacle to your next check-in.",
+    "slide_outline": [
+      "Why strength matters as you age",
+      "The practical principle",
+      "What the evidence can and cannot tell us",
+      "Strength training involves learning movements and gradually practising them with appropriate resistance",
+      "Your decision: Open your training",
+      "Check your context and safety",
+      "One next step"
+    ],
+    "evidence": [
+      {
+        "title": "WHO physical activity guidance (general context)",
+        "url": "https://www.who.int/news-room/fact-sheets/detail/physical-activity"
+      }
+    ],
+    "safety": "Use your individual plan and coach advice. Stop training if unwell or in pain; seek appropriate assessment. For food, check allergens and safe preparation. Persistent or concerning symptoms need clinical advice.",
+    "related_slugs": [
+      "back-on-track",
+      "busy-habits"
+    ],
+    "keywords": "Health Why strength matters as you age busy work travel time",
+    "review_status": "reviewed",
+    "published": false
+  },
+  {
+    "slug": "cardio",
+    "title": "Cardiovascular fitness for busy professionals",
+    "description": "Use the cardio and movement already agreed in your weekly plan.",
+    "category": "Health",
+    "action_kind": "planner",
+    "quick_answer": "Use the cardio and movement already agreed in your weekly plan. Short activity opportunities can help a demanding day feel more workable. Build from your current level, rather than adding hard intervals to an already exhausting week.",
+    "body": "Walking meetings or active travel may create useful opportunities where safe and practical. Your coach can decide how these fit alongside assigned cardio and strength work. General public-health targets are context, not a prescription for every client. Symptoms such as chest pain, faintness or unusual breathlessness require appropriate medical advice.",
+    "video_script": "HOOK (5–10s): Cardiovascular fitness for busy professionals\nEXPLANATION (30–90s): Use the cardio and movement already agreed in your weekly plan. Short activity opportunities can help a demanding day feel more workable. Build from your current level, rather than adding hard intervals to an already exhausting week. Walking meetings or active travel may create useful opportunities where safe and practical. Your coach can decide how these fit alongside assigned cardio and strength work. General public-health targets are context, not a prescription for every client. Symptoms such as chest pain, faintness or unusual breathlessness require appropriate medical advice.\nACTION (10–20s): Open your weekly planner. Bring the recurring obstacle to your next check-in.",
+    "slide_outline": [
+      "Cardiovascular fitness for busy professionals",
+      "The practical principle",
+      "What the evidence can and cannot tell us",
+      "Walking meetings or active travel may create useful opportunities where safe and practical",
+      "Your decision: Open your weekly planner",
+      "Check your context and safety",
+      "One next step"
+    ],
+    "evidence": [
+      {
+        "title": "WHO physical activity guidance (general context)",
+        "url": "https://www.who.int/news-room/fact-sheets/detail/physical-activity"
+      }
+    ],
+    "safety": "Use your individual plan and coach advice. Stop training if unwell or in pain; seek appropriate assessment. For food, check allergens and safe preparation. Persistent or concerning symptoms need clinical advice.",
+    "related_slugs": [
+      "back-on-track",
+      "busy-habits",
+      "strength-aging"
+    ],
+    "keywords": "Health Cardiovascular fitness for busy professionals busy work travel time",
+    "review_status": "reviewed",
+    "published": false
+  },
+  {
+    "slug": "busy-habits",
+    "title": "Building habits that survive demanding periods",
+    "description": "Choose a small version of the routine that fits a difficult day.",
+    "category": "Health",
+    "action_kind": "planner",
+    "quick_answer": "Choose a small version of the routine that fits a difficult day. Tie it to a reliable moment, such as lunch or arriving home. Keep the decision simple and ask your coach which minimum actions are useful when the week becomes unpredictable.",
+    "body": "A fallback routine works best when prepared before the busy period. Decide a backup meal, a feasible activity slot and how to contact your coach. Review what actually happened instead of adding more rules. A habit is a practical cue and repeated action, not a streak you must protect at the expense of health.",
+    "video_script": "HOOK (5–10s): Building habits that survive demanding periods\nEXPLANATION (30–90s): Choose a small version of the routine that fits a difficult day. Tie it to a reliable moment, such as lunch or arriving home. Keep the decision simple and ask your coach which minimum actions are useful when the week becomes unpredictable. A fallback routine works best when prepared before the busy period. Decide a backup meal, a feasible activity slot and how to contact your coach. Review what actually happened instead of adding more rules. A habit is a practical cue and repeated action, not a streak you must protect at the expense of health.\nACTION (10–20s): Open your weekly planner. Bring the recurring obstacle to your next check-in.",
+    "slide_outline": [
+      "Building habits that survive demanding periods",
+      "The practical principle",
+      "What the evidence can and cannot tell us",
+      "A fallback routine works best when prepared before the busy period",
+      "Your decision: Open your weekly planner",
+      "Check your context and safety",
+      "One next step"
+    ],
+    "evidence": [
+      {
+        "title": "WHO physical activity guidance (general context)",
+        "url": "https://www.who.int/news-room/fact-sheets/detail/physical-activity"
+      }
+    ],
+    "safety": "Use your individual plan and coach advice. Stop training if unwell or in pain; seek appropriate assessment. For food, check allergens and safe preparation. Persistent or concerning symptoms need clinical advice.",
+    "related_slugs": [
+      "back-on-track",
+      "strength-aging"
+    ],
+    "keywords": "Health Building habits that survive demanding periods busy work travel time",
+    "review_status": "reviewed",
+    "published": false
+  },
+  {
+    "slug": "back-on-track",
+    "title": "Getting back on track after a difficult week",
+    "description": "Start with the next useful action: choose a meal, book an achievable session or send your check-in.",
+    "category": "Health",
+    "action_kind": "planner",
+    "quick_answer": "Start with the next useful action: choose a meal, book an achievable session or send your check-in. You do not need a perfect Monday or a punishment week. Tell your coach what changed so the plan can match your current circumstances.",
+    "body": "Use the existing planner rather than creating an ambitious catch-up schedule. Check whether the original week still fits your work and recovery. Pick one commitment you can keep and build from there. If an injury, illness or significant life event disrupted the routine, let your coach know before restarting the previous workload.",
+    "video_script": "HOOK (5–10s): Getting back on track after a difficult week\nEXPLANATION (30–90s): Start with the next useful action: choose a meal, book an achievable session or send your check-in. You do not need a perfect Monday or a punishment week. Tell your coach what changed so the plan can match your current circumstances. Use the existing planner rather than creating an ambitious catch-up schedule. Check whether the original week still fits your work and recovery. Pick one commitment you can keep and build from there. If an injury, illness or significant life event disrupted the routine, let your coach know before restarting the previous workload.\nACTION (10–20s): Open your weekly planner. Bring the recurring obstacle to your next check-in.",
+    "slide_outline": [
+      "Getting back on track after a difficult week",
+      "The practical principle",
+      "What the evidence can and cannot tell us",
+      "Use the existing planner rather than creating an ambitious catch-up schedule",
+      "Your decision: Open your weekly planner",
+      "Check your context and safety",
+      "One next step"
+    ],
+    "evidence": [
+      {
+        "title": "WHO physical activity guidance (general context)",
+        "url": "https://www.who.int/news-room/fact-sheets/detail/physical-activity"
+      }
+    ],
+    "safety": "Use your individual plan and coach advice. Stop training if unwell or in pain; seek appropriate assessment. For food, check allergens and safe preparation. Persistent or concerning symptoms need clinical advice.",
+    "related_slugs": [
+      "busy-habits",
+      "strength-aging"
+    ],
+    "keywords": "Health Getting back on track after a difficult week busy work travel time",
+    "review_status": "reviewed",
+    "published": true
+  }
+]
