@@ -11,3 +11,7 @@ The additive learning_design JSONB column uses existing resource ownership, publ
 Verification: full deferred-script DOM tests, failure/save/ownership tests, real database rollback RLS fixtures, desktop and 390px local Chromium layout checks, synthetic trend and situation interactions, all 24 PDF pages rendered and visually inspected. Database security advisors reported no new issue from this change. Existing unrelated Auth/private-schema advisories remain.
 
 Rebuild handouts with `python tools/build-playbook-handouts.py` after changing canonical content. Apply new content updates through a new migration; do not reapply the original migration. PDF generation uses ReportLab and DejaVu fonts.
+
+## Recording preparation follow-up
+
+Prepared three approximately 300-word spoken scripts for demanding weeks, late office meals and weight fluctuations. Coach manager recording notes and shot outlines now match the downloadable recording pack. Uploaded video placement moves directly below the lesson header, before diagrams and the written lesson. No recording or client playback is claimed until Calum records and attaches the actual files.
