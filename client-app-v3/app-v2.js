@@ -120,18 +120,21 @@ async function loadCoach() {
   state.qaRows = [];
   state.qaStatus = 'loading';
   state.corporateMemberships = memberships;
-  // Completeness reporting is optional and must never gate successful sign-in.
-  const coachId = state.user?.id;
-  query('Client QA', db.from('client_qa_summary').select('*')).then(rows => {
-    if (state.user?.id !== coachId || state.preview || state.role !== 'coach') return;
-    state.qaRows = rows.filter(row => state.clients.some(c => c.id === row.client_id));
-    state.qaStatus = 'ready';
-    if (!$('#coachApp').classList.contains('hidden')) renderCoach();
-  }).catch(() => {
-    if (state.user?.id !== coachId || state.preview || state.role !== 'coach') return;
-    state.qaStatus = 'unavailable';
-    if (!$('#coachApp').classList.contains('hidden')) renderCoach();
-  });
+  // A slow optional completeness report must never turn a valid sign-in into an error.
+  const account = state.user?.id;
+  const controller = new AbortController();
+  const deadline = setTimeout(() => controller.abort(), 8000);
+  query('Client QA', db.from('client_qa_summary').select('*').abortSignal(controller.signal))
+    .then(rows => {
+      if (state.user?.id !== account || state.role !== 'coach') return;
+      state.qaRows = rows.filter(row => state.clients.some(c => c.id === row.client_id));
+      state.qaStatus = 'ready';
+    }).catch(() => {
+      if (state.user?.id === account && state.role === 'coach') state.qaStatus = 'unavailable';
+    }).finally(() => {
+      clearTimeout(deadline);
+      if (state.user?.id === account && state.role === 'coach' && !state.client && state.coachView === 'dashboard' && !document.activeElement?.matches('input,textarea,select')) renderCoach();
+    });
 }
 
 async function loadClientData(clientId) {

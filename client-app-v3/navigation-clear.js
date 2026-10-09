@@ -67,10 +67,9 @@ function clearClientMore(){
 function updateClientNav(){
  const nav=$('#clientNav');if(!nav)return;
  if(!nav.dataset.clearNavigation){
-  nav.dataset.clearNavigation='true';nav.innerHTML=[['today','⌂','Today'],['planner','▦','Schedule'],['training','◇','Training'],['nutrition','○','Nutrition'],['checkin','✓','Check-in']].map(([key,icon,label])=>`<button data-client-view="${key}"><span>${icon}</span>${label}</button>`).join('')+'<button type="button" id="clearClientMore"><span>☰</span>More</button>';
-  nav.querySelector('#clearClientMore').onclick=e=>{e.stopPropagation();state.clientView='more';renderClient();};
+  nav.dataset.clearNavigation='true';nav.innerHTML=[['today','⌂','Today'],['training','◇','Training'],['nutrition','○','Nutrition'],['progress','↗','Progress'],['support','◌','Coach']].map(([key,icon,label])=>`<button type="button" data-client-view="${key}"><span aria-hidden="true">${icon}</span>${label}</button>`).join('');
  }
- nav.querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.clientView===state.clientView||(b.id==='clearClientMore'&&!['today','planner','training','nutrition','checkin'].includes(state.clientView))));
+ nav.querySelectorAll('button').forEach(b=>{const active=b.dataset.clientView===state.clientView||(b.dataset.clientView==='progress'&&['checkin','diagnostics','health'].includes(state.clientView))||(b.dataset.clientView==='training'&&state.clientView==='planner');b.classList.toggle('active',active);if(active)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});
 }
 const clearClientRenderBefore=renderClient;
 renderClient=function(){
