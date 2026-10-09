@@ -2,7 +2,8 @@
 (function(){
  let owner=null,date=null;
  const original=coachNutrition;
- const previousPrompt=nutritionImportPrompt;nutritionImportPrompt=function(){return previousPrompt().replace('1–7 complete day variants','one repeatable daily menu');};
+ nutritionImportPrompt=function(){return window.clientNutritionDraftPrompt(state.client,state.data.onboarding[0]?.responses||{});};
+ const previousImportPanel=nutritionImportPanel;nutritionImportPanel=function(){return previousImportPanel().replace('Import 1–7 complete days. Use repeatable Training/Rest/Busy days, or seven named weekdays.','Import one everyday menu that repeats across the week.');};
  function weekFor(d){return state.data.weeks.find(w=>d>=w.week_start&&d<=iso(new Date(new Date(w.week_start+'T12:00:00Z').getTime()+6*864e5)));}
  function assigned(d){const w=weekFor(d);return state.data.nutritionDays.find(n=>n.week_id===w?.id&&n.nutrition_date===d);}
  function openClient(){state.clientView='nutrition';$('#clientHello').textContent=state.client.display_name;$('#returnCoach').classList.remove('hidden');show('#clientApp');window.openDailyNutritionDate(date);}
