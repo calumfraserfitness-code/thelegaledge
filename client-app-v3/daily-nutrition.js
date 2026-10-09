@@ -136,9 +136,9 @@
   if(owner!==ownerKey())reset();
   previousRender();
   const ready=state.preview||(state.client?.onboarding_status==='complete'&&state.client?.plan_status==='published');if(!ready)return;
-  const routes=['progress','checkin','diagnostics','health'];
+  const routes=['progress','diagnostics','health'];
   if(routes.includes(state.clientView)&&!$('#dnProgressNav')){
-   const nav=document.createElement('nav');nav.id='dnProgressNav';nav.className='dn-subnav';nav.setAttribute('aria-label','Progress sections');nav.innerHTML=[['progress','Overview'],['checkin','Weekly check-in'],['diagnostics','Diagnostics'],['health','Devices']].map(([k,label])=>`<button type="button" class="btn ${k===state.clientView?'primary':'ghost'} small" data-dn-route="${k}">${label}</button>`).join('');host().prepend(nav);nav.querySelectorAll('button').forEach(b=>b.onclick=()=>openRoute(b.dataset.dnRoute));
+   const nav=document.createElement('nav');nav.id='dnProgressNav';nav.className='dn-subnav';nav.setAttribute('aria-label','Progress sections');nav.innerHTML=[['progress','Overview'],['diagnostics','Diagnostics'],['health','Devices']].map(([k,label])=>`<button type="button" class="btn ${k===state.clientView?'primary':'ghost'} small" data-dn-route="${k}">${label}</button>`).join('');host().prepend(nav);nav.querySelectorAll('button').forEach(b=>b.onclick=()=>openRoute(b.dataset.dnRoute));
   }
   if(state.clientView==='training'&&!$('#dnSchedule')){const b=document.createElement('button');b.id='dnSchedule';b.className='btn ghost small dn-schedule';b.textContent='Arrange my week';b.onclick=()=>openRoute('planner');host().prepend(b);}
   updateClientNav();

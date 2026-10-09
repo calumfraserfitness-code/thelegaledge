@@ -32,8 +32,8 @@ state.data.mealAssignments=[{id:'a',nutrition_plan_id:'p',meal:{id:'m',name:'Egg
 async function tick(){await new Promise(r=>setTimeout(r,0));}
 (async()=>{
  await tick();
- assert.equal(doc.querySelectorAll('#clientNav button').length,5);
- assert.deepEqual([...doc.querySelectorAll('#clientNav button')].map(b=>b.dataset.clientView),['today','training','nutrition','progress','support']);
+ assert.equal(doc.querySelectorAll('#clientNav button').length,6);
+ assert.deepEqual([...doc.querySelectorAll('#clientNav button')].map(b=>b.dataset.clientView),['today','training','nutrition','checkin','progress','support']);
  assert.ok(doc.querySelector('.dn-target-panel'));assert.ok(!doc.querySelector('.dn-week').open);
  assert.ok(!doc.querySelector('.dn-meals .ingredient-list'),'Recipes collapsed initially');
  doc.querySelector('[data-dn-recipe]').click();assert.ok(doc.querySelector('[role="dialog"]'));assert.ok(doc.querySelector('.dn-ingredients').textContent.includes('Eggs'));
@@ -56,6 +56,10 @@ async function tick(){await new Promise(r=>setTimeout(r,0));}
  run(`state.client.id='switch-away';renderClient();`);await tick();
  run(`state.client.id='other';renderClient();`);await tick();await tick();assert.equal(doc.querySelectorAll('.dn-eaten').length,1,'Saved log reloaded from backend');
  run(`state.client.onboarding_status='pending_legal';renderClient();`);await tick();await tick();assert.ok(!doc.querySelector('.dn-page'),'Consent gate retained');
- console.log('PASS: full deferred modules, five destinations, collapsed recipes/week, favourites, log/undo, swaps preserve assignments, quick logging, progress subnav, client reset, failed saves, backend reload and consent gates. DOM/backend mocks, not production browser evidence.');
+ run(`state.preview=true;state.client.onboarding_status='complete';state.client.plan_status='published';state.clientView='checkin';renderClient();`);await tick();assert.equal(doc.querySelector('#clientNav [data-client-view=checkin]').getAttribute('aria-current'),'page');assert(!doc.querySelector('#dnProgressNav'),'Check-in has its own destination');
+ run('showAddClient()');const create=doc.querySelector('#addClientForm');assert(create.elements.start_onboarding.checked);assert.equal(create.elements.password.value.length,36);assert(!create.elements.start_weight_display.required);assert(!create.querySelector('[name=payment_url],[name=welcome_url]'));doc.querySelector('.modal-backdrop [data-close-modal]').click();
+ run(`renderJourney({client_id:'fixture',stage:'welcome',funding_mode:'personal',welcome_url:'https://example.invalid/welcome.mp4'});`);assert(!doc.querySelector('video'));assert(doc.querySelector('#journeyContinue').textContent.includes('agreement'));
+ run(`renderJourney({client_id:'fixture',stage:'contract',funding_mode:'personal',payment_handled_externally:true,contract_title:'QA agreement',contract_version:'QA',contract_body:'QA only'});`);assert.equal(doc.querySelectorAll('.journey-steps li').length,4);assert(!doc.querySelector('.journey-steps').textContent.includes('Payment'));assert(doc.querySelector('#journeySign'));
+ console.log('PASS: full deferred modules, six destinations including Check-in, collapsed recipes/week, favourites, log/undo, swaps preserve assignments, quick logging, progress subnav, client reset, failed saves, backend reload and consent gates. DOM/backend mocks, not production browser evidence.');
  dom.window.close();
 })().catch(e=>{console.error(e);dom.window.close();process.exitCode=1;});

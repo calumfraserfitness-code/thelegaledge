@@ -113,9 +113,14 @@ async function query(label, promise) {
 }
 
 async function loadCoach() {
-  const [clients, memberships] = await Promise.all([query('Clients', db.from('clients')
-    .select('*,profile:profiles!clients_profile_id_fkey(full_name,email)')
-    .order('start_date')), query('Corporate memberships', db.from('firm_participants').select('client_id'))]);
+  async function allRows(label,build){
+    const rows=[],size=500;
+    for(let offset=0;;offset+=size){const page=await query(label,build().range(offset,offset+size-1));rows.push(...page);if(page.length<size)return rows;}
+  }
+  const [clients, memberships] = await Promise.all([
+    allRows('Clients',()=>db.from('clients').select('*,profile:profiles!clients_profile_id_fkey(full_name,email)').order('start_date').order('id')),
+    allRows('Corporate memberships',()=>db.from('firm_participants').select('client_id').order('id'))
+  ]);
   state.clients = clients.filter(c => c.source_system !== 'coach_health_test').map(normalizeClient);
   state.qaRows = [];
   state.qaStatus = 'loading';
@@ -351,19 +356,28 @@ function bindAddClient() { $$('[data-add-client]').forEach((button) => button.on
 
 function showAddClient() {
   const modal = document.createElement('div'); modal.className='modal-backdrop';
-  modal.innerHTML=`<section class="modal-card"><div class="panel-head"><div><span class="eyebrow">5-MINUTE SETUP</span><h2>Add a client</h2></div><button class="icon-btn" data-close-modal>✕</button></div><form id="addClientForm" class="editor-grid"><label>Full name<input name="full_name" required></label><label>Email<input name="email" type="email" required></label><label>Phone<input name="phone" type="tel"></label><label>Temporary password<input name="password" type="password" minlength="12" autocomplete="new-password" required></label><label>Region<select name="market_region"><option value="us">United States · lb/oz</option><option value="ireland">Ireland · kg/g</option><option value="uk">United Kingdom</option><option value="other">Other</option></select></label><label>Check-in day<select name="checkin_day">${DAYS.map((day,index)=>`<option value="${index}" ${index===5?'selected':''}>${day}</option>`).join('')}</select></label><label>Daily steps<input name="daily_steps_goal" type="number" min="1" step="1" value="8000"></label><label>Starting weight<input name="start_weight_display" type="number" min="1" step="0.1" required></label><label class="wide">Goals<textarea name="goal_summary" rows="3" required></textarea></label><label class="toggle-field"><input name="cardio_enabled" type="checkbox"> Cardio required</label><label class="toggle-field"><input name="mobility_enabled" type="checkbox" checked> Mobility required</label><p class="wide muted">The client must accept legal/privacy terms and complete onboarding before their plan unlocks.</p><button class="btn primary wide">Create secure client login</button></form></section>`;
+  modal.innerHTML=`<section class="modal-card"><div class="panel-head"><div><span class="eyebrow">CLIENT SETUP</span><h2>Create login & start onboarding</h2></div><button class="icon-btn" data-close-modal>✕</button></div><form id="addClientForm" class="editor-grid"><label>Full name<input name="full_name" autocomplete="name" required></label><label>Email<input name="email" type="email" autocomplete="email" required></label><label>Region<select name="market_region"><option value="us">United States · lb/oz</option><option value="ireland">Ireland · kg/g</option><option value="uk">United Kingdom</option><option value="other">Other</option></select></label><input name="password" type="hidden"><label class="toggle-field wide"><input name="start_onboarding" type="checkbox" checked>Start their agreement and coaching profile immediately</label><p class="wide muted">Your saved, approved agreement and privacy notice are used. Payment is handled on your call. Share the login details after creation; no invitation email is sent automatically.</p><details class="wide"><summary>Optional coaching defaults</summary><label>Phone<input name="phone" type="tel"></label><label>Check-in day<select name="checkin_day">${DAYS.map((day,index)=>`<option value="${index}" ${index===5?'selected':''}>${day}</option>`).join('')}</select></label><label>Daily steps<input name="daily_steps_goal" type="number" min="1" step="1" value="8000"></label><label>Starting weight<input name="start_weight_display" type="number" min="1" step="0.1"></label><label>Goals<textarea name="goal_summary" rows="3"></textarea></label><label class="toggle-field"><input name="cardio_enabled" type="checkbox"> Cardio required</label><label class="toggle-field"><input name="mobility_enabled" type="checkbox" checked> Mobility required</label></details><button class="btn primary wide">Create login & onboarding</button></form></section>`;
+  modal.querySelector('[name=password]').value=Array.from(crypto.getRandomValues(new Uint8Array(18)),n=>n.toString(16).padStart(2,'0')).join('');
   document.body.append(modal); modal.querySelector('[data-close-modal]').onclick=()=>modal.remove(); modal.onclick=(e)=>{if(e.target===modal)modal.remove();}; modal.querySelector('form').onsubmit=createClientAccount;
 }
 
 async function createClientAccount(event) {
-  event.preventDefault(); const fd=new FormData(event.target); const payload=Object.fromEntries(fd.entries()); payload.cardio_enabled=fd.has('cardio_enabled'); payload.mobility_enabled=fd.has('mobility_enabled'); payload.daily_steps_goal=Number(payload.daily_steps_goal); payload.checkin_day=Number(payload.checkin_day); payload.start_weight_display=Number(payload.start_weight_display);
+  event.preventDefault(); const fd=new FormData(event.target); const payload=Object.fromEntries(fd.entries()); payload.cardio_enabled=fd.has('cardio_enabled'); payload.mobility_enabled=fd.has('mobility_enabled'); payload.daily_steps_goal=Number(payload.daily_steps_goal); payload.checkin_day=Number(payload.checkin_day); payload.start_weight_display=payload.start_weight_display===''?null:Number(payload.start_weight_display);payload.start_onboarding=fd.has('start_onboarding');
   setBusy(event.submitter,true);
   try {
     if (state.preview) {
       state.clients.unshift(normalizeClient({id:`preview-${Date.now()}`,display_name:payload.full_name,email:payload.email,phone:payload.phone,market_region:payload.market_region,status:'active',daily_steps_goal:payload.daily_steps_goal,checkin_day:payload.checkin_day,goal_summary:payload.goal_summary,cardio_enabled:payload.cardio_enabled,mobility_enabled:payload.mobility_enabled,onboarding_status:'pending',plan_status:'draft'}));
       event.target.closest('.modal-backdrop').remove(); toast('Preview client created locally'); renderCoach(); return;
     }
-    const client = await provisionClientAccount(payload); state.clients.unshift(normalizeClient(client)); event.target.closest('.modal-backdrop').remove(); toast('Client login created'); renderCoach();
+    const coachId=state.user?.id;
+    const client = await provisionClientAccount(payload);if(state.user?.id!==coachId)return;state.clients.unshift(normalizeClient(client));
+    const modal=event.target.closest('.modal-backdrop');renderCoach();
+    modal.querySelector('.modal-card').innerHTML=`<div class="panel-head"><h2>Client login created</h2><button class="icon-btn" data-close-modal>✕</button></div><p>${payload.start_onboarding?'Their first sign-in opens the agreement and coaching profile.':'Their first sign-in opens the existing onboarding flow.'} No email has been sent.</p><label>Email<input readonly value="${esc(payload.email)}"></label><label>Temporary password<input type="password" readonly autocomplete="off" id="createdClientPassword"></label><button class="btn ghost" type="button" id="revealClientPassword">Show password</button><p>Share these details privately with your client. You can copy them now; the password is not saved in your browser.</p><a class="btn ghost" href="https://legal-edge-client-app.vercel.app/" target="_blank" rel="noopener">Open client sign-in</a><button class="btn primary" type="button" id="copyClientAccess">Copy login details</button><p id="clientAccessStatus" role="status"></p>`;
+    modal.querySelector('#createdClientPassword').value=payload.password;
+    modal.querySelector('[data-close-modal]').onclick=()=>modal.remove();
+    modal.querySelector('#revealClientPassword').onclick=e=>{const p=modal.querySelector('#createdClientPassword');p.type=p.type==='password'?'text':'password';e.target.textContent=p.type==='password'?'Show password':'Hide password';};
+    modal.querySelector('#copyClientAccess').onclick=async()=>{try{await navigator.clipboard.writeText(`Your Legal Edge account is ready.\nSign in: https://legal-edge-client-app.vercel.app/\nEmail: ${payload.email}\nTemporary password: ${payload.password}\nComplete your agreement and coaching profile after signing in.`);modal.querySelector('#clientAccessStatus').textContent='Copied. Share privately with this client.';}catch{modal.querySelector('#clientAccessStatus').textContent='Copy unavailable. Select the details above.';}};
+
   }
   catch(error){toast(error.message||'Could not create client','error');setBusy(event.submitter,false);}
 }

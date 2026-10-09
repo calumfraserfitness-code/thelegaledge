@@ -40,8 +40,15 @@ Deno.serve(async (req: Request) => {
   }
   const fullName=existing?.display_name||String(body.full_name||"").trim();
   const weight=Number(body.start_weight_display);
-  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||!fullName||password.length<12||(!existing&&!pilotId&&(!Number.isFinite(weight)||weight<=0))||(pilotId&&body.start_weight_display!=null&&body.start_weight_display!==""&&(!Number.isFinite(weight)||weight<=0)))
-    return json({error:"Name, valid email and a 12+ character temporary password are required; individual clients also need a starting weight"},400);
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||!fullName||password.length<12||(body.start_weight_display!=null&&body.start_weight_display!==""&&(!Number.isFinite(weight)||weight<=0)))
+    return json({error:"Name, valid email and a 12+ character temporary password are required; starting weight is optional"},400);
+  let onboardingSettings:any=null;
+  if(body.start_onboarding===true){
+    if(existing||pilotId)return json({error:"Use enrollment for an existing or firm-funded account"},400);
+    const {data:settings,error}=await admin.from("coaching_onboarding_settings").select("documents_approved,contract_title,contract_version,contract_body,privacy_version,privacy_body").eq("coach_id",user.id).single();
+    if(error||!settings?.documents_approved)return json({error:"Save and approve your agreement and privacy defaults in Settings before creating an enrolled client"},409);
+    onboardingSettings=settings;
+  }
   console.log('[provision-client] validated coach request', {coach_id:user.id});
   const {data:created,error:createError}=await admin.auth.admin.createUser({email,password,email_confirm:true,user_metadata:{full_name:fullName},app_metadata:{role:"client"}});
   if(createError||!created.user) return json({error:createError?.message||"Could not create account"},400);
@@ -55,7 +62,7 @@ Deno.serve(async (req: Request) => {
     return json({client:linked});
   }
   const unit=body.market_region==="us"?"lbs":"kg";
-  const {data:client,error:clientError}=await admin.from("clients").insert({profile_id:created.user.id,coach_id:user.id,display_name:fullName,email,phone:body.phone||null,status:"active",market_region:body.market_region||"other",weight_unit:unit,start_weight_kg:pilotId && !body.start_weight_display ? null : (unit==="lbs"?weight/2.2046226218:weight),goal_summary:body.goal_summary||null,daily_steps_goal:Number(body.daily_steps_goal)||8000,checkin_day:Number(body.checkin_day??5),cardio_enabled:Boolean(body.cardio_enabled),mobility_enabled:Boolean(body.mobility_enabled),onboarding_status:"pending_legal",plan_status:"awaiting_onboarding",portal_enabled:false}).select().single();
+  const {data:client,error:clientError}=await admin.from("clients").insert({profile_id:created.user.id,coach_id:user.id,display_name:fullName,email,phone:body.phone||null,status:"active",market_region:body.market_region||"other",weight_unit:unit,start_weight_kg:!body.start_weight_display ? null : (unit==="lbs"?weight/2.2046226218:weight),goal_summary:body.goal_summary||null,daily_steps_goal:Number(body.daily_steps_goal)||8000,checkin_day:Number(body.checkin_day??5),cardio_enabled:Boolean(body.cardio_enabled),mobility_enabled:Boolean(body.mobility_enabled),onboarding_status:"pending_legal",plan_status:"awaiting_onboarding",portal_enabled:false}).select().single();
   if(clientError){await admin.auth.admin.deleteUser(created.user.id);return json({error:clientError.message},400);}
   let participant=null;
   if(pilotId){
@@ -68,6 +75,16 @@ Deno.serve(async (req: Request) => {
       return json({error:memberError?.message||"Could not add participant"},409);
     }
     participant=member;
+  }
+  if(onboardingSettings){
+    const {error}=await caller.rpc("journey_action",{p_client:client.id,p_action:"enroll",p_data:{...onboardingSettings,welcome_url:"",funding_mode:"personal",payment_handled_externally:true}});
+    if(error){
+      const {error:cleanupError}=await admin.from("clients").delete().eq("id",client.id).eq("profile_id",created.user.id);
+      if(cleanupError)return json({error:"Login created but onboarding could not start. Review the roster before retrying."},409);
+      await admin.from("profiles").delete().eq("id",created.user.id);
+      await admin.auth.admin.deleteUser(created.user.id);
+      return json({error:"Onboarding could not start: "+error.message},409);
+    }
   }
   console.log('[provision-client] client created' , {coach_id:user.id,client_id:client.id,user_id:created.user.id});
   return json({client,participant});
