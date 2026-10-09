@@ -19,7 +19,7 @@ export function normalizeDevicePayload(payload,scopes,now=new Date()){
    const [start,end,value,sampleSource]=cols;sources.add(sampleSource);
    if(sampleSource!==source)continue;
    if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})$/.test(start)||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})$/.test(end))throw Error('Step dates need timezone offsets');
-   const date=start.slice(0,10),a=Date.parse(start),b=Date.parse(end),qty=Number(value);
+   const date=start.slice(0,10),a=Date.parse(start),b=Date.parse(end),qty=/^\d+(?:\.\d+)?$/.test(value)?Number(value):NaN;
    if(!Number.isFinite(a)||!Number.isFinite(b)||b<a||!Number.isFinite(qty)||qty<0||qty>150000)throw Error('Invalid step sample');
    if(date>=today)continue; // Do not overwrite a complete-day observation with today's partial total.
    if(end.slice(0,10)!==date&&!/T00:00:00/.test(end))throw Error('A step sample crosses local days; use a daily export or native companion');

@@ -1,6 +1,6 @@
 // Full existing script chain, synthetic backend, no production records or browser session.
 const fs=require('fs'),path=require('path'),vm=require('vm'),assert=require('assert'),{JSDOM}=require('jsdom');
-const root=path.resolve(__dirname,'..'),content=JSON.parse(fs.readFileSync(path.join(root,'playbook/content.json')));
+const root=path.resolve(__dirname,'..'),content=JSON.parse(fs.readFileSync(path.join(root,'..','content/legal-edge-playbook.json')));
 const dom=new JSDOM(fs.readFileSync(path.join(root,'index.html'),'utf8'),{url:'https://example.invalid/',runScripts:'outside-only',pretendToBeVisual:true}),w=dom.window;
 w.HTMLElement.prototype.scrollIntoView=function(){};w.fetch=async()=>({ok:true,json:async()=>content});w.navigator.clipboard={writeText:async()=>{}};
 let rejectSave=false,uploads=0,accepted=0;const tables={coaching_start_resources:content.map(r=>({...r,id:r.slug,coach_id:'coach',updated_at:'2026-10-09T00:00:00Z',archived:false})),playbook_workout_options:[],playbook_workout_history:[],playbook_bookmarks:[],playbook_recommendations:[],playbook_feedback:[],playbook_events:[],playbook_collections:[],playbook_collection_assignments:[],playbook_cohort_consents:[]};

@@ -2,7 +2,7 @@
 
 This is a preconfigured **steps-only** Apple Shortcut, not an installable/tested release yet. It reads Health samples from the last seven days and sends them to the existing private receiver. There are no embedded client keys, artificial readings, Health writes or payments.
 
-1. Sign the template on a Mac with `shortcuts sign` (included `sign-on-mac.command`). The GitHub macOS workflow also attempts generic signing; its success must be inspected.
+1. Sign the template on a Mac with `shortcuts sign` (included `sign-on-mac.command`). The GitHub macOS workflow validated the plist. Its signing attempt failed because the runner is not signed into iCloud. Signing must run on an iCloud-signed-in Mac; the workflow now validates only.
 2. AirDrop the signed file to an iPhone and add it. Import asks for the owner's private setup key and one exact Health source name (Garmin commonly `Connect`, but the device must confirm it).
 3. Run while unlocked and approve Health/network permissions. Read the **actual** server response. `saved_days` proves receipt; an error does not.
 4. Compare at least the previous full day's total against **the selected source**, not Health's combined total. Test late-arriving records, a repeat upload, no samples, locked phone and revoked key.

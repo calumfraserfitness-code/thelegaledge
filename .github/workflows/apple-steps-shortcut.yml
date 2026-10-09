@@ -1,4 +1,4 @@
-name: Prepare Apple steps shortcut
+name: Validate prepared Apple steps shortcut
 on:
   push:
     branches: [release/daily-nutrition-20261009]
@@ -9,17 +9,14 @@ on:
 permissions:
   contents: read
 jobs:
-  sign:
+  validate:
     runs-on: macos-15
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
       - name: Validate prepared plist
         run: plutil -lint client-app-v3/shortcuts/Legal-Edge-Steps.unsigned.shortcut
-      - name: Sign generic template with Apple
-        run: shortcuts sign --mode anyone --input client-app-v3/shortcuts/Legal-Edge-Steps.unsigned.shortcut --output /tmp/Legal-Edge-Steps.shortcut
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: Legal-Edge-Steps-signed
-          path: /tmp/Legal-Edge-Steps.shortcut
-          retention-days: 14
+      - name: Explain device release gate
+        run: echo 'Apple signing requires an iCloud-signed-in Mac. Use the included Mac helper, then verify on a physical iPhone before client rollout.'
