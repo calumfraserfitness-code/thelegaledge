@@ -2,19 +2,22 @@ begin;
 select set_config('coaching_test.client',(select client_id::text from public.coaching_recording_events where source='fathom' and matching_status='matched' order by occurred_at desc limit 1),true);
 select set_config('coaching_test.coach',(select coach_id::text from public.clients where id=current_setting('coaching_test.client')::uuid),true);
 select set_config('coaching_test.owner',(select profile_id::text from public.clients where id=current_setting('coaching_test.client')::uuid),true);
-select set_config('coaching_test.other',(select profile_id::text from public.clients where id<>current_setting('coaching_test.client')::uuid and profile_id is not null limit 1),true);
+select set_config('coaching_test.other',(select profile_id::text from public.clients where id<>current_setting('coaching_test.client')::uuid and profile_id in (select id from public.profiles where role='client') limit 1),true);
 select set_config('coaching_test.calories',(select calorie_goal::text from public.clients where id=current_setting('coaching_test.client')::uuid),true);
 select set_config('coaching_test.steps',(select daily_steps_goal::text from public.clients where id=current_setting('coaching_test.client')::uuid),true);
+-- Clone proposals so repeat runs do not depend on existing review status.
+insert into public.coaching_change_proposals(recording_event_id,client_id,change_type,description,proposed_value,source_key)
+ select recording_event_id,client_id,change_type,'Rollback review fixture',proposed_value,'qa-review-'||gen_random_uuid() from public.coaching_change_proposals where client_id=current_setting('coaching_test.client')::uuid and change_type in ('commitment','nutrition_target');
 set local role authenticated;
 select set_config('request.jwt.claim.sub',current_setting('coaching_test.coach'),true);
 do $$declare p uuid; conflicts uuid; r jsonb;begin
  if (select count(*) from public.coaching_recording_events where client_id=current_setting('coaching_test.client')::uuid)<>2 then raise exception 'Coach cannot see source history';end if;
- select id into conflicts from public.coaching_change_proposals where client_id=current_setting('coaching_test.client')::uuid and change_type='nutrition_target' limit 1;
+ select id into conflicts from public.coaching_change_proposals where client_id=current_setting('coaching_test.client')::uuid and change_type='nutrition_target' and description='Rollback review fixture' limit 1;
  begin
    perform public.review_coaching_proposal(conflicts,'approved','Unreconciled target',current_date,current_date+7,false);
    raise exception 'Conflict guard failed';
  exception when raise_exception then if sqlerrm<>'Reconcile the conflicting prescription first' then raise;end if;end;
- select id into p from public.coaching_change_proposals where client_id=current_setting('coaching_test.client')::uuid and change_type='commitment' limit 1;
+ select id into p from public.coaching_change_proposals where client_id=current_setting('coaching_test.client')::uuid and change_type='commitment' and description='Rollback review fixture' limit 1;
  r:=public.review_coaching_proposal(p,'approved','Temporary rollback-only test item',current_date,current_date+7,false);
  if r->>'status'<>'approved' or r->>'prescriptions_changed'<>'false' then raise exception 'Approval failed';end if;
  r:=public.review_coaching_proposal(p,'approved','Duplicate temporary item',current_date,current_date+7,false);

@@ -150,6 +150,7 @@ function fullCoachingSample(index=0){
  data.healthDaily=[];data.healthConnections=[];return data;
 }
 function startFullCoachingDemo(){
+  if (window.legalEdgeProduction) return;
  const index=Math.min(9,Math.max(0,Number(new URLSearchParams(location.search).get('person'))||0));
  state.preview=true;state.role='coach';state.sampleClientData=new Map();
  state.clients=pilotPeople.map((person,i)=>sampleWorkspaceClient(i,person[0]));

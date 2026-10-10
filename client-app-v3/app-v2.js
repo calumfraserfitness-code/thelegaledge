@@ -104,7 +104,7 @@ function safeStepGoal(client = state.client) {
   const goal = Number(client?.daily_steps_goal);
   return Number.isFinite(goal) && goal > 0 ? goal : 8000;
 }
-function normalizeClient(client){return {...client,display_name:client.display_name||client.profile?.full_name||'Unnamed client',daily_steps_goal:safeStepGoal(client)};}
+function normalizeClient(client){return {...client,display_name:client.display_name||client.profile?.full_name||'Unnamed client',email:client.email||client.profile?.email||null,coach_notes:client.private_details?.coach_notes??client.coach_notes,daily_steps_goal:safeStepGoal(client)};}
 
 async function query(label, promise) {
   const result = await promise;
@@ -118,7 +118,7 @@ async function loadCoach() {
     for(let offset=0;;offset+=size){const page=await query(label,build().range(offset,offset+size-1));rows.push(...page);if(page.length<size)return rows;}
   }
   const [clients, memberships] = await Promise.all([
-    allRows('Clients',()=>db.from('clients').select('*,profile:profiles!clients_profile_id_fkey(full_name,email)').order('start_date').order('id')),
+    allRows('Clients',()=>db.from('clients').select('*,profile:profiles!clients_profile_id_fkey(full_name,email),private_details:client_private_details(coach_notes)').order('start_date').order('id')),
     allRows('Corporate memberships',()=>db.from('firm_participants').select('client_id').order('id'))
   ]);
   state.clients = clients.filter(c => c.source_system !== 'coach_health_test').map(normalizeClient);
@@ -245,6 +245,7 @@ async function boot() {
 }
 
 function preview(role) {
+  if (window.legalEdgeProduction) return;
   state.preview = true;
   state.role = role;
   const demoClient = {

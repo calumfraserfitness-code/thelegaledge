@@ -3,6 +3,7 @@ async function launchSave(table,id,patch){
  if(state.preview)return {...patch,id};
  const rows=await query('Save '+table,db.from(table).update(patch).eq('id',id).select());
  if(rows.length!==1||rows[0].id!==id)throw Error('Save was not confirmed. Your changes have not been applied.');
+ if(table==='clients'&&state.role==='coach')rows[0].coach_notes=Object.prototype.hasOwnProperty.call(patch,'coach_notes')?patch.coach_notes:(state.clients.find(c=>c.id===id)?.coach_notes??state.client?.coach_notes??null);
  return rows[0];
 }
 function launchApplyClient(id,saved){
