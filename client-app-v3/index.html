@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#101722">
   <title>The Legal Edge</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="apple-touch-icon" href="./assets/app-icon-192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Lato:wght@400;700&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -13,13 +16,14 @@
   <link rel="stylesheet" href="./firm-pilots.css?v=20260930-6">
   <link rel="stylesheet" href="./pilot-showcase.css?v=20261002-1">
   <link rel="stylesheet" href="./plan-experience.css?v=20260930-3">
+  <script src="./production-mode.js?v=20261010-1"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4" defer></script>
-  <script src="./app-v2.js?v=20261008-6" defer></script>
+  <script src="./app-v2.js?v=20261010-1" defer></script>
   <script src="./plan-experience.js?v=20260930-6" defer></script>
   <script src="./firm-pilots.js?v=20261002-2" defer></script>
-  <script src="./pilot-showcase.js?v=20261002-1" defer></script>
+  <script src="./pilot-showcase.js?v=20261009-visual" defer></script>
   <link rel="stylesheet" href="./coaching-workspace.css?v=20261001-1">
-  <script src="./coaching-workspace.js?v=20261002-2" defer></script>
+  <script src="./coaching-workspace.js?v=20261010-1" defer></script>
   <link rel="stylesheet" href="./production-workflows.css?v=20261001-1">
   <script src="./production-workflows.js?v=20261008-4" defer></script>
   <link rel="stylesheet" href="./legal-edge-brand.css?v=20261002-2">
@@ -33,22 +37,22 @@
   <script src="./coach-health.js?v=20261002-1" defer></script>
   <script src="./hevy.js?v=20261003-1" defer></script>
   <link rel="stylesheet" href="./onboarding-journey.css?v=20261005-4">
-  <script src="./onboarding-journey.js?v=20261005-5" defer></script>
+  <script src="./onboarding-journey.js?v=20261010-1" defer></script>
   <link rel="stylesheet" href="./connections-hub.css?v=20261005-3">
-  <script src="./phone-connection.js?v=20261006-3" defer></script>
+  <script src="./phone-connection.js?v=20261009-3" defer></script>
   <link rel="stylesheet" href="./phone-connection.css?v=20261006-1">
   <script src="./connections-hub.js?v=20261006-1" defer></script>
   <script src="./onboarding-profile.js?v=20261005-2" defer></script>
-  <script src="./onboarding-resources.js?v=20261005-3" defer></script>
+  <script src="./onboarding-resources.js?v=20261009-6" defer></script>
   <script src="./phone-first.js?v=20261006-5" defer></script>
   <link rel="stylesheet" href="./coach-simplicity.css?v=20261005-2">
-  <script src="./coach-simplicity.js?v=20261005-2" defer></script>
+  <script src="./coach-simplicity.js?v=20261010-1" defer></script>
   <script src="./onboarding-documents.js?v=20261005-2" defer></script>
-  <link rel="stylesheet" href="./navigation-clear.css?v=20261007-5">
-  <script src="./navigation-clear.js?v=20261007-6" defer></script>
+  <link rel="stylesheet" href="./navigation-clear.css?v=20261009-4">
+  <script src="./navigation-clear.js?v=20261009-4" defer></script>
   <script src="./client-integrity.js?v=20261006-5" defer></script>
-  <script src="./coaching-completion.js?v=20261007-1" defer></script>
-  <script src="./onboarding-setup.js?v=20261006-1" defer></script>
+  <script src="./coaching-completion.js?v=20261009-5" defer></script>
+  <script src="./onboarding-setup.js?v=20261009-4" defer></script>
   <link rel="stylesheet" href="./daily-tools.css?v=20261007-1">
   <script src="./daily-tools.js?v=20261007-2" defer></script>
   <link rel="stylesheet" href="./meal-library.css?v=20261007-2">
@@ -56,13 +60,13 @@
   <script src="./meal-library.js?v=20261007-2" defer></script>
   <link rel="stylesheet" href="./client-polish.css?v=20261007-2">
   <script src="./client-polish.js?v=20261007-3" defer></script>
-  <script src="./launch-ready.js?v=20261007-3" defer></script>
+  <script src="./launch-ready.js?v=20261010-1" defer></script>
   <link rel="stylesheet" href="./free-health.css?v=20261007-1">
-  <script src="./free-health.js?v=20261008-1" defer></script>
+  <script src="./free-health.js?v=20261009-8" defer></script>
   <link rel="stylesheet" href="./performance-ready.css?v=20261007-1">
-  <script src="./performance-ready.js?v=20261008-5" defer></script>
-  <link rel="stylesheet" href="./calm-experience.css?v=20261008-2">
-  <script src="./calm-experience.js?v=20261008-2" defer></script>
+  <script src="./performance-ready.js?v=20261009-3" defer></script>
+  <link rel="stylesheet" href="./calm-experience.css?v=20261009-2">
+  <script src="./calm-experience.js?v=20261009-8" defer></script>
   <link rel="stylesheet" href="./gym-options.css?v=20261008-1">
   <script src="./gym-options.js?v=20261008-1" defer></script>
 <link rel="stylesheet" href="./client-summary.css?v=20261008-1">
@@ -70,7 +74,7 @@
 <body>
   <div id="toast" class="toast" aria-live="polite"></div>
   <section id="auth" class="auth-page">
-    <div class="auth-brand"><img class="brand-logo auth-logo" src="https://www.thelegal-edge.com/assets/LEGAL_EDGE_LOGO.png" alt="The Legal Edge"><h1>Your coaching.<br><em>In one place.</em></h1><p>The Legal Edge client workspace.</p></div>
+    <div class="auth-brand"><img class="brand-logo auth-logo" src="./assets/legal-edge-logo.svg" alt="The Legal Edge"><h1>Your coaching.<br><em>In one place.</em></h1><p>The Legal Edge client workspace.</p></div>
     <form id="loginForm" class="auth-card">
       <div><span class="eyebrow">WELCOME BACK</span><h2>Sign in</h2><p class="muted">Use the secure account issued by your coach.</p></div>
       <label>Email<input id="email" type="email" autocomplete="email" required></label>
@@ -79,11 +83,10 @@
       <button class="text-btn" id="resetBtn" type="button">Forgot password?</button>
       <div id="authMsg" class="form-msg"></div>
       <p class="muted">Coach and client accounts use separate private workspaces.</p>
-      <a class="btn ghost" href="?workspace=demo&section=corporate">Explore the full app</a>
     </form>
   </section>
   <section id="recovery" class="auth-page hidden">
-    <div class="auth-brand"><img class="brand-logo auth-logo" src="https://www.thelegal-edge.com/assets/LEGAL_EDGE_LOGO.png" alt="The Legal Edge"><h1>Secure your<br><em>account.</em></h1><p>Choose a new password for your Legal Edge account.</p></div>
+    <div class="auth-brand"><img class="brand-logo auth-logo" src="./assets/legal-edge-logo.svg" alt="The Legal Edge"><h1>Secure your<br><em>account.</em></h1><p>Choose a new password for your Legal Edge account.</p></div>
     <form id="recoveryForm" class="auth-card">
       <div><span class="eyebrow">ACCOUNT RECOVERY</span><h2>Set a new password</h2></div>
       <label>New password<input name="new_password" type="password" autocomplete="new-password" minlength="12" required></label>
@@ -93,9 +96,20 @@
       <div id="recoveryMsg" class="form-msg" role="status"></div>
     </form>
   </section>
-  <div id="coachApp" class="app-shell hidden"><aside class="sidebar"><div class="side-brand"><img class="brand-logo shell-logo" src="https://www.thelegal-edge.com/assets/LEGAL_EDGE_LOGO.png" alt=""><div><strong>THE LEGAL EDGE</strong><span>Coach workspace</span></div></div><nav id="coachNav"><button class="side-link active" data-coach-view="dashboard"><span>⌂</span>Dashboard</button><button class="side-link" data-coach-view="clients"><span>◉</span>1-to-1 Clients</button><button class="side-link" data-coach-view="firms"><span>▤</span>Corporate</button></nav><div class="side-foot"><div class="avatar">CF</div><div><strong id="coachName">Calum Fraser</strong><span>Coach</span></div><button class="icon-btn logout" title="Sign out">↗</button></div></aside><header class="mobile-head"><div class="side-brand"><img class="brand-logo shell-logo" src="https://www.thelegal-edge.com/assets/LEGAL_EDGE_LOGO.png" alt=""><strong>THE LEGAL EDGE</strong></div><button id="mobileMenu" class="icon-btn">☰</button></header><main id="coachMain" class="main"></main></div>
-  <div id="clientApp" class="client-shell hidden"><header class="client-head"><div class="side-brand"><img class="brand-logo shell-logo" src="https://www.thelegal-edge.com/assets/LEGAL_EDGE_LOGO.png" alt=""><strong>THE LEGAL EDGE</strong></div><div class="head-actions"><button id="returnCoach" class="btn ghost small hidden" type="button">← Coach view</button><span id="clientHello"></span><details class="account-menu"><summary>Account</summary><div><button type="button" data-account-view="progress">Progress</button><button type="button" data-account-view="diagnostics">Diagnostics</button><button type="button" data-account-view="health">Connected health</button><button type="button" data-account-view="pilot">Firm resources</button><button type="button" class="logout">Sign out</button></div></details></div></header><main id="clientMain" class="client-main"></main><nav id="clientNav" class="client-nav"><button data-client-view="today"><span>⌂</span>Today</button><button class="active" data-client-view="planner"><span>▦</span>Planner</button><button data-client-view="training"><span>◇</span>Training</button><button data-client-view="nutrition"><span>○</span>Nutrition</button><button data-client-view="checkin"><span>✓</span>Check-ins</button></nav></div>
+  <div id="coachApp" class="app-shell hidden"><aside class="sidebar"><div class="side-brand"><img class="brand-logo shell-logo" src="./assets/legal-edge-logo.svg" alt=""><div><strong>THE LEGAL EDGE</strong><span>Coach workspace</span></div></div><nav id="coachNav"><button class="side-link active" data-coach-view="dashboard"><span>⌂</span>Dashboard</button><button class="side-link" data-coach-view="clients"><span>◉</span>1-to-1 Clients</button><button class="side-link" data-coach-view="firms"><span>▤</span>Corporate</button></nav><div class="side-foot"><div class="avatar">CF</div><div><strong id="coachName">Calum Fraser</strong><span>Coach</span></div><button class="icon-btn logout" title="Sign out">↗</button></div></aside><header class="mobile-head"><div class="side-brand"><img class="brand-logo shell-logo" src="./assets/legal-edge-logo.svg" alt=""><strong>THE LEGAL EDGE</strong></div><button id="mobileMenu" class="icon-btn">☰</button></header><main id="coachMain" class="main"></main></div>
+  <div id="clientApp" class="client-shell hidden"><header class="client-head"><div class="side-brand"><img class="brand-logo shell-logo" src="./assets/legal-edge-logo.svg" alt=""><strong>THE LEGAL EDGE</strong></div><div class="head-actions"><button id="returnCoach" class="btn ghost small hidden" type="button">← Coach view</button><span id="clientHello"></span><details class="account-menu"><summary>Account</summary><div><button type="button" data-account-view="progress">Progress</button><button type="button" data-account-view="diagnostics">Diagnostics</button><button type="button" data-account-view="health">Connected health</button><button type="button" data-account-view="pilot">Firm resources</button><button type="button" class="logout">Sign out</button></div></details></div></header><main id="clientMain" class="client-main"></main><nav id="clientNav" class="client-nav"><button data-client-view="today"><span>⌂</span>Today</button><button class="active" data-client-view="planner"><span>▦</span>Planner</button><button data-client-view="training"><span>◇</span>Training</button><button data-client-view="nutrition"><span>○</span>Nutrition</button><button data-client-view="checkin"><span>✓</span>Check-ins</button></nav></div>
 <script src="./client-summary.js?v=20261008-1" defer></script>
+<link rel="stylesheet" href="./daily-nutrition.css?v=20261009-5">
+<script src="./daily-nutrition-model.js?v=20261009-1" defer></script>
+<script src="./daily-nutrition.js?v=20261009-5" defer></script>
+<script src="./premium-start.js?v=20261009-7" defer></script>
+<link rel="stylesheet" href="./premium-start.css?v=20261009-7">
+<script src="./coach-daily-nutrition.js?v=20261009-6" defer></script>
+<link rel="stylesheet" href="./coaching-updates.css?v=20261009-1">
+<script src="./coaching-updates.js?v=20261009-4" defer></script>
+<link rel="stylesheet" href="./playbook.css?v=20261009-3">
+<script src="./playbook.js?v=20261009-4" defer></script>
+<link rel="stylesheet" href="./checkin-system.css?v=20261010-1"><script src="./checkin-system.js?v=20261010-1" defer></script>
 </body>
 </html>
 

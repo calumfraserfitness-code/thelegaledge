@@ -11,7 +11,7 @@ insert into lec_client_fixture(kind) values('a'),('b');
 insert into public.clients(id,profile_id,coach_id,display_name)
  select f.id,u.id,c.id,'Rollback client' from lec_client_fixture f join lec_security_fixture u on u.kind='client_'||f.kind join lec_security_fixture c on c.kind='coach_'||f.kind;
 insert into public.checkins(client_id,wins) select id,'Rollback only' from lec_client_fixture;
-insert into public.training_programs(client_id,name) select id,'Rollback training' from lec_client_fixture;
+insert into public.training_programs(client_id,name,status) select id,'Rollback training','active' from lec_client_fixture;
 insert into public.nutrition_plans(client_id,name) select id,'Rollback nutrition' from lec_client_fixture;
 grant select on lec_security_fixture,lec_client_fixture to authenticated;
 set local role authenticated;
@@ -36,6 +36,7 @@ begin
  select count(*) into after_count from public.training_programs where client_id=(select id from lec_client_fixture where kind='a');if before_count<>after_count then raise exception 'Partial programme persisted after failure';end if;
  begin perform public.import_client_training((select id from lec_client_fixture where kind='b'),plan);raise exception 'Other coach import accepted';exception when insufficient_privilege then null;end;
 end $$;
+update public.training_programs set status='active' where client_id=(select id from lec_client_fixture where kind='a');
 select set_config('request.jwt.claims',jsonb_build_object('sub',(select id from lec_security_fixture where kind='client_a'),'role','authenticated')::text,true);
 do $$ declare n int; begin
  begin update public.profiles set role='coach' where id=(select id from lec_security_fixture where kind='client_a');raise exception 'Client promoted own role';exception when insufficient_privilege then null;end;

@@ -3,7 +3,7 @@ const src=fs.readFileSync(__dirname+'/../app-v2.js','utf8');
 const fn=src.slice(src.indexOf('async function loadCoach()'),src.indexOf('async function loadClientData'));
 async function scenario(result){
  let release;const pending=new Promise(resolve=>release=resolve);
- const ctx={state:{user:{id:'coach'},role:'coach',preview:false},normalizeClient:x=>x,renderCoach(){},$:()=>({classList:{contains:()=>true}}),db:{from:table=>({select:()=>({order:()=>table}),then:resolve=>resolve(table)})},query:(label)=>label==='Client QA'?pending:Promise.resolve(label==='Clients'?[{id:'own'}]:[])};
+ const ctx={AbortController,setTimeout,clearTimeout,document:{activeElement:null},state:{user:{id:'coach'},role:'coach',preview:false},normalizeClient:x=>x,renderCoach(){},$:()=>({classList:{contains:()=>true}}),db:{from:table=>({select(){return this},order(){return this},range(){return table},abortSignal(){return table}})},query:(label)=>label==='Client QA'?pending:Promise.resolve(label==='Clients'?[{id:'own'}]:[])};
  vm.createContext(ctx);vm.runInContext(fn,ctx);
  await ctx.loadCoach();assert.equal(ctx.state.clients.length,1);assert.equal(ctx.state.qaStatus,'loading');
  release(result);await new Promise(resolve=>setImmediate(resolve));return ctx;
