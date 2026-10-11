@@ -2,9 +2,9 @@
 (function(){
  'use strict';
  const M=window.DailyNutrition,host=()=>$('#clientMain');
- let owner=null,logs=[],favourites=[],loaded=false,loadError='',loading=null,dateChoice=null,libraryFilter='All',searchText='',sheet=null,busy=false;
+ let owner=null,logs=[],favourites=[],loaded=false,loadedDate=null,favouritesLoaded=false,loadError='',loading=null,loadSequence=0,dateChoice=null,libraryFilter='All',searchText='',sheet=null,busy=false;
  const ownerKey=()=>`${state.preview?'sample':state.user?.id||''}:${state.client?.id||''}`;
- function reset(){owner=ownerKey();logs=[];favourites=[];loaded=false;loadError='';loading=null;dateChoice=null;sheet=null;busy=false;libraryFilter='All';searchText='';}
+ function reset(){owner=ownerKey();logs=[];favourites=[];loaded=false;loadedDate=null;favouritesLoaded=false;loadError='';loading=null;loadSequence++;dateChoice=null;sheet=null;busy=false;libraryFilter='All';searchText='';}
  function date(){return dateChoice||state.selectedNutritionDate||localCoachingDate();}
  function current(){
   const d=date(),w=state.data.weeks.find(w=>d>=w.week_start&&d<=iso(new Date(new Date(w.week_start+'T12:00:00Z').getTime()+6*864e5)));
@@ -27,21 +27,26 @@
   return result;
  }
  async function load(){
-  if(loaded||loading)return loading;
-  if(state.preview){loaded=true;paint();return;}
-  const key=owner,client=state.client.id;
-  loading=(async()=>{
+  const d=date();
+  if(loaded&&loadedDate===d)return;
+  if(loading?.date===d)return loading.promise;
+  if(state.preview){loaded=true;loadedDate=d;paint();return;}
+  const key=owner,client=state.client.id,sequence=++loadSequence;
+  loaded=false;loadedDate=null;logs=[];loadError='';paint();
+  const request={date:d,promise:null};loading=request;
+  request.promise=(async()=>{
    try{
     const [a,b]=await Promise.all([
-     query('Daily food log',db.from('client_food_entries').select('*').eq('client_id',client).order('entry_date',{ascending:false}).limit(1000)),
-     query('Saved recipes',db.from('client_recipe_favourites').select('*').eq('client_id',client).limit(500))
+     query('Daily food log',db.from('client_food_entries').select('*').eq('client_id',client).eq('entry_date',d).order('created_at',{ascending:true})),
+     favouritesLoaded?Promise.resolve(favourites):query('Saved recipes',db.from('client_recipe_favourites').select('*').eq('client_id',client).limit(500))
     ]);
-    if(owner!==key||ownerKey()!==key)return;
-    logs=a;favourites=b;loaded=true;loadError='';
-   }catch(e){if(owner===key){loadError='Your food log could not load. Your assigned meals are still available.';}}
-   finally{if(owner===key){loading=null;if(state.clientView==='nutrition')paint();}}
-  })();return loading;
+    if(owner!==key||ownerKey()!==key||sequence!==loadSequence||date()!==d)return;
+    logs=a;favourites=b;favouritesLoaded=true;loaded=true;loadedDate=d;loadError='';
+   }catch(e){if(owner===key&&sequence===loadSequence&&date()===d){loadError='Your food log could not load. Your assigned meals are still available.';}}
+   finally{if(owner===key&&sequence===loadSequence){loading=null;if(state.clientView==='nutrition')paint();}}
+  })();return request.promise;
  }
+ function changeDate(d){dateChoice=d;state.selectedNutritionDate=null;sheet=null;if(!state.preview){loaded=false;loadedDate=null;logs=[];}paint();load();}
  const value=(n,unit='')=>n===null?'Not supplied':`${Math.round(n).toLocaleString()}${unit}`;
  function summary(meal,servings=1){return `${value(M.number(meal.calories)===null?null:Number(meal.calories)*servings,' kcal')} · ${value(M.number(meal.protein_g)===null?null:Number(meal.protein_g)*servings,'g protein')}`;}
  function openRoute(route){state.clientView=route;renderClient();}
@@ -63,9 +68,9 @@
 
    <div id="dnSheetHost"></div></div>`;
   $('#dnLibrary').onclick=()=>openLibrary();$('#dnEmptyLibrary')?.addEventListener('click',()=>openLibrary());
-  $('#dnDate').onchange=e=>{if(!e.target.value)return;dateChoice=e.target.value;state.selectedNutritionDate=null;sheet=null;paint();};
-  $('#dnToday')?.addEventListener('click',()=>{dateChoice=null;state.selectedNutritionDate=null;sheet=null;paint();});
-  $$('[data-dn-date]').forEach(b=>b.onclick=()=>{dateChoice=b.dataset.dnDate;state.selectedNutritionDate=null;sheet=null;paint();});
+  $('#dnDate').onchange=e=>{if(e.target.value)changeDate(e.target.value);};
+  $('#dnToday')?.addEventListener('click',()=>changeDate(null));
+  $$('[data-dn-date]').forEach(b=>b.onclick=()=>changeDate(b.dataset.dnDate));
   $$('[data-dn-recipe]').forEach(b=>b.onclick=()=>openRecipe(current().rows.find(r=>r.key===b.dataset.dnRecipe)));
   $$('[data-dn-swap]').forEach(b=>b.onclick=()=>openLibrary(b.dataset.dnSwap));
   $$('[data-dn-log]').forEach(b=>b.onclick=()=>{const r=current().rows.find(r=>r.key===b.dataset.dnLog);save(r,!r.eaten);});
@@ -81,7 +86,7 @@
    const saved=state.preview?{...payload,id:`sample:${d}:${row.key}`}: (await query('Save food log',db.from('client_food_entries').upsert(payload,{onConflict:'client_id,entry_date,slot_key'}).select()))[0];
    if(!saved)throw new Error('Your food log was not saved. Try again.');
    if(ownerKey()!==key)return;
-   const i=logs.findIndex(e=>e.entry_date===d&&e.slot_key===row.key);if(i<0)logs.push(saved);else logs[i]=saved;
+   if(date()===d){const i=logs.findIndex(e=>e.entry_date===d&&e.slot_key===row.key);if(i<0)logs.push(saved);else logs[i]=saved;}
    sheet=null;toast(state.preview?'Sample food updated locally':eaten?'Food logged':'Meal saved');
   }catch(e){if(ownerKey()===key)toast(e.message,'error');}
   finally{if(ownerKey()===key){busy=false;if(state.clientView==='nutrition')paint();}}
@@ -131,8 +136,8 @@
   $('#dnQuickForm').onsubmit=e=>{e.preventDefault();const f=new FormData(e.target),meal={name:String(f.get('name')).trim(),meal_type:'Snack',...Object.fromEntries(M.fields.map(k=>[k,M.number(f.get(k))]))};if(!meal.name)return;save({key:'quick-'+crypto.randomUUID(),servings:1},true,meal,1);};
  }
  // The outer renderer still enforces the existing account, consent and plan gates.
- renderWeeklyNutrition=function(){if(owner!==ownerKey())reset();if(!dateChoice&&state.selectedNutritionDate&&state.selectedNutritionDate!==localCoachingDate())dateChoice=state.selectedNutritionDate;paint();load();};
- window.openDailyNutritionDate=function(d){if(owner!==ownerKey())reset();dateChoice=d||null;state.selectedNutritionDate=null;renderClient();};
+ renderWeeklyNutrition=function(){if(owner!==ownerKey())reset();if(!dateChoice&&state.selectedNutritionDate&&state.selectedNutritionDate!==localCoachingDate())dateChoice=state.selectedNutritionDate;if(!state.preview&&loadedDate!==date()){loaded=false;logs=[];}paint();load();};
+ window.openDailyNutritionDate=function(d){if(owner!==ownerKey())reset();dateChoice=d||null;state.selectedNutritionDate=null;if(!state.preview){loaded=false;loadedDate=null;logs=[];}renderClient();};
  const previousRender=renderClient;
  renderClient=function(){
   if(owner!==ownerKey())reset();
