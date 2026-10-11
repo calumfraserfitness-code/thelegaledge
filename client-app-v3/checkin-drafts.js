@@ -8,18 +8,18 @@
   const client=state.client.id,profile=state.user?.id,period=form.elements.period_start.value;
   const active=()=>generation===version&&state.client?.id===client&&state.user?.id===profile&&form.isConnected;
   const status=document.createElement('p');status.setAttribute('role','status');status.className='muted';status.textContent=state.preview?'Sample draft stays on this screen.':'Your answers save privately as you type. Photos and audio attach when you submit.';form.prepend(status);
-  let dirty=false,timer=null,chain=Promise.resolve(),submitted=false;
+  let dirty=false,timer=null,chain=Promise.resolve(),submitted=false,submitting=false;
   function answers(){const a={};for(const [k,v] of new FormData(form)){if(typeof v==='string'&&!['photo_front'].includes(k))a[k]=v.slice(0,8000);}return a;}
-  function persist(){if(state.preview||submitted||!active())return chain;const snapshot=answers();chain=chain.then(async()=>{if(submitted)return;const {error}=await db.from('client_checkin_drafts').upsert({client_id:client,period_start:period,answers:snapshot,updated_at:new Date().toISOString()},{onConflict:'client_id,period_start'});if(active())status.textContent=error?'Draft could not save. Keep this screen open and try again.':'Draft saved. Photos and audio attach when you submit.';});return chain;}
+  function persist(){if(state.preview||submitted||!active())return chain;const snapshot=answers();chain=chain.catch(()=>{}).then(async()=>{if(submitted)return;let error;try{({error}=await db.from('client_checkin_drafts').upsert({client_id:client,period_start:period,answers:snapshot,updated_at:new Date().toISOString()},{onConflict:'client_id,period_start'}));}catch(e){error=e;}if(active())status.textContent=error?'Draft could not save. Keep this screen open and try again.':'Draft saved. Photos and audio attach when you submit.';});return chain;}
   function changed(){dirty=true;if(!state.preview)status.textContent='Saving draft…';clearTimeout(timer);timer=setTimeout(persist,700);}
   form.addEventListener('input',changed);form.addEventListener('change',changed);
   const submit=form.onsubmit;
-  form.onsubmit=async function(e){e.preventDefault();clearTimeout(timer);await persist();if(!active())return;await submit.call(this,e);const confirmed=state.data.checkins.some(c=>c.period_start===period);if(confirmed&&!state.preview){submitted=true;await chain;await db.from('client_checkin_drafts').delete().eq('client_id',client).eq('period_start',period);}};
+  form.onsubmit=async function(e){e.preventDefault();if(submitting)return;submitting=true;try{clearTimeout(timer);await persist();if(!active())return;await submit.call(this,e);const confirmed=state.data.checkins.some(c=>c.period_start===period);if(confirmed&&!state.preview){submitted=true;await chain;await db.from('client_checkin_drafts').delete().eq('client_id',client).eq('period_start',period);}}finally{submitting=false;}};
   // Suppress the browser's default submit before waiting for the server draft.
   form.addEventListener('submit',e=>e.preventDefault());
   if(!state.preview)db.from('client_checkin_drafts').select('answers').eq('client_id',client).eq('period_start',period).maybeSingle().then(({data,error})=>{
    if(!active()||dirty)return;if(error){status.textContent='Draft unavailable. You can still submit your check-in.';return;}
    if(data){for(const [k,v] of Object.entries(data.answers||{})){const nodes=form.querySelectorAll('[name]');nodes.forEach(n=>{if(n.name!==k||n.type==='file'||n.type==='hidden')return;if(n.type==='radio')n.checked=n.value===String(v);else n.value=String(v);});}status.textContent='Your saved draft has been restored.';}
-  });
+  }).catch(()=>{if(active())status.textContent='Draft unavailable. You can still submit your check-in.';});
  };
 })();

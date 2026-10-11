@@ -28,17 +28,18 @@ exerciseCard=function(ex,loggable=false){
  if(/dumbbell|\bdb\b/i.test(ex.name))html=html.replace('<form class="set-log"','<p class="muted">Load is the combined weight when using two dumbbells: 2 × 20 = 40. For one dumbbell, enter its weight. Use '+(state.client.weight_unit==='lbs'?'lb':'kg')+'.</p><form class="set-log"');
  return html;
 };
-function checkinWeekChoices(){const now=iso(monday()),date=new Date(now+'T12:00:00');const past=Array.from({length:52},(_,i)=>iso(new Date(+date-i*7*86400000))).filter(d=>!state.client.start_date||d>=state.client.start_date);return [...new Set([now,...past,...state.data.weeks.filter(w=>w.week_start<=now).map(w=>w.week_start)])].sort().reverse();}
+function checkinClientWeek(){return window.CheckinStatus?window.CheckinStatus.week(state.client):iso(monday());}
+function checkinWeekChoices(){const now=checkinClientWeek(),date=new Date(now+'T12:00:00');const past=Array.from({length:52},(_,i)=>iso(new Date(+date-i*7*86400000))).filter(d=>!state.client.start_date||d>=state.client.start_date);return [...new Set([now,...past,...state.data.weeks.filter(w=>w.week_start<=now).map(w=>w.week_start)])].sort().reverse();}
 const completionCheckin=clientCheckin;
 clientCheckin=function(){
- completionCheckin();const host=$('#clientMain'),weeks=checkinWeekChoices(),selected=state.checkinWeek||iso(monday());
+ completionCheckin();const host=$('#clientMain'),weeks=checkinWeekChoices(),selected=state.checkinWeek||checkinClientWeek();
  host.insertAdjacentHTML('afterbegin','<section class="panel"><label>Week to review<select id="checkinWeekChoice">'+weeks.map(d=>'<option value="'+d+'" '+(d===selected?'selected':'')+'>Week beginning '+esc(fmt(d))+'</option>').join('')+'</select></label></section>');
  $('#checkinWeekChoice').onchange=e=>{state.checkinWeek=e.target.value;clientCheckin();};
- if(selected===iso(monday()))return;
+ if(selected===checkinClientWeek())return;
  const record=state.data.checkins.find(c=>c.period_start===selected);
  if(record){host.innerHTML='<section class="panel"><button id="checkinChooseAnother" class="btn ghost">Choose another week</button><h2>Week beginning '+esc(fmt(selected))+'</h2>'+checkinCard(record)+'</section>';$('#checkinChooseAnother').onclick=()=>{state.checkinWeek=null;clientCheckin();};return;}
  // Reuse the established staged form for an unsubmitted past week, without current-week readings.
- const current=state.data.checkins,now=iso(monday());state.data.checkins=current.filter(c=>c.period_start!==now);completionCheckin();state.data.checkins=current;
+ const current=state.data.checkins,now=checkinClientWeek();state.data.checkins=current.filter(c=>c.period_start!==now);completionCheckin();state.data.checkins=current;
  host.insertAdjacentHTML('afterbegin','<section class="panel"><h2>Missed check-in · '+esc(fmt(selected))+'</h2><p>Your answers will be saved against this week.</p><button id="checkinChooseAnother" class="btn ghost">Choose another week</button></section>');$('#checkinChooseAnother').onclick=()=>{state.checkinWeek=null;clientCheckin();};
  const form=$('#checkinForm');form.elements.namedItem('period_start').value=selected;form.elements.namedItem('week_number').value=state.data.weeks.find(w=>w.week_start===selected)?.week_number||1;form.querySelector('[name="average_steps"]')?.remove();form.querySelector('.refresh-connected')?.remove();
 };
