@@ -61,7 +61,7 @@
    ${loadError?`<div class="dn-notice" role="status">${esc(loadError)} <button class="text-btn" id="dnRetry">Retry</button></div>`:!loaded?'<p class="muted" role="status">Loading your saved food log…</p>':''}
    <div class="dn-section-heading"><h2>Your meals</h2><span>Recipe details only when you need them</span></div>
    <div class="dn-meals">${m.rows.map((r,i)=>`<article class="dn-meal ${r.eaten?'dn-eaten':''}"><div class="dn-meal-number" aria-hidden="true">${String(i+1).padStart(2,'0')}</div><div class="dn-meal-body"><div class="dn-meal-label"><span class="eyebrow">${esc(r.group)}</span>${r.eaten?'<span class="dn-status">Logged</span>':''}</div><h3>${esc(r.meal.name)}</h3><p>${esc(summary(r.meal,r.servings))}${r.servings!==1?` · ${r.servings} servings`:''}</p><div class="dn-meal-actions"><button class="text-btn" data-dn-recipe="${esc(r.key)}">View recipe</button><button class="text-btn" data-dn-swap="${esc(r.key)}" ${r.eaten?'disabled title="Undo this log before changing the meal"':''}>Swap meal</button><button class="btn ${r.eaten?'ghost':'primary'} small" data-dn-log="${esc(r.key)}" ${!loaded||busy?'disabled':''}>${r.eaten?'Undo log':'Log eaten'}</button></div></div></article>`).join('')||`<div class="dn-empty"><h3>${m.day?'No recipes assigned for this day yet.':'No published meal schedule for this date.'}</h3><p>Your coach’s daily targets are above. Browse your assigned recipes or log food you’ve eaten.</p><button class="btn ghost" id="dnEmptyLibrary">Choose a recipe</button></div>`}</div>
-   <div class="dn-daily-actions"><button class="btn ghost" id="dnQuickLog" ${!loaded?'disabled':''}>+ Quick food log</button><span>Only logged food counts towards your intake.</span></div>
+   <div class="dn-daily-actions"><button class="btn primary" id="dnAnywhere" ${!loaded?'disabled':''}>Food Anywhere</button><button class="btn ghost" id="dnQuickLog" ${!loaded?'disabled':''}>+ Quick food log</button><span>Only logged food counts towards your intake.</span></div>
    <details class="dn-details"><summary>Chosen meal totals</summary><p>${value(planned.calories,' kcal')} · ${value(planned.protein_g,'g protein')} · ${value(planned.carbs_g,'g carbs')} · ${value(planned.fat_g,'g fat')}</p><p>Estimates from your saved recipes. Choosing a meal does not mark it eaten. Missing nutrients keep the relevant total unknown.</p></details>
    ${m.plan?.coach_notes?`<aside class="dn-coach-note"><span class="eyebrow">FROM YOUR COACH</span><p>${esc(m.plan.coach_notes)}</p></aside>`:''}
    <details class="dn-details dn-week"><summary>Shopping list</summary>${shoppingListMarkup(weeklyNutritionSelection().days)}</details>
@@ -74,7 +74,7 @@
   $$('[data-dn-recipe]').forEach(b=>b.onclick=()=>openRecipe(current().rows.find(r=>r.key===b.dataset.dnRecipe)));
   $$('[data-dn-swap]').forEach(b=>b.onclick=()=>openLibrary(b.dataset.dnSwap));
   $$('[data-dn-log]').forEach(b=>b.onclick=()=>{const r=current().rows.find(r=>r.key===b.dataset.dnLog);save(r,!r.eaten);});
-  $('#dnQuickLog').onclick=quickLog;$('#dnRetry')?.addEventListener('click',()=>{loadError='';load();paint();});
+  $('#dnAnywhere').onclick=()=>window.FoodAnywhere?.open();$('#dnQuickLog').onclick=quickLog;$('#dnRetry')?.addEventListener('click',()=>{loadError='';load();paint();});
   if(sheet)renderSheet();
  }
  async function save(row,eaten,meal=row.meal,servings=row.servings||1){
@@ -87,8 +87,8 @@
    if(!saved)throw new Error('Your food log was not saved. Try again.');
    if(ownerKey()!==key)return;
    if(date()===d){const i=logs.findIndex(e=>e.entry_date===d&&e.slot_key===row.key);if(i<0)logs.push(saved);else logs[i]=saved;}
-   sheet=null;toast(state.preview?'Sample food updated locally':eaten?'Food logged':'Meal saved');
-  }catch(e){if(ownerKey()===key)toast(e.message,'error');}
+   sheet=null;toast(state.preview?'Sample food updated locally':eaten?'Food logged':'Meal saved');return true;
+  }catch(e){if(ownerKey()===key)toast(e.message,'error');return false;}
   finally{if(ownerKey()===key){busy=false;if(state.clientView==='nutrition')paint();}}
  }
  function showSheet(content,title){
@@ -135,6 +135,7 @@
   sheet={type:'quick'};showSheet(`<p>Use the food label or your own tracked values. Leave unknown nutrients blank.</p><form id="dnQuickForm"><label>Food or meal<input name="name" maxlength="200" required placeholder="e.g. Lunch leftovers"></label><div class="dn-quick-grid">${M.fields.map((k,i)=>`<label>${['Calories (kcal)','Protein (g)','Carbs (g)','Fat (g)'][i]}<input name="${k}" type="number" inputmode="decimal" min="0" max="10000" step="any" placeholder="Optional"></label>`).join('')}</div><p class="muted">Enter totals for the amount you ate. This adds a food log; it does not change your coaching plan.</p><button class="btn primary">Log food eaten</button></form>`,'Quick food log');
   $('#dnQuickForm').onsubmit=e=>{e.preventDefault();const f=new FormData(e.target),meal={name:String(f.get('name')).trim(),meal_type:'Snack',...Object.fromEntries(M.fields.map(k=>[k,M.number(f.get(k))]))};if(!meal.name)return;save({key:'quick-'+crypto.randomUUID(),servings:1},true,meal,1);};
  }
+ window.DailyNutritionAccess={context:()=>({...current(),loaded,owner:ownerKey()}),log:async(meal,servings=1)=>{if(!loaded||busy)throw Error('Wait for your food log to load.');const ok=await save({key:'anywhere-'+crypto.randomUUID(),servings},true,meal,servings);if(!ok)throw Error('Your food was not logged. Retry when your connection is available.');}};
  // The outer renderer still enforces the existing account, consent and plan gates.
  renderWeeklyNutrition=function(){if(owner!==ownerKey())reset();if(!dateChoice&&state.selectedNutritionDate&&state.selectedNutritionDate!==localCoachingDate())dateChoice=state.selectedNutritionDate;if(!state.preview&&loadedDate!==date()){loaded=false;logs=[];}paint();load();};
  window.openDailyNutritionDate=function(d){if(owner!==ownerKey())reset();dateChoice=d||null;state.selectedNutritionDate=null;if(!state.preview){loaded=false;loadedDate=null;logs=[];}renderClient();};
