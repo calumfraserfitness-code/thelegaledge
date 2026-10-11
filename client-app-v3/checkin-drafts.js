@@ -14,7 +14,7 @@
   function changed(){dirty=true;if(!state.preview)status.textContent='Saving draft…';clearTimeout(timer);timer=setTimeout(persist,700);}
   form.addEventListener('input',changed);form.addEventListener('change',changed);
   const submit=form.onsubmit;
-  form.onsubmit=async function(e){e.preventDefault();if(submitting)return;submitting=true;try{clearTimeout(timer);await persist();if(!active())return;await submit.call(this,e);const confirmed=state.data.checkins.some(c=>c.period_start===period);if(confirmed&&!state.preview){submitted=true;await chain;await db.from('client_checkin_drafts').delete().eq('client_id',client).eq('period_start',period);}}finally{submitting=false;}};
+  form.onsubmit=async function(e){e.preventDefault();if(submitting)return;submitting=true;try{clearTimeout(timer);await persist();if(!active())return;await submit.call(this,e);if(state.client?.id!==client||state.user?.id!==profile)return;const confirmed=state.data.checkins.some(c=>c.period_start===period);if(confirmed&&!state.preview){submitted=true;await chain;await db.from('client_checkin_drafts').delete().eq('client_id',client).eq('period_start',period);}}finally{submitting=false;}};
   // Suppress the browser's default submit before waiting for the server draft.
   form.addEventListener('submit',e=>e.preventDefault());
   if(!state.preview)db.from('client_checkin_drafts').select('answers').eq('client_id',client).eq('period_start',period).maybeSingle().then(({data,error})=>{

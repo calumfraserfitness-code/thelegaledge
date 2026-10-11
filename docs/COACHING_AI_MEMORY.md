@@ -14,6 +14,8 @@ Use client-app-v3/RELEASE_20261009.md as the authoritative release checklist. Pr
 - Provider acceptance is not proof a phone displayed a push notification. A wearable connection needs genuine provider data; no seeded results.
 - AI food estimates must retain provenance, region and portion assumptions. Provider keys belong in the encrypted coach vault, never browser code or this public repository.
 
+- Capture attachment files and ownership at submission start. Recheck account/client between uploads; never attach a later photo using a newly selected client or clear another screen’s voice note.
+
 ## Daily review
 
 The enabled Legal Edge app review runs around 08:00 Europe/Dublin. It uses bounded read-only checks and reports actionable failures. It must not rewrite client plans, deploy, send client messages or alter production data. Persistent lessons support future maintenance; the model does not retrain itself automatically. Keep all lessons technical and aggregate; never commit private client health data or credentials.

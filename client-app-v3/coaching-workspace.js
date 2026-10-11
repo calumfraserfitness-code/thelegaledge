@@ -60,7 +60,7 @@ async function saveCoachingRecord(event,table,key,id,render){
  try{
  const saved=state.preview?{...row,id:id||'sample-'+Date.now(),status:row.status||(table==='client_coaching_calls'?'scheduled':'active')}:(await query('Personal coaching record',id?db.from(table).update(row).eq('id',id).eq('client_id',clientId).select():db.from(table).insert(row).select()))[0];
  if(!saved?.id)throw new Error('Record was not saved. Reload and try again.');
- if(state.client.id!==clientId)return;
+ if(state.client?.id!==clientId)return;
  const entries=state.data[key]||[],index=entries.findIndex(x=>x.id===saved.id);if(index>=0)entries[index]={...entries[index],...saved};else entries.push(saved);state.data[key]=entries;
  render();toast(state.preview?'Sample updated locally':'Personal coaching record saved');
  }catch(error){toast(error.message,'error');setBusy(event.submitter,false);}
@@ -102,7 +102,7 @@ clientCheckin=function(){originalCoachingCheckin();const form=$('#checkinForm');
  form.onsubmit=submitAtomicCoachingCheckin;
 };
 async function submitAtomicCoachingCheckin(event){
- event.preventDefault();const fd=new FormData(event.target),answers={},clientId=state.client.id;
+ event.preventDefault();const fd=new FormData(event.target),answers={},clientId=state.client.id,userId=state.user?.id;const active=()=>state.client?.id===clientId&&state.user?.id===userId;const audioContext={clientId,userId,preview:state.preview,file:typeof checkinAudioFile==='undefined'?null:checkinAudioFile};
  for(const[key,value]of fd){if(key.startsWith('photo_')||key==='weight_display')continue;answers[key]=value===''?null:value;}
  if(fd.get('weight_display'))answers.weight_kg=Number(fd.get('weight_display'))/(state.client.weight_unit==='lbs'?2.2046226218:1);
  const period=answers.period_start;if(!period||new Date(period+'T12:00:00').getDay()!==1)return toast('Choose the Monday for this check-in','error');
@@ -112,9 +112,9 @@ async function submitAtomicCoachingCheckin(event){
  try{
  const previewExisting=state.preview?state.data.checkins.find(c=>c.period_start===period):null;
  const result=state.preview?{checkin:previewExisting||{...answers,id:'sample-checkin-'+Date.now(),client_id:clientId,submitted_at:new Date().toISOString()},already_submitted:Boolean(previewExisting)}:await query('Weekly check-in and progress',db.rpc('submit_client_checkin',{target_client_id:clientId,answers}));
- saved=result.checkin;if(!saved?.id)throw new Error('Check-in response incomplete');if(state.client.id!==clientId)return;
- if(!result.already_submitted){state.data.checkins.unshift(saved);if(result.progress){const index=state.data.progress.findIndex(p=>p.id===result.progress.id);if(index>=0)state.data.progress[index]=result.progress;else state.data.progress.unshift(result.progress);}for(const photo of photos){if(!state.preview)await storeProgressPhoto(photo.file,photo.view,Number(answers.week_number)||null,saved.id);}}
- if(typeof storeCheckinAudio==='function')await storeCheckinAudio(saved.id,Number(answers.week_number)||null);
+ saved=result.checkin;if(!saved?.id)throw new Error('Check-in response incomplete');if(!active())return;
+ if(!result.already_submitted){state.data.checkins.unshift(saved);if(result.progress){const index=state.data.progress.findIndex(p=>p.id===result.progress.id);if(index>=0)state.data.progress[index]=result.progress;else state.data.progress.unshift(result.progress);}for(const photo of photos){if(!active())return;if(!state.preview)await storeProgressPhoto(photo.file,photo.view,Number(answers.week_number)||null,saved.id);}}
+ if(!active())return;if(typeof storeCheckinAudio==='function')await storeCheckinAudio(saved.id,Number(answers.week_number)||null,audioContext);if(!active())return;
  toast(result.already_submitted?'This week was already submitted; no duplicate saved':state.preview?'Sample check-in saved locally':'Check-in and progress saved together');clientCheckin();
  }catch(error){toast(saved?'Check-in saved; attachment upload failed: '+error.message:error.message,'error');setBusy(event.submitter,false);}
 }
