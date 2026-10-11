@@ -1,6 +1,17 @@
 const SUPABASE_URL = 'https://baxvhilvrhshlfizakak.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_DRoPSo_3TPlU8mMeLQNruw_82hanHNi';
-const db = window.supabase?.createClient?.(SUPABASE_URL, SUPABASE_KEY) ?? null;
+async function secureFetch(input, options = {}) {
+  const url=String(input?.url||input),timeout=url.includes('/auth/v1/')?15000:url.includes('/storage/v1/')?120000:url.includes('/functions/v1/')?100000:25000;
+  const controller=new AbortController(),signal=options.signal;
+  const abort=()=>controller.abort(signal?.reason);
+  if(signal?.aborted)abort();else signal?.addEventListener('abort',abort,{once:true});
+  const timer=setTimeout(()=>controller.abort(),timeout);
+  try{return await fetch(input,{...options,signal:controller.signal});}
+  finally{clearTimeout(timer);signal?.removeEventListener('abort',abort);}
+}
+const db = window.supabase?.createClient?.(SUPABASE_URL, SUPABASE_KEY, {global:{fetch:secureFetch}}) ?? null;
+let bootRequest=null;
+function boot(){if(bootRequest)return bootRequest;bootRequest=bootAccount().finally(()=>bootRequest=null);return bootRequest;}
 let recoveryMode = new URLSearchParams(location.hash.slice(1)).get('type') === 'recovery';
 
 const $ = (selector) => document.querySelector(selector);
@@ -207,7 +218,7 @@ function demoData() {
   };
 }
 
-async function boot() {
+async function bootAccount() {
   try {
     if (new URLSearchParams(location.search).get('onboarding') === 'demo'||new URLSearchParams(location.search).get('pilot') === 'demo'||new URLSearchParams(location.search).get('workspace') === 'demo') return;
     if (!db) throw new Error('The secure connection did not load. Refresh the page.');
@@ -1665,9 +1676,17 @@ function bindShell() {
     event.preventDefault();
     $('#authMsg').textContent = 'Signing in…';
     if (!db) return $('#authMsg').textContent = 'Secure login failed to load. Refresh the page.';
-    const { error } = await db.auth.signInWithPassword({ email: $('#email').value.trim(), password: $('#password').value });
-    if (error) return $('#authMsg').textContent = error.message;
-    await boot();
+    const button=event.submitter||$('#loginForm button[type="submit"]');
+    if(button?.disabled)return;
+    setBusy(button,true,'Signing in…');
+    try{
+      const { error } = await db.auth.signInWithPassword({ email: $('#email').value.trim().toLowerCase(), password: $('#password').value });
+      if(error)throw error;
+      $('#authMsg').textContent='Opening your coaching workspace…';
+      await boot();
+    }catch(error){$('#authMsg').textContent=/abort|timeout|fetch|network/i.test(error.message||'')?'The connection timed out. Your records are safe. Tap Sign in to retry.':error.message||'Sign-in could not complete. Try again.';}
+    finally{setBusy(button,false);}
+
   };
   $('#resetBtn').onclick = async () => {
     const email = $('#email').value.trim();
