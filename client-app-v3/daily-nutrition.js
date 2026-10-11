@@ -2,9 +2,9 @@
 (function(){
  'use strict';
  const M=window.DailyNutrition,host=()=>$('#clientMain');
- let owner=null,logs=[],favourites=[],loaded=false,loadError='',loading=null,dateChoice=null,libraryFilter='All',searchText='',sheet=null,busy=false;
+ let owner=null,logs=[],favourites=[],loaded=false,loadedDate=null,favouritesLoaded=false,loadError='',loading=null,loadSequence=0,dateChoice=null,libraryFilter='All',searchText='',sheet=null,busy=false;
  const ownerKey=()=>`${state.preview?'sample':state.user?.id||''}:${state.client?.id||''}`;
- function reset(){owner=ownerKey();logs=[];favourites=[];loaded=false;loadError='';loading=null;dateChoice=null;sheet=null;busy=false;libraryFilter='All';searchText='';}
+ function reset(){owner=ownerKey();logs=[];favourites=[];loaded=false;loadedDate=null;favouritesLoaded=false;loadError='';loading=null;loadSequence++;dateChoice=null;sheet=null;busy=false;libraryFilter='All';searchText='';}
  function date(){return dateChoice||state.selectedNutritionDate||localCoachingDate();}
  function current(){
   const d=date(),w=state.data.weeks.find(w=>d>=w.week_start&&d<=iso(new Date(new Date(w.week_start+'T12:00:00Z').getTime()+6*864e5)));
@@ -27,21 +27,26 @@
   return result;
  }
  async function load(){
-  if(loaded||loading)return loading;
-  if(state.preview){loaded=true;paint();return;}
-  const key=owner,client=state.client.id;
-  loading=(async()=>{
+  const d=date();
+  if(loaded&&loadedDate===d)return;
+  if(loading?.date===d)return loading.promise;
+  if(state.preview){loaded=true;loadedDate=d;paint();return;}
+  const key=owner,client=state.client.id,sequence=++loadSequence;
+  loaded=false;loadedDate=null;logs=[];loadError='';paint();
+  const request={date:d,promise:null};loading=request;
+  request.promise=(async()=>{
    try{
     const [a,b]=await Promise.all([
-     query('Daily food log',db.from('client_food_entries').select('*').eq('client_id',client).order('entry_date',{ascending:false}).limit(1000)),
-     query('Saved recipes',db.from('client_recipe_favourites').select('*').eq('client_id',client).limit(500))
+     query('Daily food log',db.from('client_food_entries').select('*').eq('client_id',client).eq('entry_date',d).order('created_at',{ascending:true})),
+     favouritesLoaded?Promise.resolve(favourites):query('Saved recipes',db.from('client_recipe_favourites').select('*').eq('client_id',client).limit(500))
     ]);
-    if(owner!==key||ownerKey()!==key)return;
-    logs=a;favourites=b;loaded=true;loadError='';
-   }catch(e){if(owner===key){loadError='Your food log could not load. Your assigned meals are still available.';}}
-   finally{if(owner===key){loading=null;if(state.clientView==='nutrition')paint();}}
-  })();return loading;
+    if(owner!==key||ownerKey()!==key||sequence!==loadSequence||date()!==d)return;
+    logs=a;favourites=b;favouritesLoaded=true;loaded=true;loadedDate=d;loadError='';
+   }catch(e){if(owner===key&&sequence===loadSequence&&date()===d){loadError='Your food log could not load. Your assigned meals are still available.';}}
+   finally{if(owner===key&&sequence===loadSequence){loading=null;if(state.clientView==='nutrition')paint();}}
+  })();return request.promise;
  }
+ function changeDate(d){dateChoice=d;state.selectedNutritionDate=null;sheet=null;if(!state.preview){loaded=false;loadedDate=null;logs=[];}paint();load();}
  const value=(n,unit='')=>n===null?'Not supplied':`${Math.round(n).toLocaleString()}${unit}`;
  function summary(meal,servings=1){return `${value(M.number(meal.calories)===null?null:Number(meal.calories)*servings,' kcal')} · ${value(M.number(meal.protein_g)===null?null:Number(meal.protein_g)*servings,'g protein')}`;}
  function openRoute(route){state.clientView=route;renderClient();}
@@ -56,20 +61,20 @@
    ${loadError?`<div class="dn-notice" role="status">${esc(loadError)} <button class="text-btn" id="dnRetry">Retry</button></div>`:!loaded?'<p class="muted" role="status">Loading your saved food log…</p>':''}
    <div class="dn-section-heading"><h2>Your meals</h2><span>Recipe details only when you need them</span></div>
    <div class="dn-meals">${m.rows.map((r,i)=>`<article class="dn-meal ${r.eaten?'dn-eaten':''}"><div class="dn-meal-number" aria-hidden="true">${String(i+1).padStart(2,'0')}</div><div class="dn-meal-body"><div class="dn-meal-label"><span class="eyebrow">${esc(r.group)}</span>${r.eaten?'<span class="dn-status">Logged</span>':''}</div><h3>${esc(r.meal.name)}</h3><p>${esc(summary(r.meal,r.servings))}${r.servings!==1?` · ${r.servings} servings`:''}</p><div class="dn-meal-actions"><button class="text-btn" data-dn-recipe="${esc(r.key)}">View recipe</button><button class="text-btn" data-dn-swap="${esc(r.key)}" ${r.eaten?'disabled title="Undo this log before changing the meal"':''}>Swap meal</button><button class="btn ${r.eaten?'ghost':'primary'} small" data-dn-log="${esc(r.key)}" ${!loaded||busy?'disabled':''}>${r.eaten?'Undo log':'Log eaten'}</button></div></div></article>`).join('')||`<div class="dn-empty"><h3>${m.day?'No recipes assigned for this day yet.':'No published meal schedule for this date.'}</h3><p>Your coach’s daily targets are above. Browse your assigned recipes or log food you’ve eaten.</p><button class="btn ghost" id="dnEmptyLibrary">Choose a recipe</button></div>`}</div>
-   <div class="dn-daily-actions"><button class="btn ghost" id="dnQuickLog" ${!loaded?'disabled':''}>+ Quick food log</button><span>Only logged food counts towards your intake.</span></div>
+   <div class="dn-daily-actions"><button class="btn primary" id="dnAnywhere" ${!loaded?'disabled':''}>Food Anywhere</button><button class="btn ghost" id="dnQuickLog" ${!loaded?'disabled':''}>+ Quick food log</button><span>Only logged food counts towards your intake.</span></div>
    <details class="dn-details"><summary>Chosen meal totals</summary><p>${value(planned.calories,' kcal')} · ${value(planned.protein_g,'g protein')} · ${value(planned.carbs_g,'g carbs')} · ${value(planned.fat_g,'g fat')}</p><p>Estimates from your saved recipes. Choosing a meal does not mark it eaten. Missing nutrients keep the relevant total unknown.</p></details>
    ${m.plan?.coach_notes?`<aside class="dn-coach-note"><span class="eyebrow">FROM YOUR COACH</span><p>${esc(m.plan.coach_notes)}</p></aside>`:''}
    <details class="dn-details dn-week"><summary>Shopping list</summary>${shoppingListMarkup(weeklyNutritionSelection().days)}</details>
 
    <div id="dnSheetHost"></div></div>`;
   $('#dnLibrary').onclick=()=>openLibrary();$('#dnEmptyLibrary')?.addEventListener('click',()=>openLibrary());
-  $('#dnDate').onchange=e=>{if(!e.target.value)return;dateChoice=e.target.value;state.selectedNutritionDate=null;sheet=null;paint();};
-  $('#dnToday')?.addEventListener('click',()=>{dateChoice=null;state.selectedNutritionDate=null;sheet=null;paint();});
-  $$('[data-dn-date]').forEach(b=>b.onclick=()=>{dateChoice=b.dataset.dnDate;state.selectedNutritionDate=null;sheet=null;paint();});
+  $('#dnDate').onchange=e=>{if(e.target.value)changeDate(e.target.value);};
+  $('#dnToday')?.addEventListener('click',()=>changeDate(null));
+  $$('[data-dn-date]').forEach(b=>b.onclick=()=>changeDate(b.dataset.dnDate));
   $$('[data-dn-recipe]').forEach(b=>b.onclick=()=>openRecipe(current().rows.find(r=>r.key===b.dataset.dnRecipe)));
   $$('[data-dn-swap]').forEach(b=>b.onclick=()=>openLibrary(b.dataset.dnSwap));
   $$('[data-dn-log]').forEach(b=>b.onclick=()=>{const r=current().rows.find(r=>r.key===b.dataset.dnLog);save(r,!r.eaten);});
-  $('#dnQuickLog').onclick=quickLog;$('#dnRetry')?.addEventListener('click',()=>{loadError='';load();paint();});
+  $('#dnAnywhere').onclick=()=>window.FoodAnywhere?.open();$('#dnQuickLog').onclick=quickLog;$('#dnRetry')?.addEventListener('click',()=>{loadError='';load();paint();});
   if(sheet)renderSheet();
  }
  async function save(row,eaten,meal=row.meal,servings=row.servings||1){
@@ -81,9 +86,9 @@
    const saved=state.preview?{...payload,id:`sample:${d}:${row.key}`}: (await query('Save food log',db.from('client_food_entries').upsert(payload,{onConflict:'client_id,entry_date,slot_key'}).select()))[0];
    if(!saved)throw new Error('Your food log was not saved. Try again.');
    if(ownerKey()!==key)return;
-   const i=logs.findIndex(e=>e.entry_date===d&&e.slot_key===row.key);if(i<0)logs.push(saved);else logs[i]=saved;
-   sheet=null;toast(state.preview?'Sample food updated locally':eaten?'Food logged':'Meal saved');
-  }catch(e){if(ownerKey()===key)toast(e.message,'error');}
+   if(date()===d){const i=logs.findIndex(e=>e.entry_date===d&&e.slot_key===row.key);if(i<0)logs.push(saved);else logs[i]=saved;}
+   sheet=null;toast(state.preview?'Sample food updated locally':eaten?'Food logged':'Meal saved');return true;
+  }catch(e){if(ownerKey()===key)toast(e.message,'error');return false;}
   finally{if(ownerKey()===key){busy=false;if(state.clientView==='nutrition')paint();}}
  }
  function showSheet(content,title){
@@ -130,9 +135,10 @@
   sheet={type:'quick'};showSheet(`<p>Use the food label or your own tracked values. Leave unknown nutrients blank.</p><form id="dnQuickForm"><label>Food or meal<input name="name" maxlength="200" required placeholder="e.g. Lunch leftovers"></label><div class="dn-quick-grid">${M.fields.map((k,i)=>`<label>${['Calories (kcal)','Protein (g)','Carbs (g)','Fat (g)'][i]}<input name="${k}" type="number" inputmode="decimal" min="0" max="10000" step="any" placeholder="Optional"></label>`).join('')}</div><p class="muted">Enter totals for the amount you ate. This adds a food log; it does not change your coaching plan.</p><button class="btn primary">Log food eaten</button></form>`,'Quick food log');
   $('#dnQuickForm').onsubmit=e=>{e.preventDefault();const f=new FormData(e.target),meal={name:String(f.get('name')).trim(),meal_type:'Snack',...Object.fromEntries(M.fields.map(k=>[k,M.number(f.get(k))]))};if(!meal.name)return;save({key:'quick-'+crypto.randomUUID(),servings:1},true,meal,1);};
  }
+ window.DailyNutritionAccess={context:()=>({...current(),loaded,owner:ownerKey()}),log:async(meal,servings=1)=>{if(!loaded||busy)throw Error('Wait for your food log to load.');const ok=await save({key:'anywhere-'+crypto.randomUUID(),servings},true,meal,servings);if(!ok)throw Error('Your food was not logged. Retry when your connection is available.');}};
  // The outer renderer still enforces the existing account, consent and plan gates.
- renderWeeklyNutrition=function(){if(owner!==ownerKey())reset();if(!dateChoice&&state.selectedNutritionDate&&state.selectedNutritionDate!==localCoachingDate())dateChoice=state.selectedNutritionDate;paint();load();};
- window.openDailyNutritionDate=function(d){if(owner!==ownerKey())reset();dateChoice=d||null;state.selectedNutritionDate=null;renderClient();};
+ renderWeeklyNutrition=function(){if(owner!==ownerKey())reset();if(!dateChoice&&state.selectedNutritionDate&&state.selectedNutritionDate!==localCoachingDate())dateChoice=state.selectedNutritionDate;if(!state.preview&&loadedDate!==date()){loaded=false;logs=[];}paint();load();};
+ window.openDailyNutritionDate=function(d){if(owner!==ownerKey())reset();dateChoice=d||null;state.selectedNutritionDate=null;if(!state.preview){loaded=false;loadedDate=null;logs=[];}renderClient();};
  const previousRender=renderClient;
  renderClient=function(){
   if(owner!==ownerKey())reset();

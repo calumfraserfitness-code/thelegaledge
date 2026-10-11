@@ -4,7 +4,7 @@ const {JSDOM}=require('jsdom');
 const root=path.resolve(__dirname,'..'),html=fs.readFileSync(path.join(root,'index.html'),'utf8');
 const dom=new JSDOM(html,{url:'http://localhost/',runScripts:'outside-only',pretendToBeVisual:true});
 dom.window.HTMLElement.prototype.scrollIntoView=function(){};
-const tables={client_food_entries:[],client_recipe_favourites:[]};let failSave=false;
+const tables={client_food_entries:[],client_recipe_favourites:[]};let failSave=false,delayedReads=new Map();const reads=[];
 dom.window.supabase={createClient:()=>({auth:{getUser:async()=>({data:{user:null}}),onAuthStateChange(){}},from(table){
  let action='read',payload,filters=[];
  const q={select(){return q;},eq(k,v){filters.push([k,v]);return q;},order(){return q;},limit(){return q;},upsert(p){action='save';payload=p;return q;},delete(){action='delete';return q;},then(resolve,reject){return Promise.resolve().then(()=>{
@@ -18,7 +18,11 @@ dom.window.supabase={createClient:()=>({auth:{getUser:async()=>({data:{user:null
   }
   const matches=r=>filters.every(([k,v])=>r[k]===v);
   if(action==='delete')tables[table]=rows.filter(r=>!matches(r));
-  return {data:rows.filter(matches),error:null};
+  reads.push({table,filters:[...filters]});
+  const selectedDate=filters.find(([k])=>k==='entry_date')?.[1];
+  const result={data:rows.filter(matches),error:null};
+  if(table==='client_food_entries'&&delayedReads.has(selectedDate))return new Promise(r=>delayedReads.set(selectedDate,()=>r(result)));
+  return result;
  }).then(resolve,reject);}};return q;}})};
 const ctx=dom.getInternalVMContext();
 for(const script of dom.window.document.querySelectorAll('script[src^="./"]')){
@@ -55,6 +59,22 @@ async function tick(){await new Promise(r=>setTimeout(r,0));}
  failSave=false;doc.querySelector('[data-dn-log]').click();await tick();assert.equal(tables.client_food_entries.length,1);
  run(`state.client.id='switch-away';renderClient();`);await tick();
  run(`state.client.id='other';renderClient();`);await tick();await tick();assert.equal(doc.querySelectorAll('.dn-eaten').length,1,'Saved log reloaded from backend');
+ const today=run('localCoachingDate()'),clientId=run('state.client.id');
+ tables.client_food_entries.push({client_id:clientId,entry_date:'2026-01-01',slot_key:'quick-past',meal_snapshot:{name:'Historical meal',calories:650},eaten:true,servings:1});
+ // Large histories must not enter the one-day response or truncate old-date lookup.
+ for(let i=0;i<1200;i++)tables.client_food_entries.push({client_id:clientId,entry_date:'2026-01-02',slot_key:'history-'+i,meal_snapshot:{name:'Other-day record',calories:1},eaten:true,servings:1});
+ const favouritesBefore=reads.filter(r=>r.table==='client_recipe_favourites').length;
+ run(`openDailyNutritionDate('2026-01-01')`);await tick();await tick();
+ assert.ok(doc.querySelector('.dn-intake strong').textContent.includes('650'),'Old date remains accessible beyond 1000 newer entries');
+ assert.equal(reads.filter(r=>r.table==='client_recipe_favourites').length,favouritesBefore,'Date switches reuse account-scoped favourites');
+ assert(reads.filter(r=>r.table==='client_food_entries').every(r=>r.filters.some(([k])=>k==='entry_date')),'Every log query filters by displayed date');
+ delayedReads.set('2026-01-03',true);run(`openDailyNutritionDate('2026-01-03')`);await tick();
+ assert.ok(doc.querySelector('.dn-intake strong').textContent.includes('Not supplied'),'No false zero while loading another date');
+ run(`openDailyNutritionDate('2026-01-01')`);await tick();await tick();
+ delayedReads.get('2026-01-03')();await tick();await tick();
+ assert.ok(doc.querySelector('.dn-intake strong').textContent.includes('650'),'Late response cannot replace the selected date');
+ run(`openDailyNutritionDate(${JSON.stringify(today)})`);await tick();await tick();
+ assert.equal(doc.querySelectorAll('.dn-eaten').length,1,'Returning to today reloads its saved meal');
  run(`state.client.onboarding_status='pending_legal';renderClient();`);await tick();await tick();assert.ok(!doc.querySelector('.dn-page'),'Consent gate retained');
  run(`state.preview=true;state.client.onboarding_status='complete';state.client.plan_status='published';state.clientView='checkin';renderClient();`);await tick();assert.equal(doc.querySelector('#clientNav [data-client-view=checkin]').getAttribute('aria-current'),'page');assert(!doc.querySelector('#dnProgressNav'),'Check-in has its own destination');
  run(`state.role='coach';$('#coachMain').innerHTML='<div id="clientWorkspaceBody"></div>';state.selectedNutritionPlanId='p';coachNutrition();`);assert(doc.querySelector('#coachDailyMenu'));assert(!doc.querySelector('#clientWorkspaceBody .nutrition-day-tabs'));assert(doc.querySelector('[data-plan-editor] [name=calories]'));assert(doc.querySelector('[data-meal-editor]'),'Existing personal recipe editor retained');

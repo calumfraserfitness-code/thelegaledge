@@ -11,7 +11,7 @@
   if(/snack|meal\s*[4-9]/i.test(type))return 'Snacks';
   return ['Breakfast','Lunch','Dinner','Snacks'][Math.min(index,3)];
  }
- function snapshot(meal){return {name:String(meal.name||'Meal').slice(0,200),meal_type:meal.meal_type||meal.timing||'Meal',...Object.fromEntries(fields.map(k=>[k,number(meal[k])])),ingredients:meal.ingredients||(meal.items||[]),cooking_instructions:meal.cooking_instructions||null,preparation:meal.preparation||null,swaps:meal.swaps||[],source_system:meal.source_system||null};}
+ function snapshot(meal){return {name:String(meal.name||'Meal').slice(0,200),meal_type:meal.meal_type||meal.timing||'Meal',...Object.fromEntries(fields.map(k=>[k,number(meal[k])])),ingredients:meal.ingredients||(meal.items||[]),cooking_instructions:meal.cooking_instructions||null,preparation:meal.preparation||null,swaps:meal.swaps||[],source_system:meal.source_system||null,source_url:meal.source_url||null,quality:meal.quality||null,portion:meal.portion||null,retrieved_at:meal.retrieved_at||null,allergen_note:meal.allergen_note||null};}
  function slots(meals,entries=[]){
   const counts={};const rows=meals.map((meal,i)=>{let group=category(meal,i);if(/main meal/i.test(meal.meal_type||''))group=!counts.Lunch?'Lunch':!counts.Dinner?'Dinner':'Snacks';counts[group]=(counts[group]||0)+1;const key=group.toLowerCase()+'-'+counts[group];return {key,group,meal,entry:entries.find(e=>e.slot_key===key)};});
   entries.filter(e=>!rows.some(r=>r.key===e.slot_key)).forEach(entry=>rows.push({key:entry.slot_key,group:category(entry.meal_snapshot,3),meal:entry.meal_snapshot,entry}));
