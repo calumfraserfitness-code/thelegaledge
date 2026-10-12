@@ -30,7 +30,7 @@
     ],
     "keywords": "Training What if I miss a workout? busy work travel time",
     "review_status": "reviewed",
-    "published": true,
+    "published": false,
     "learning_design": {
       "version": 1,
       "headline": "A missed session is a scheduling problem.",
@@ -119,7 +119,7 @@
     ],
     "keywords": "Training The 20-minute emergency workout busy work travel time",
     "review_status": "reviewed",
-    "published": true,
+    "published": false,
     "learning_design": {
       "version": 1,
       "headline": "Twenty minutes can still count.",
@@ -207,7 +207,7 @@
     ],
     "keywords": "Training Training during a 60–70-hour work week busy work travel time",
     "review_status": "reviewed",
-    "published": true,
+    "published": false,
     "learning_design": {
       "version": 1,
       "headline": "Plan for the week you have.",
@@ -296,7 +296,7 @@
     ],
     "keywords": "Training Training while travelling busy work travel time",
     "review_status": "reviewed",
-    "published": true,
+    "published": false,
     "learning_design": {
       "version": 1,
       "headline": "Keep the pattern. Adapt the setting.",
@@ -383,7 +383,7 @@
     ],
     "keywords": "Nutrition Eating well during late office nights busy work travel time",
     "review_status": "reviewed",
-    "published": true,
+    "published": false,
     "learning_design": {
       "version": 1,
       "headline": "Do not leave dinner to 9 pm hunger.",
@@ -472,7 +472,7 @@
     ],
     "keywords": "Nutrition Ordering food at restaurants busy work travel time",
     "review_status": "reviewed",
-    "published": true,
+    "published": false,
     "learning_design": {
       "version": 1,
       "headline": "Order with a structure, not a rulebook.",
@@ -562,7 +562,7 @@
     ],
     "keywords": "Nutrition Nutrition during business travel busy work travel time",
     "review_status": "reviewed",
-    "published": true,
+    "published": false,
     "learning_design": {
       "version": 1,
       "headline": "Plan the gaps between meals.",
@@ -652,7 +652,7 @@
     ],
     "keywords": "Nutrition What to do after overeating busy work travel time",
     "review_status": "reviewed",
-    "published": true,
+    "published": false,
     "learning_design": {
       "version": 1,
       "headline": "Your next meal is the reset.",
@@ -741,7 +741,7 @@
     ],
     "keywords": "Nutrition Meal preparation for busy professionals busy work travel time",
     "review_status": "reviewed",
-    "published": true,
+    "published": false,
     "learning_design": {
       "version": 1,
       "headline": "Prepare components. Keep choice.",
@@ -834,7 +834,7 @@
     ],
     "keywords": "Recovery What to do after a poor night’s sleep busy work travel time",
     "review_status": "reviewed",
-    "published": true,
+    "published": false,
     "learning_design": {
       "version": 1,
       "headline": "Match the day to your alertness.",
@@ -925,7 +925,7 @@
     ],
     "keywords": "Progress Why body weight fluctuates busy work travel time",
     "review_status": "reviewed",
-    "published": true,
+    "published": false,
     "learning_design": {
       "version": 1,
       "headline": "The scale weighs more than fat.",
@@ -1018,7 +1018,7 @@
     ],
     "keywords": "Health Getting back on track after a difficult week busy work travel time",
     "review_status": "reviewed",
-    "published": true,
+    "published": false,
     "learning_design": {
       "version": 1,
       "headline": "Restart at the next useful action.",
