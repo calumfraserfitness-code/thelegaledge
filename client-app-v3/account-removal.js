@@ -5,7 +5,7 @@
  coachOverview=function(){
   prior();const client=state.client;if(!client||state.role!=='coach')return;
   const panel=$('#psClientStatus')?.closest('.panel');if(!panel)return;
-  if(client.deleted_at){panel.querySelector('p').textContent='Removed account · client access closed · coaching records retained';$('#psClientStatus').remove();}
+  if(client.deleted_at){$('#linkSavedClient')?.closest('.panel')?.remove();panel.querySelector('p').textContent='Removed account · client access closed · coaching records retained';$('#psClientStatus').remove();}
   const button=document.createElement('button');button.className='btn ghost';button.id='removeClientAccount';button.textContent=client.deleted_at?'Restore removed account':'Delete account…';panel.querySelector('.panel-head').append(button);
   button.onclick=()=>review(client);
  };
