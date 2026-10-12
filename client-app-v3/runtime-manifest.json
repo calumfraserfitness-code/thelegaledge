@@ -51,7 +51,9 @@
     "progress-photos.js",
     "save-integrity.js",
     "account-removal.js",
-    "clean-coaching.js"
+    "clean-coaching.js",
+    "busy-week-model.js",
+    "busy-week.js"
   ],
   "styles": [
     "app.css",
@@ -84,6 +86,7 @@
     "playbook.css",
     "checkin-system.css",
     "coach-checkin-status.css",
-    "progress-photos.css"
+    "progress-photos.css",
+    "busy-week.css"
   ]
 }
