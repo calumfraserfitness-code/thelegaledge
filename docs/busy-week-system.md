@@ -17,7 +17,7 @@ The recommendation previews instantly. Save & adapt my week confirms the returne
 
 Travel and home/hotel location are overlays. They do not automatically force a crisis week. Completed sessions count towards the focus; skipped sessions are not offered as priority workouts. Additional sessions stay accessible and retain their real completion status. Workload thresholds are product rules, not diagnostic cutoffs.
 
-Priority workouts include assigned strength or cardio sessions. If the saved prescription exceeds available time, the client sees a request for a shorter coach prescription. Sets, intensity, rest and calorie/macro targets are not silently cut. The system adapts priorities and practical options; it does not manufacture a medically reviewed programme.
+The focus uses assigned strength workouts when available, and cardio workouts for participants with no strength assignment. If the saved prescription exceeds available time, the client sees a request for a shorter coach prescription. Sets, intensity, rest and calorie/macro targets are not silently cut. The system adapts priorities and practical options; it does not manufacture a medically reviewed programme.
 
 ## Practical alternatives
 
@@ -44,3 +44,15 @@ Each participant's setup is private to that client and their assigned coach. Cor
 - Existing full regression suite gates production builds.
 
 The initial release is a deterministic adaptation engine. It does not claim passive detection of calendar workload, sleep from every wearable, or self-training AI. Those require separately verified data sources and evaluation.
+
+## Two full-body busy-week options
+
+Coach Training → Quick Plan Editor can create two full-body drafts by combining existing upper/lower prescriptions. It copies saved movements and doses, without inventing equipment or exercises. Review recent call changes before publishing. In Overview → Busy Week System, select Full body A and B and publish. When a client saves a heavy week, eligible unstarted strength sessions change to these two full-body options in the same database transaction as the weekly save. Recorded or completed sessions stay protected. Returning to a normal gym week restores eligible original sessions. Travel/home alternatives remain in place when still required.
+
+## Reports, access and recording
+
+Coach Overview and client Today show the latest saved health report, its original period and a button to all reports. Forwarded report text stays available. Coach Overview shows login email, copy-login details and a verified-recipient reset-email button. Passwords are not recoverable from authentication hashes.
+
+Recording view starts from the selected client workspace. It shows client-facing screens, hides coach/corporate navigation, offers a screen selector and exits with Escape. Browser full-screen is requested from the user’s click; hiding app sections does not control what Loom captures outside the browser.
+
+Call reviews open filtered to the selected client from Training. Automated Fathom capture and reviewed proposals do not yet constitute automatic AI prescription updates. The paid AI credit blocker remains separate.

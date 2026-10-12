@@ -53,7 +53,9 @@
     "account-removal.js",
     "clean-coaching.js",
     "busy-week-model.js",
-    "busy-week.js"
+    "busy-week.js",
+    "coach-tools.js",
+    "quick-training.js"
   ],
   "styles": [
     "app.css",
@@ -87,6 +89,8 @@
     "checkin-system.css",
     "coach-checkin-status.css",
     "progress-photos.css",
-    "busy-week.css"
+    "busy-week.css",
+    "coach-tools.css",
+    "quick-training.css"
   ]
 }

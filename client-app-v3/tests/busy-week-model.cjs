@@ -6,7 +6,7 @@ for(const patch of [{work_hours:60},{sleep_hours:4.5},{training_windows:1},{ener
 for(const health of ['injury','illness'])assert.equal(M.assess({...base,health,work_hours:80}).mode,'review');
 assert.equal(M.assess({...base,travel:true}).mode,'normal','Travel overlays a workload mode');
 const sessions=[{id:'s1',session_date:'2026-10-12',training_type:'weights',status:'completed',duration_minutes:60},{id:'s2',session_date:'2026-10-14',training_type:'weights',status:'planned',duration_minutes:60},{id:'s3',session_date:'2026-10-16',training_type:'resistance',status:'planned',duration_minutes:45},{id:'s4',session_date:'2026-10-18',training_type:'cardio',status:'planned'}],original=JSON.stringify(sessions);
-let m=M.focus({...base,work_hours:50},null,sessions);assert.equal(m.cap,2);assert.equal(m.priority.length,1);assert.equal(m.priority[0].id,'s2');assert.equal(m.optional.length,2);assert.equal(m.short.length,1);
+let m=M.focus({...base,work_hours:50},null,sessions);assert.equal(m.cap,2);assert.equal(m.priority.length,1);assert.equal(m.priority[0].id,'s2');assert.equal(m.optional.length,1);assert.equal(m.short.length,1);
 m=M.focus({...base,work_hours:60},null,sessions);assert.equal(m.priority.length,0,'Completed training counts towards a crisis minimum');
 m=M.focus({...base,health:'injury'},null,sessions);assert.equal(m.cap,0);assert.equal(m.priority.length,0);
 m=M.focus({...base,work_hours:50},{published:true,heavy_sessions:1,crisis_sessions:0},sessions);assert.equal(m.cap,1);

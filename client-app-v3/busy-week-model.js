@@ -20,7 +20,8 @@
   return {mode,label:labels[mode],reasons:reasons.length?reasons:['Your regular plan fits the week']};
  }
  function focus(v,settings,sessions){
-  const a=assess(v),all=sessions.filter(s=>['weights','resistance','cardio'].includes(s.training_type)).sort((x,y)=>String(x.session_date).localeCompare(String(y.session_date))||String(x.id).localeCompare(String(y.id)));
+  const a=assess(v),candidates=sessions.filter(s=>['weights','resistance','cardio'].includes(s.training_type)).sort((x,y)=>String(x.session_date).localeCompare(String(y.session_date))||String(x.id).localeCompare(String(y.id)));
+  const strength=candidates.filter(s=>['weights','resistance'].includes(s.training_type)),all=strength.length?strength:candidates;
   const requested=a.mode==='review'?0:a.mode==='normal'?v.training_windows:Math.min(v.training_windows,settings?.published?(a.mode==='heavy'?settings.heavy_sessions:settings.crisis_sessions):(a.mode==='heavy'?2:1));
   const cap=Math.min(all.length,requested);
   const done=all.filter(s=>s.status==='completed'),pending=all.filter(s=>s.status==='planned'),priority=pending.slice(0,Math.max(0,cap-done.length));

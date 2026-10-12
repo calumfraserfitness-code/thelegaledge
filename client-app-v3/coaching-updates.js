@@ -33,7 +33,7 @@
        }).join('')||'<p>No recordings match this search.</p>';
        $('#cuResults').querySelectorAll('[data-cu-review]').forEach(form=>form.onsubmit=event=>reviewProposal(event,form));
      };
-     $('#cuSearch').oninput=draw;$('#cuClient').onchange=draw;draw();
+     $('#cuSearch').oninput=draw;$('#cuClient').onchange=draw;if(state.coachingReviewClientId)$('#cuClient').value=state.coachingReviewClientId;draw();
    }catch(error){if(ticket===generation&&state.coachView==='coaching-updates')$('#cuResults').textContent=error.message;}
  }
  async function connectScreen(ticket){
