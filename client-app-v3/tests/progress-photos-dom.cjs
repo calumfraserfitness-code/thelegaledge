@@ -31,6 +31,7 @@ for(const script of dom.window.document.querySelectorAll('script[src^="./"]')){
 const run=s=>vm.runInContext(s,ctx),doc=dom.window.document;
 (async()=>{await new Promise(r=>setTimeout(r,0));
 run(`preview('client');state.client.goal_weight_kg=null;state.client.goal_summary='Maintain weight, build strength and improve recovery.';state.clientView='progress';state.data.files=[{file_type:'progress_photo',week_number:1,photo_view:'front',storage_path:'private/front1',created_at:'2026-10-01'},{file_type:'progress_photo',week_number:2,photo_view:'front',storage_path:'private/front2',created_at:'2026-10-08'}];renderClient();`);
+assert(run("clientRows([{id:'rounding',display_name:'Goal fixture',weight_unit:'lbs',goal_weight_kg:99.79}])").includes('220 lb'),'Roster rounds the saved goal instead of truncating it');
 assert(Number.isNaN(run('progressData().goal')),'Unset weight target stays unknown');
 assert(!doc.querySelector('.progress-metrics').textContent.includes('0.0 lb'));
 assert.equal(doc.querySelectorAll('.photo-compare-pair [data-photo-path]').length,2);
@@ -42,5 +43,6 @@ run(`state.data.nutritionPlans=[{id:'p',client_id:state.client.id,is_active:true
 doc.querySelector('#dnLibrary').click();assert.equal(doc.querySelectorAll('.dn-library-results article').length,1,'A recipe family appears once');assert.equal(doc.querySelectorAll('[data-dn-variant] option').length,2,'Exact copies removed; distinct portions preserved');
 const variant=doc.querySelector('[data-dn-variant]');variant.value='1';variant.dispatchEvent(new dom.window.Event('change'));assert(doc.querySelector('[data-dn-variant-summary]').textContent.includes('600'));
 doc.querySelector('[data-dn-library-recipe]').click();assert(doc.querySelector('[role=dialog]').textContent.includes('600'),'Selected portion opens matching recipe');
+run(`state.data.coachingGuidance=[{published:true,category:'recovery',title:'Recovery',body:'Keep the agreed routine. Source: https://fathom.video/calls/example'}];`);assert(!run('coachingGuidanceMarkup()').includes('fathom.video'));assert(run('state.data.coachingGuidance[0].body').includes('fathom.video'),'Private source evidence remains saved');
 console.log('PASS: unset goals, private matching-view photos, separate camera/gallery inputs and grouped recipe portions.');dom.window.close();
 })().catch(e=>{console.error(e);dom.window.close();process.exit(1)});

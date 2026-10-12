@@ -296,7 +296,7 @@ function clientRows(clients) {
     <span class="avatar">${esc(client.display_name.split(' ').map((part) => part[0]).slice(0, 2).join(''))}</span>
     <span><span class="name">${esc(client.display_name)}</span><span class="sub">${esc(title(client.status || 'active'))} · ${client.weight_unit === 'lbs' ? 'US / lb' : 'Ireland / kg'}</span></span>
     <span class="hide-mobile"><span class="sub">Daily steps</span>${safeStepGoal(client).toLocaleString()}</span>
-    <span class="hide-mobile"><span class="sub">Goal</span>${client.track_weight === false ? 'Performance / health' : (client.goal_weight_kg ? `${Number(client.goal_weight_kg) * (client.weight_unit === 'lbs' ? 2.20462 : 1) | 0} ${client.weight_unit === 'lbs' ? 'lb' : 'kg'}` : 'Not set')}</span>
+    <span class="hide-mobile"><span class="sub">Goal</span>${client.track_weight === false ? 'Performance / health' : (client.goal_weight_kg ? `${Math.round(Number(client.goal_weight_kg) * (client.weight_unit === 'lbs' ? 2.20462 : 1))} ${client.weight_unit === 'lbs' ? 'lb' : 'kg'}` : 'Not set')}</span>
     <span class="status">Open</span>
   </button>`).join('');
 }

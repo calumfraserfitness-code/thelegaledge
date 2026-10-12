@@ -2,7 +2,7 @@
 function cleanCoachingText(value){
  const text=String(value??'').trim();
  if(/(?:SAVE TARGETS|IMPORT WITH AI|Import meal-plan JSON|source_system|\"(?:days|meals|ingredients)\"\s*:|<\/?(?:html|script|div)\b)/i.test(text)||text.length>2500)return '';
- return text;
+ return text.replace(/\bSource:\s*https?:\/\/\S+/gi,'').trim();
 }
 const polishNutritionMarkup=nutritionPlanMarkup;
 nutritionPlanMarkup=function(plan){return polishNutritionMarkup({...plan,coach_notes:cleanCoachingText(plan.coach_notes)});};
@@ -54,7 +54,7 @@ persistNutritionImport=async function(payload,button){
 const polishLoad=loadClientData;
 loadClientData=async function(id){await polishLoad(id);if(state.client?.id!==id)return;for(const key of ['sessions','exercises','weeks','nutritionPlans'])state.data[key]=(state.data[key]||[]).map(row=>({...row,notes:cleanCoachingText(row.notes),coach_note:cleanCoachingText(row.coach_note),coach_notes:cleanCoachingText(row.coach_notes),coach_instructions:cleanCoachingText(row.coach_instructions)}));state.data.programs=(state.data.programs||[]).map(program=>({...program,days:(program.days||[]).map(day=>({...day,coach_notes:cleanCoachingText(day.coach_notes),recovery_notes:cleanCoachingText(day.recovery_notes)}))}));};
 const polishCallsMarkup=coachingCallsMarkup;
-coachingCallsMarkup=function(){const reviews=(state.data.coachingGuidance||[]).filter(r=>r.published&&/^Fathom review ·/.test(r.title));return polishCallsMarkup()+ (reviews.length?'<section class="panel"><span class="eyebrow">RECORDED REVIEWS</span><h2>Agreed priorities from your calls</h2>'+reviews.map(r=>'<article class="cw-call"><div><b>'+esc(r.title.replace('Fathom review · ',''))+'</b><p class="cw-lines">'+esc(r.body)+'</p></div></article>').join('')+'</section>':'');};
+coachingCallsMarkup=function(){const reviews=(state.data.coachingGuidance||[]).filter(r=>r.published&&/^Fathom review ·/.test(r.title));return polishCallsMarkup()+ (reviews.length?'<section class="panel"><span class="eyebrow">RECORDED REVIEWS</span><h2>Agreed priorities from your calls</h2>'+reviews.map(r=>'<article class="cw-call"><div><b>'+esc(r.title.replace('Fathom review · ',''))+'</b><p class="cw-lines">'+esc(cleanCoachingText(r.body))+'</p></div></article>').join('')+'</section>':'');};
 const polishGuidanceMarkup=coachingGuidanceMarkup;
 coachingGuidanceMarkup=function(){const rows=state.data.coachingGuidance;state.data.coachingGuidance=(rows||[]).filter(r=>!/^Fathom review ·/.test(r.title));try{return polishGuidanceMarkup();}finally{state.data.coachingGuidance=rows;}};
 
