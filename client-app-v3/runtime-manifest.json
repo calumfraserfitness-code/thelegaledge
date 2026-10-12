@@ -47,7 +47,8 @@
     "checkin-drafts.js",
     "checkin-status-model.js",
     "coach-checkin-status.js",
-    "legacy-transition.js"
+    "legacy-transition.js",
+    "progress-photos.js"
   ],
   "styles": [
     "app.css",
@@ -79,6 +80,7 @@
     "coaching-updates.css",
     "playbook.css",
     "checkin-system.css",
-    "coach-checkin-status.css"
+    "coach-checkin-status.css",
+    "progress-photos.css"
   ]
 }

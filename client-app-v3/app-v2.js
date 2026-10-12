@@ -954,7 +954,7 @@ function nutritionUnit(amount, unit) {
   const raw = `${amount}${unit ? ` ${unit}` : ''}`;
   if (!Number.isFinite(n)) return raw;
   const us = (state.foodUnits || (state.client?.weight_unit === 'lbs' ? 'us' : 'metric')) === 'us';
-  const rounded = value => Number(value.toFixed(2));
+  const rounded = value => Number(value.toFixed(1));
   if (us) {
     if (u === 'g') return `${rounded(n / 28.349523125)} oz`;
     if (u === 'kg') return `${rounded(n * 35.27396195)} oz`;
@@ -1277,7 +1277,7 @@ function progressData() {
   const entries = [...state.data.progress].filter((entry) => entry.weight_kg != null).sort((a, b) => String(a.entry_date).localeCompare(String(b.entry_date)));
   const start = Number(state.client.start_weight_kg ?? entries[0]?.weight_kg);
   const current = Number(entries.at(-1)?.weight_kg);
-  const goal = Number(state.client.goal_weight_kg);
+  const goal = state.client.goal_weight_kg == null || state.client.goal_weight_kg === '' || Number(state.client.goal_weight_kg) <= 0 ? NaN : Number(state.client.goal_weight_kg);
   const change = Number.isFinite(start) && Number.isFinite(current) ? current - start : null;
   const remaining = Number.isFinite(goal) && Number.isFinite(current) ? goal - current : null;
   const journey = Number.isFinite(goal) && Number.isFinite(start) ? goal - start : null;
@@ -1627,8 +1627,9 @@ async function hydrateProgressPhotos() {
   if (!db || state.preview) return;
   for (const card of $$('[data-photo-path]')) {
     const { data, error } = await db.storage.from('client-files').createSignedUrl(card.dataset.photoPath, 900);
-    if (!error && data?.signedUrl) card.querySelector('.photo-placeholder').outerHTML = `<img src="${esc(data.signedUrl)}" alt="Private progress photo" loading="lazy">`;
-    else card.querySelector('.photo-placeholder').textContent = 'Photo unavailable';
+    const placeholder=card.querySelector('.photo-placeholder');if(!card.isConnected||!placeholder)continue;
+    if (!error && data?.signedUrl) placeholder.outerHTML = `<img src="${esc(data.signedUrl)}" alt="Private progress photo" loading="lazy">`;
+    else placeholder.textContent = 'Photo unavailable';
   }
 }
 
