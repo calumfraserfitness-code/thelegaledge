@@ -33,5 +33,5 @@ const report=vm.runInContext('pilotWeeklyReport()',ctx);assert.doesNotMatch(repo
 assert.match(vm.runInContext("pilotDraft.coachSection='checkins';pilotCoachPerson()",ctx),/SECRET_PRIVATE_WIN/);
 vm.runInContext('pilotDraft.reportConsent[0]=false;pilotDraft.reportConsent[1]=false;pilotDraft.reportConsent[2]=false;pilotDraft.reportConsent[3]=false',ctx);
 assert.equal(vm.runInContext('pilotWeeklyAggregate().suppressed',ctx),true);
-assert.match(vm.runInContext('pilotWeeklyReport()',ctx),/fewer than five/);
-console.log('PASS: shared structured check-in aggregation, private answer exclusion, consent filtering and under-five suppression.');
+assert.match(vm.runInContext('pilotWeeklyReport()',ctx),/fewer than eight/);
+console.log('PASS: shared structured check-in aggregation, private answer exclusion, consent filtering and under-eight suppression.');

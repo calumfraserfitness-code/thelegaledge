@@ -1,5 +1,5 @@
 // Coach-operated firm pilot workflow. Sponsor output is aggregate-only.
-const firmState = { organizations: [], pilots: [], participants: [], consents: [], resources: [], briefs: [], selected: null, loaded: false };
+const firmState = { organizations: [], pilots: [], participants: [], consents: [], resources: [], briefs: [], launchChecks: [], selected: null, loaded: false };
 const firmPhases = ['baseline', 'midpoint', 'endline'];
 const firmResourceIdeas = [
   ['Deadline-week nutrition', 'Nutrition', 'A realistic meal structure for late meetings and unpredictable lunch breaks.', 'Choose a reliable breakfast, prepare a portable lunch, and decide on one easy dinner before the busiest day begins. Keep water available at your desk. Make the plan fit your actual meeting schedule and any food restrictions recorded with your coach.'],
@@ -25,21 +25,31 @@ async function loadFirmPilots() {
       query('Firm resources', db.from('firm_resources').select('*').order('created_at', { ascending: false })),
       query('Firm programme briefs', db.from('firm_programme_briefs').select('*'))
     ]);
-    Object.assign(firmState, { organizations, pilots, participants, consents, resources, briefs });
+    let launchChecks=[];
+    const launchResult=await db.from('firm_pilot_launch_checks').select('*').order('check_key');
+    if(!launchResult.error)launchChecks=launchResult.data||[];
+    else if(!['42P01','PGRST205'].includes(launchResult.error.code))throw launchResult.error;
+    Object.assign(firmState, { organizations, pilots, participants, consents, resources, briefs, launchChecks });
   }
   firmState.loaded = true;
   if (!firmState.pilots.some(p => p.id === firmState.selected)) firmState.selected = firmState.pilots[0]?.id || null;
 }
 
 function firmPilotReport(pilot, rows) {
-  const threshold = Math.max(5, Number(pilot.minimum_report_count) || 5);
+  const threshold = Math.max(8, Number(pilot.minimum_report_count) || 8);
   const byPhase = new Map(rows.map(row => [row.phase, row]));
   return `<section class="panel"><div class="panel-head"><div><h3>Sponsor-safe report</h3><span class="sub">Only group averages from consenting respondents. Minimum ${threshold} responses per phase.</span></div></div>
     <div class="firm-report"><div class="firm-report-head"><span>Assessment</span><span>Responses</span><span>Energy</span><span>Sleep</span><span>Stress</span><span>Workload</span><span>Consistency</span></div>
     ${firmPhases.map(phase => { const row = byPhase.get(phase); return `<div class="firm-report-row"><b>${title(phase)}</b>${row
       ? `<span>${row.respondents}</span><span>${row.energy}</span><span>${row.sleep}</span><span>${row.stress}</span><span>${row.workload}</span><span>${row.consistency}</span>`
       : `<span class="muted firm-suppressed">Suppressed until ${threshold} responses</span>`}</div>`; }).join('')}</div>
-    <p class="muted">No individual scores, coaching notes, health data, or identifiable responses belong in a sponsor report. Review this summary before sharing it outside the coaching team.</p></section>`;
+    <p class="muted">No individual scores, coaching notes, health data, or identifiable responses belong in a sponsor report. Five-person pilots receive delivery-only closeout reporting; quantitative outcome trends require at least eight eligible participants and eight valid responses.</p></section>`;
+}
+
+function firmComplianceMarkup(pilot){
+  const checks=firmState.launchChecks.filter(c=>c.pilot_id===pilot.id);
+  const complete=checks.filter(c=>c.status==='verified').length;
+  return `<section class="panel"><div class="panel-head"><div><span class="eyebrow">LAUNCH CONTROL</span><h3>Compliance readiness</h3><span class="sub">${complete}/${checks.length||10} mandatory checks verified</span></div><span class="pill">${complete===checks.length&&checks.length?'Ready for approval':'Launch blocked'}</span></div><p>The database will not allow invitations or activation until every mandatory check is verified. Verification records who confirmed the evidence and when.</p><div class="firm-list">${checks.map(c=>`<label><input type="checkbox" data-launch-check="${esc(c.id)}" ${c.status==='verified'?'checked':''}> <b>${title(c.check_key.replaceAll('_',' '))}</b><small>${c.status==='verified'?'Verified '+fmt(c.verified_at):'Evidence required before launch'}</small></label>`).join('')||'<p class="muted">Apply the compliance migration before creating or launching a real firm pilot.</p>'}</div></section>`;
 }
 
 async function renderFirmPilots() {
@@ -65,7 +75,7 @@ async function paintFirmPilots() {
   const checkins=pilot&&!state.preview&&activeRoster.length?await query('Pilot weekly reviews',db.from('checkins').select('id,client_id,submitted_at,reviewed_at').in('client_id',activeRoster.map(m=>m.client_id)).gte('submitted_at',weekStart+'T00:00:00Z').order('submitted_at',{ascending:false}).limit(500)):state.preview&&state.sampleClientData?activeRoster.flatMap(m=>(state.sampleClientData.get(m.client_id)?.checkins||[]).filter(c=>String(c.submitted_at||'').slice(0,10)>=weekStart)):[];
   main.innerHTML = pageHead('CORPORATE COACHING', 'Firms & pilot rosters') + `
     <div class="firm-intro"><div><strong>90-day lawyer performance pilot</strong><p>Private coaching for each participant, with anonymous cohort reporting for the sponsor.</p></div><span>Coach only</span></div>
-    ${pilot?firmDeliveryMarkup(pilot,activeRoster,checkins)+firmProgrammeBriefMarkup(pilot):''}
+    ${pilot?firmComplianceMarkup(pilot)+firmDeliveryMarkup(pilot,activeRoster,checkins)+firmProgrammeBriefMarkup(pilot):''}
     <div class="firm-grid"><section class="panel"><div class="panel-head"><h3>Firms</h3></div>
       <form id="firmOrganizationForm" class="firm-form"><label>Firm name<input name="name" maxlength="160" required></label><label>Number of employees<input name="employee_count" type="number" min="1" max="100000"></label><label>Contact name<input name="contact_name"></label><label>Contact email<input name="contact_email" type="email"></label><button class="btn primary">Add firm</button></form>
       <div class="firm-list">${firmState.organizations.map(o => `<div><b>${esc(o.name)}</b><small>${o.employee_count ? `${Number(o.employee_count).toLocaleString()} employees · ` : ''}${esc(o.contact_name || 'No contact recorded')}</small></div>`).join('') || '<p class="muted">Add the first firm to start a pilot.</p>'}</div></section>
@@ -100,6 +110,11 @@ async function paintFirmPilots() {
     form.scrollIntoView({ behavior: 'smooth', block: 'center' });
   });
   $$('[data-resource-publish]').forEach(button => button.onclick = () => toggleFirmResource(button));
+  $$('[data-launch-check]').forEach(input=>input.onchange=async()=>{
+    const status=input.checked?'verified':'pending';input.disabled=true;
+    try{await query('Pilot launch check',db.from('firm_pilot_launch_checks').update({status,verified_at:input.checked?new Date().toISOString():null,verified_by:input.checked?state.user?.id:null}).eq('id',input.dataset.launchCheck).select());const check=firmState.launchChecks.find(c=>c.id===input.dataset.launchCheck);if(check)Object.assign(check,{status,verified_at:input.checked?new Date().toISOString():null,verified_by:input.checked?state.user?.id:null});await paintFirmPilots();}
+    catch(error){input.checked=!input.checked;input.disabled=false;toast(error.message,'error');}
+  });
   $$('[data-pilot-id]').forEach(button => button.onclick = () => { firmState.selected = button.dataset.pilotId; paintFirmPilots().catch(error => renderError(main, error, renderFirmPilots)); });
 }
 
@@ -230,13 +245,23 @@ async function renderParticipantPilot() {
       query('Your assessments', db.from('firm_assessments').select('phase,submitted_at').eq('participant_id', member.id)),
       query('Your firm resources', db.from('firm_resources').select('title,topic,summary,body,created_at').eq('pilot_id', member.pilot_id).eq('published', true).order('created_at', { ascending: false }))
     ]);
-    main.innerHTML = pageHead('FIRM PILOT', pilot?.name || 'Your pilot') + `<section class="panel"><div class="panel-head"><div><h3>${esc(org?.name || 'Firm-sponsored coaching')}</h3><span class="sub">${fmt(pilot?.start_date)} – ${fmt(pilot?.end_date)}</span></div></div><p>Your individual training, nutrition, check-ins, messages and health records are private to you and your coach. The firm receives group assessment averages only when at least five people respond. You can separately opt into weekly group energy, sleep and stress ratings; your written check-in answers remain private.</p>
+    main.innerHTML = pageHead('FIRM PILOT', pilot?.name || 'Your pilot') + `<section class="panel"><div class="panel-head"><div><h3>${esc(org?.name || 'Firm-sponsored coaching')}</h3><span class="sub">${fmt(pilot?.start_date)} – ${fmt(pilot?.end_date)}</span></div></div><p>Your individual training, nutrition, check-ins, messages and health records are private to you and your coach. A five-person pilot gives the firm delivery information only. Quantitative group results are withheld unless at least eight eligible people provide valid responses. You can separately opt into group ratings; your written answers remain private.</p>
       ${member.status === 'withdrawn' ? '<p>This invitation has been withdrawn.</p>' : consents.length ? '<p class="pill">Aggregate reporting consent recorded</p>' : '<label><input type="checkbox" id="weeklyReportingConsent"> Include my energy, sleep and stress check-in ratings in weekly anonymous group averages. Written answers, goals and body data stay private.</label><button class="btn primary" id="acceptFirmConsent">I agree to anonymous assessment reporting</button>'}</section>
+      ${member.status !== 'withdrawn' ? '<section class="panel"><h3>Your choices and data rights</h3><p>Participation and group reporting are optional. Withdrawing does not affect your employment or access to ordinary firm benefits. It stops future pilot reporting and coaching participation; records already processed are handled under the privacy notice and retention rules.</p><button class="btn ghost" id="withdrawFirmPilot">Withdraw from this pilot</button><form id="dataRightsRequest" class="firm-form"><label>Privacy request<select name="request_type"><option value="access">Access my data</option><option value="correction">Correct my data</option><option value="deletion">Delete data where applicable</option><option value="restriction">Restrict processing</option><option value="portability">Provide a portable copy</option><option value="objection">Object to processing</option><option value="consent_withdrawal">Withdraw health-data consent</option></select></label><label>Details<textarea name="details" maxlength="2000" required></textarea></label><button class="btn primary">Submit privacy request</button></form></section>' : ''}
       ${member.status !== 'withdrawn' ? `<section class="panel"><div class="panel-head"><div><h3>Resources for ${esc(org?.name || 'your firm')}</h3><span class="sub">Practical guidance selected by your coach for this pilot.</span></div></div>${resources.map(r => `<article class="firm-resource"><span class="eyebrow">${esc(r.topic)}</span><h4>${esc(r.title)}</h4><p>${esc(r.summary)}</p><div class="resource-body">${esc(r.body).replaceAll('\n', '<br>')}</div></article>`).join('') || '<p class="muted">Your coach has not published any firm resources yet.</p>'}</section>` : ''}
       ${consents.length && member.status !== 'withdrawn' ? `<section class="panel"><h3>Short assessments</h3><p>Rate each from 1 to 10. Your individual answers stay private.</p>${firmPhases.map(phase => assessments.some(a => a.phase === phase) ? `<p>${title(phase)} submitted</p>` : (firmAssessmentOpens(phase,pilot)===''||firmAssessmentOpens(phase,pilot)>iso(new Date())) ? `<p class="muted">${title(phase)} ${firmAssessmentOpens(phase,pilot)?'opens '+fmt(firmAssessmentOpens(phase,pilot)):'will open once programme dates are confirmed'}.</p>` : `<form class="firm-assessment" data-phase="${phase}"><h4>${title(phase)}</h4><div class="firm-score-grid">${['energy','sleep','stress','workload','consistency'].map(key => `<label>${title(key)}<input name="${key}" type="number" min="1" max="10" required></label>`).join('')}</div><button class="btn primary">Submit ${phase}</button></form>`).join('')}</section>` : ''}`;
     $('#acceptFirmConsent') && ($('#acceptFirmConsent').onclick = async () => {
       try { await query('Pilot consent', db.from('firm_consents').insert({ participant_id: member.id, client_id: state.client.id,include_weekly_ratings:!!$('#weeklyReportingConsent')?.checked }).select()); toast('Consent recorded'); renderParticipantPilot(); }
       catch (error) { toast(error.message, 'error'); }
+    });
+    $('#withdrawFirmPilot') && ($('#withdrawFirmPilot').onclick=async()=>{
+      if(!confirm('Withdraw from the firm pilot? This stops future participation and sponsor reporting.'))return;
+      try{await query('Withdraw from pilot',db.rpc('withdraw_from_firm_pilot',{target_participant_id:member.id}));toast('You have withdrawn from the pilot');renderParticipantPilot();}catch(error){toast(error.message,'error');}
+    });
+    $('#dataRightsRequest') && ($('#dataRightsRequest').onsubmit=async event=>{
+      event.preventDefault();const fd=new FormData(event.currentTarget);setBusy(event.submitter,true);
+      try{await query('Privacy request',db.rpc('submit_data_rights_request',{request_type:fd.get('request_type'),request_details:String(fd.get('details')||'').trim()}));toast('Privacy request recorded');event.currentTarget.reset();}
+      catch(error){toast(error.message,'error');setBusy(event.submitter,false);}
     });
     $$('.firm-assessment').forEach(form => form.onsubmit = async event => {
       event.preventDefault(); const button = event.submitter; const fd = new FormData(form);
