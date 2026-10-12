@@ -23,3 +23,9 @@ The enabled Legal Edge app review runs around 08:00 Europe/Dublin. It uses bound
 ## Outstanding real-world evidence
 
 Phone sign-in after the October 11 auth hotfix, actual device notification display, wearable ingestion, backup restoration and AI-provider responses still need direct evidence. Some active clients lack approved published plans or a configured check-in day. Do not label all clients ready until these are resolved.
+
+## October 12 transition evidence
+
+A full-app login wrapper disabled the submit button before the base handler’s duplicate-submit check, suppressing the provider call. Test login through every loaded module; isolated auth tests are insufficient. Runtime bundling must preserve separate global script boundaries and DOM-ready registration.
+
+Old source check-ins use source client ID plus source week as their identity. Calendar weeks may contain multiple source submissions; preserve original week labels and leave ambiguous periods unset rather than merging or fabricating dates. Exact imported timestamps remain unverified. Source snapshots are on-demand, assigned-coach-only records. A snapshot of a loading screen is incomplete, not migrated data. Never declare all clients ready while source transfer, account mapping or approved plans remain incomplete.

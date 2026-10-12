@@ -46,7 +46,8 @@
     "food-anywhere.js",
     "checkin-drafts.js",
     "checkin-status-model.js",
-    "coach-checkin-status.js"
+    "coach-checkin-status.js",
+    "legacy-transition.js"
   ],
   "styles": [
     "app.css",
