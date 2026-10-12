@@ -38,6 +38,7 @@ async function tick(){await new Promise(r=>setTimeout(r,0));}
  await tick();
  assert.equal(doc.querySelectorAll('#clientNav button').length,7);
  assert.deepEqual([...doc.querySelectorAll('#clientNav button')].map(b=>b.dataset.clientView),['today','training','nutrition','checkin','progress','support','playbook']);
+ doc.querySelector('#dnIdeas').click();assert(doc.querySelector('#dnIdeaGroup'));assert(doc.querySelector('[role=dialog]').textContent.includes('No AI credits needed'));const intakeBefore=doc.querySelector('.dn-intake strong').textContent;[...doc.querySelectorAll('[data-idea-choose]')].find(b=>b.closest('article').textContent.includes('Egg wrap')).click();await tick();assert.equal(doc.querySelectorAll('.dn-eaten').length,0,'Choosing idea does not mark eaten');assert.equal(doc.querySelector('.dn-intake strong').textContent,intakeBefore);doc.querySelector('#dnAnywhere').click();doc.querySelector('#faMealIdeas').click();assert(doc.querySelector('#dnIdeaGroup'),'Credit-free ideas accessible from food search');doc.querySelector('#dnClose').click();
  assert.ok(doc.querySelector('.dn-target-panel'));assert.ok(!doc.querySelector('.dn-week').open);
  assert.ok(!doc.querySelector('.dn-meals .ingredient-list'),'Recipes collapsed initially');
  doc.querySelector('[data-dn-recipe]').click();assert.ok(doc.querySelector('[role="dialog"]'));assert.ok(doc.querySelector('.dn-ingredients').textContent.includes('Eggs'));

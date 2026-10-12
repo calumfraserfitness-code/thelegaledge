@@ -2,7 +2,7 @@
 (function(){
  'use strict';
  const M=window.DailyNutrition,host=()=>$('#clientMain');
- let owner=null,logs=[],favourites=[],loaded=false,loadedDate=null,favouritesLoaded=false,loadError='',loading=null,loadSequence=0,dateChoice=null,libraryFilter='All',searchText='',sheet=null,busy=false;
+ let owner=null,logs=[],favourites=[],loaded=false,loadedDate=null,favouritesLoaded=false,loadError='',loading=null,loadSequence=0,dateChoice=null,libraryFilter='All',searchText='',sheet=null,busy=false,ideaGroup='All';
  const ownerKey=()=>`${state.preview?'sample':state.user?.id||''}:${state.client?.id||''}`;
  function reset(){owner=ownerKey();logs=[];favourites=[];loaded=false;loadedDate=null;favouritesLoaded=false;loadError='';loading=null;loadSequence++;dateChoice=null;sheet=null;busy=false;libraryFilter='All';searchText='';}
  function date(){return dateChoice||state.selectedNutritionDate||localCoachingDate();}
@@ -62,7 +62,7 @@
    ${loadError?`<div class="dn-notice" role="status">${esc(loadError)} <button class="text-btn" id="dnRetry">Retry</button></div>`:!loaded?'<p class="muted" role="status">Loading your saved food log…</p>':''}
    <div class="dn-section-heading"><h2>Your meals</h2><span>Recipe details only when you need them</span></div>
    <div class="dn-meals">${m.rows.map((r,i)=>`<article class="dn-meal ${r.eaten?'dn-eaten':''}"><div class="dn-meal-number" aria-hidden="true">${String(i+1).padStart(2,'0')}</div><div class="dn-meal-body"><div class="dn-meal-label"><span class="eyebrow">${esc(r.group)}</span>${r.eaten?'<span class="dn-status">Logged</span>':''}</div><h3>${esc(r.meal.name)}</h3><p>${esc(summary(r.meal,r.servings))}${r.servings!==1?` · ${r.servings} servings`:''}</p><div class="dn-meal-actions"><button class="text-btn" data-dn-recipe="${esc(r.key)}">View recipe</button><button class="text-btn" data-dn-swap="${esc(r.key)}" ${r.eaten?'disabled title="Undo this log before changing the meal"':''}>Swap meal</button><button class="btn ${r.eaten?'ghost':'primary'} small" data-dn-log="${esc(r.key)}" ${!loaded||busy?'disabled':''}>${r.eaten?'Undo log':'Log eaten'}</button></div></div></article>`).join('')||`<div class="dn-empty"><h3>${m.day?'No recipes assigned for this day yet.':'No published meal schedule for this date.'}</h3><p>Your coach’s daily targets are above. Browse your assigned recipes or log food you’ve eaten.</p><button class="btn ghost" id="dnEmptyLibrary">Choose a recipe</button></div>`}</div>
-   <div class="dn-daily-actions"><button class="btn primary" id="dnAnywhere" ${!loaded?'disabled':''}>Food Anywhere</button><button class="btn ghost" id="dnQuickLog" ${!loaded?'disabled':''}>+ Quick food log</button><span>Only logged food counts towards your intake.</span></div>
+   <div class="dn-daily-actions"><button class="btn primary" id="dnIdeas" ${!loaded?'disabled':''}>What could I eat?</button><button class="btn ghost" id="dnAnywhere" ${!loaded?'disabled':''}>Food Anywhere</button><button class="btn ghost" id="dnQuickLog" ${!loaded?'disabled':''}>+ Quick food log</button><span>Only logged food counts towards your intake.</span></div>
    <details class="dn-details"><summary>Chosen meal totals</summary><p>${value(planned.calories,' kcal')} · ${value(planned.protein_g,'g protein')} · ${value(planned.carbs_g,'g carbs')} · ${value(planned.fat_g,'g fat')}</p><p>Estimates from your saved recipes. Choosing a meal does not mark it eaten. Missing nutrients keep the relevant total unknown.</p></details>
    ${m.plan?.coach_notes?`<aside class="dn-coach-note"><span class="eyebrow">FROM YOUR COACH</span><p>${esc(m.plan.coach_notes)}</p></aside>`:''}
    <details class="dn-details dn-week"><summary>Shopping list</summary>${shoppingListMarkup(weeklyNutritionSelection().days)}</details>
@@ -75,7 +75,7 @@
   $$('[data-dn-recipe]').forEach(b=>b.onclick=()=>openRecipe(current().rows.find(r=>r.key===b.dataset.dnRecipe)));
   $$('[data-dn-swap]').forEach(b=>b.onclick=()=>openLibrary(b.dataset.dnSwap));
   $$('[data-dn-log]').forEach(b=>b.onclick=()=>{const r=current().rows.find(r=>r.key===b.dataset.dnLog);save(r,!r.eaten);});
-  $('#dnAnywhere').onclick=()=>window.FoodAnywhere?.open();$('#dnQuickLog').onclick=quickLog;$('#dnRetry')?.addEventListener('click',()=>{loadError='';load();paint();});
+  $('#dnIdeas').onclick=openIdeas;$('#dnAnywhere').onclick=()=>window.FoodAnywhere?.open();$('#dnQuickLog').onclick=quickLog;$('#dnRetry')?.addEventListener('click',()=>{loadError='';load();paint();});
   if(sheet)renderSheet();
  }
  async function save(row,eaten,meal=row.meal,servings=row.servings||1){
@@ -102,7 +102,7 @@
  function recipeKey(meal){return String(meal.id||meal.name||'Meal').slice(0,190);}
  function openRecipe(row){if(!row)return;sheet={type:'recipe',row};renderSheet();}
  function openLibrary(slot=null){sheet={type:'library',slot};libraryFilter='All';searchText='';renderSheet();}
- function renderSheet(){if(sheet?.type==='recipe')recipeSheet();else if(sheet?.type==='library')librarySheet();else if(sheet?.type==='quick')quickLog();}
+ function renderSheet(){if(sheet?.type==='recipe')recipeSheet();else if(sheet?.type==='library')librarySheet();else if(sheet?.type==='quick')quickLog();else if(sheet?.type==='ideas')ideasSheet();}
  function recipeSheet(){
   const {row}=sheet,meal=row.meal,found=recipes().find(r=>r.key===row.key||r.meal.id&&r.meal.id===meal.id),key=found?.key||row.key||recipeKey(meal),star=favourites.some(f=>f.recipe_key===key);
   const quantities=(meal.ingredients||meal.items||[]).map(cleanIngredient);
@@ -133,11 +133,20 @@
   $('#dnSearch').oninput=e=>{searchText=e.target.value;candidates=(original?all.filter(r=>r.group===original.group):all).filter(r=>(libraryFilter==='All'||libraryFilter==='Saved'&&favourites.some(f=>f.recipe_key===r.key)||r.group===libraryFilter)&&r.meal.name.toLowerCase().includes(searchText.toLowerCase()));results();};
   $$('[data-dn-filter]').forEach(b=>b.onclick=()=>{libraryFilter=b.dataset.dnFilter;librarySheet();});
  }
+ function openIdeas(){sheet={type:'ideas'};ideaGroup='All';ideasSheet();}
+ function ideasSheet(){
+  const own=ownerKey(),m=current(),candidates=M.mealIdeas(recipes(),m.rows,m.targets,ideaGroup);
+  showSheet(`<p>Ideas from your coach-assigned recipes, matched to the food you’ve logged and your remaining targets for ${esc(m.date)}. No AI credits needed.</p><label>What are you looking for?<select id="dnIdeaGroup">${['All','Breakfast','Lunch','Dinner','Snacks'].map(g=>`<option ${g===ideaGroup?'selected':''}>${g}</option>`).join('')}</select></label><p class="muted">Choose an assigned portion. Check ingredients against your allergies and dietary requirements; this ranking does not certify allergen safety.</p><div class="dn-library-results">${candidates.slice(0,8).map((r,i)=>`<article><div><span class="eyebrow">${esc(r.group)} · ${r.comparable?(r.fits?'WITHIN REMAINING CALORIES':'COMPARE WITH TODAY’S INTAKE'):'TARGET OR NUTRIENTS INCOMPLETE'}</span><h3>${esc(r.meal.name)}</h3><p>${esc(summary(r.meal))}</p><small>${esc(r.plan.name)} · assigned portion</small><p>Remaining after eating this: ${M.fields.map((k,j)=>r.after[k]===null?'Unknown '+['calories','protein','carbs','fat'][j]:`${Math.round(r.after[k])} ${['kcal','g protein','g carbs','g fat'][j]}`).join(' · ')}</p></div><div><button class="btn ghost small" data-idea-recipe="${i}">View recipe</button><button class="btn primary small" data-idea-choose="${i}" ${!loaded||busy?'disabled':''}>Choose for my day</button></div></article>`).join('')||'<p>No assigned recipes match. Ask your coach to add meal ideas, or use Food Anywhere to search published nutrition.</p>'}</div><details><summary>Eating out instead?</summary><p>Start with a protein you enjoy, add vegetables and choose a carbohydrate portion that suits your meal. Request sauces separately when useful. Follow your coach’s dietary guidance and confirm allergens with staff.</p><p>Use the restaurant’s published nutrition in Food Anywhere to compare actual portions. A cuisine or restaurant name alone cannot tell us exact calories.</p><button class="btn ghost" id="dnIdeasAnywhere">Search food and restaurants</button></details><p class="muted">Choosing saves your meal without marking it eaten. Your calorie and macro targets stay unchanged. Only Log eaten counts towards intake.</p>`,'What could I eat?');
+  $('#dnIdeaGroup').onchange=e=>{ideaGroup=e.target.value;ideasSheet();};
+  $$('[data-idea-recipe]').forEach(b=>b.onclick=()=>{if(ownerKey()!==own)return;const r=candidates[Number(b.dataset.ideaRecipe)];openRecipe({key:r.key,group:r.group,meal:r.meal});});
+  $$('[data-idea-choose]').forEach(b=>b.onclick=()=>{if(ownerKey()!==own||date()!==m.date)return;const r=candidates[Number(b.dataset.ideaChoose)];const slot=current().rows.find(row=>!row.eaten&&row.group===r.group);save(slot||{key:r.group.toLowerCase()+'-extra-'+crypto.randomUUID(),group:r.group},false,r.meal,1);});
+  $('#dnIdeasAnywhere').onclick=()=>{closeSheet();window.FoodAnywhere?.open();};
+ }
  function quickLog(){
   sheet={type:'quick'};showSheet(`<p>Use the food label or your own tracked values. Leave unknown nutrients blank.</p><form id="dnQuickForm"><label>Food or meal<input name="name" maxlength="200" required placeholder="e.g. Lunch leftovers"></label><div class="dn-quick-grid">${M.fields.map((k,i)=>`<label>${['Calories (kcal)','Protein (g)','Carbs (g)','Fat (g)'][i]}<input name="${k}" type="number" inputmode="decimal" min="0" max="10000" step="any" placeholder="Optional"></label>`).join('')}</div><p class="muted">Enter totals for the amount you ate. This adds a food log; it does not change your coaching plan.</p><button class="btn primary">Log food eaten</button></form>`,'Quick food log');
   $('#dnQuickForm').onsubmit=e=>{e.preventDefault();const f=new FormData(e.target),meal={name:String(f.get('name')).trim(),meal_type:'Snack',...Object.fromEntries(M.fields.map(k=>[k,M.number(f.get(k))]))};if(!meal.name)return;save({key:'quick-'+crypto.randomUUID(),servings:1},true,meal,1);};
  }
- window.DailyNutritionAccess={context:()=>({...current(),loaded,owner:ownerKey()}),log:async(meal,servings=1)=>{if(!loaded||busy)throw Error('Wait for your food log to load.');const ok=await save({key:'anywhere-'+crypto.randomUUID(),servings},true,meal,servings);if(!ok)throw Error('Your food was not logged. Retry when your connection is available.');}};
+ window.DailyNutritionAccess={ideas:openIdeas,context:()=>({...current(),loaded,owner:ownerKey()}),log:async(meal,servings=1)=>{if(!loaded||busy)throw Error('Wait for your food log to load.');const ok=await save({key:'anywhere-'+crypto.randomUUID(),servings},true,meal,servings);if(!ok)throw Error('Your food was not logged. Retry when your connection is available.');}};
  // The outer renderer still enforces the existing account, consent and plan gates.
  renderWeeklyNutrition=function(){if(owner!==ownerKey())reset();if(!dateChoice&&state.selectedNutritionDate&&state.selectedNutritionDate!==localCoachingDate())dateChoice=state.selectedNutritionDate;if(!state.preview&&loadedDate!==date()){loaded=false;logs=[];}paint();load();};
  window.openDailyNutritionDate=function(d){if(owner!==ownerKey())reset();dateChoice=d||null;state.selectedNutritionDate=null;if(!state.preview){loaded=false;loadedDate=null;logs=[];}renderClient();};

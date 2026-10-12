@@ -49,7 +49,8 @@
     "coach-checkin-status.js",
     "legacy-transition.js",
     "progress-photos.js",
-    "save-integrity.js"
+    "save-integrity.js",
+    "account-removal.js"
   ],
   "styles": [
     "app.css",
