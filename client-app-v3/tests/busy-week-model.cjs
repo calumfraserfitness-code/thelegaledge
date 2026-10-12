@@ -11,5 +11,7 @@ m=M.focus({...base,work_hours:60},null,sessions);assert.equal(m.priority.length,
 m=M.focus({...base,health:'injury'},null,sessions);assert.equal(m.cap,0);assert.equal(m.priority.length,0);
 m=M.focus({...base,work_hours:50},{published:true,heavy_sessions:1,crisis_sessions:0},sessions);assert.equal(m.cap,1);
 m=M.focus({...base,work_hours:50},{published:false,heavy_sessions:7},sessions);assert.equal(m.cap,2,'Unpublished coach drafts do not drive client focus');
+assert.equal(M.focus(base,null,[]).cap,0,'No priority workouts are invented without an assignment');
+assert.equal(M.focus(base,null,[sessions[1]]).cap,1,'Focus cannot exceed actual assigned workouts');
 assert.equal(JSON.stringify(sessions),original,'No prescription, date or completion history is changed by the model');
 console.log('Busy-week mode boundaries, health precedence, travel overlay, completed-session credit, published coach settings and immutable history passed.');
