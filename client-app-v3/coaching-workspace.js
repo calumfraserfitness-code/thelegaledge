@@ -187,8 +187,8 @@ function openSampleScene(scene){
 }
 function sharedSamplePulse(){
  const start=iso(monday()),rows=firmState.participants.filter(m=>m.status!=='withdrawn'&&firmState.consents.some(c=>c.participant_id===m.id)).map(m=>(state.sampleClientData.get(m.client_id)?.checkins||[]).filter(c=>c.period_start?c.period_start===start:String(c.submitted_at||'').slice(0,10)>=start).sort((a,b)=>String(b.submitted_at).localeCompare(String(a.submitted_at)))[0]).filter(Boolean);
- const result={count:rows.length,suppressed:rows.length<5};
- for(const key of ['energy','sleep','stress','workload']){const values=rows.map(r=>r[key]).filter(v=>v!=null&&Number.isFinite(Number(v)));result[key]=values.length>=5?(values.reduce((a,b)=>a+Number(b),0)/values.length).toFixed(1):null;}
+ const result={count:rows.length,suppressed:rows.length<8};
+ for(const key of ['energy','sleep','stress','workload']){const values=rows.map(r=>r[key]).filter(v=>v!=null&&Number.isFinite(Number(v)));result[key]=values.length>=8?(values.reduce((a,b)=>a+Number(b),0)/values.length).toFixed(1):null;}
  return result;
 }
 function renderSharedSampleSponsor(){
