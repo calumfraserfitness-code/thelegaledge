@@ -2,8 +2,8 @@
 function clientGoalText(value){return String(value||'').replace(/\bSource:\s*https?:\/\/\S+/gi,'').replace(/https?:\/\/fathom\.video\/\S+/gi,'').trim();}
 (function(){
  'use strict';
- function enhance(){
-  const host=state.role==='coach'?$('#clientWorkspaceBody'):$('#clientMain');if(!host)return;
+ function enhance(host){
+  if(!host)return;
   const summary=clientGoalText(state.client?.goal_summary);
   if(summary&&!host.querySelector('[data-agreed-goal]')){const p=document.createElement('p');p.dataset.agreedGoal='';p.className='panel';p.textContent=summary;host.querySelector('.progress-hero')?.before(p);}
   if(!finiteRecorded(state.client?.goal_weight_kg)||Number(state.client.goal_weight_kg)<=0){const hero=host.querySelector('.goal-progress');if(hero)hero.innerHTML='<span>Goal focus</span><strong>Your agreed goals</strong><small>No target weight set</small>';}
@@ -16,8 +16,8 @@ function clientGoalText(value){return String(value||'').replace(/\bSource:\s*htt
   function paint(){const selected=view.value;panel.querySelector('.photo-compare-pair').innerHTML=[['Before',before.value],['After',after.value]].map(([label,week])=>{const p=photos.filter(p=>Number(p.week_number)===Number(week)&&p.photo_view===selected).at(-1);return `<article><h4>${label} · Week ${esc(week)}</h4>${p?`<div data-photo-path="${esc(p.storage_path)}"><div class="photo-placeholder">Loading private photo…</div></div><small>${esc(fmt(p.created_at))}</small>`:`<p>No ${esc(selected)} photo for this week.</p>`}</article>`;}).join('');hydrateProgressPhotos();}
   before.onchange=after.onchange=view.onchange=paint;cards[0].closest('section').before(panel);paint();
  }
- const coach=coachProgress;coachProgress=function(){coach();enhance();};
- const client=clientProgress;clientProgress=function(){client();enhance();cameraInputs($('#clientMain'));};
+ const coach=coachProgress;coachProgress=function(){coach();enhance($('#clientWorkspaceBody'));};
+ const client=clientProgress;clientProgress=function(){client();enhance($('#clientMain'));cameraInputs($('#clientMain'));};
  function cameraInputs(host){if(!host)return;for(const input of host.querySelectorAll('input[type=file][accept^="image/"]')){
   if(input.dataset.cameraReady)continue;input.dataset.cameraReady='true';const camera=document.createElement('input');camera.type='file';camera.accept='image/*';camera.setAttribute('capture','environment');camera.hidden=true;camera.setAttribute('aria-label','Take progress photo');
   const button=document.createElement('button');button.type='button';button.className='btn ghost small';button.textContent='Take a photo';button.onclick=()=>camera.click();camera.onchange=()=>{if(camera.files?.length){input.files=camera.files;input.dispatchEvent(new Event('change',{bubbles:true}));}};input.after(button,camera);

@@ -35,6 +35,7 @@ assert(run("clientRows([{id:'rounding',display_name:'Goal fixture',weight_unit:'
 assert(Number.isNaN(run('progressData().goal')),'Unset weight target stays unknown');
 assert(!doc.querySelector('.progress-metrics').textContent.includes('0.0 lb'));
 assert.equal(doc.querySelectorAll('.photo-compare-pair [data-photo-path]').length,2);
+run(`state.role='coach';clientProgress();`);assert(doc.querySelector('#clientMain [data-agreed-goal]'),'Coach viewing the client sees the same goal focus');assert.equal(doc.querySelectorAll('#clientMain .photo-compare-pair [data-photo-path]').length,2);run(`state.role='client';`);
 assert.equal(doc.querySelector('[data-photo-before]').value,'1');assert.equal(doc.querySelector('[data-photo-after]').value,'2');
 doc.querySelector('[data-photo-view]').value='side';doc.querySelector('[data-photo-view]').dispatchEvent(new dom.window.Event('change'));assert(doc.querySelector('.photo-compare-pair').textContent.includes('No side photo'));
 assert(doc.querySelector('input[capture=environment]'),'Dedicated phone camera chooser');assert(doc.querySelector('input[name=photo]:not([capture])'),'File/gallery chooser retained');
