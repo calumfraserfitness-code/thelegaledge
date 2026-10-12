@@ -85,7 +85,7 @@ function clearLogin(){
  const preview=form.querySelector('a[href*="workspace=demo"]');if(preview){const detail=document.createElement('details');detail.className='clear-preview-link';detail.innerHTML='<summary>See a sample before signing in</summary>';preview.before(detail);detail.append(preview);preview.textContent='Open fictional preview';}
  const password=$('#password'),toggle=document.createElement('button');toggle.type='button';toggle.className='text-btn clear-password-toggle';toggle.textContent='Show password';toggle.setAttribute('aria-pressed','false');toggle.onclick=()=>{const visible=password.type==='password';password.type=visible?'text':'password';toggle.textContent=visible?'Hide password':'Show password';toggle.setAttribute('aria-pressed',String(visible));};password.closest('label').append(toggle);
  const original=form.onsubmit;let pending=false;
- form.onsubmit=async event=>{event.preventDefault();if(pending)return;pending=true;const button=form.querySelector('button[type="submit"]');setBusy(button,true,'Signing in…');try{await original(event);}catch{$('#authMsg').textContent='Could not sign in. Check your connection and try again.';}finally{pending=false;setBusy(button,false);}};
+ form.onsubmit=async event=>{event.preventDefault();if(pending)return;pending=true;try{await original(event);}catch{$('#authMsg').textContent='Could not sign in. Check your connection and try again.';}finally{pending=false;}};
  $('#authMsg').setAttribute('role','status');$('#authMsg').setAttribute('aria-live','polite');
 }
 document.addEventListener('DOMContentLoaded',()=>{clearCoachNav();updateClientNav();clearWorkspaceTabs();clearLogin();});

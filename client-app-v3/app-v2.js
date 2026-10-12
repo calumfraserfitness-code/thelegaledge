@@ -226,7 +226,7 @@ async function bootAccount() {
     if (!db) throw new Error('The secure connection did not load. Refresh the page.');
     if (recoveryMode) return show('#recovery');
     const { data: { user },error:authError } = await withinDeadline(db.auth.getUser(),'Secure sign-in');
-    if(authError)throw authError;
+    if(authError&&authError.name!=='AuthSessionMissingError')throw authError;
     if (recoveryMode) return show('#recovery');
     if (!user) return show('#auth');
     state.user = user;
@@ -1683,7 +1683,7 @@ function bindShell() {
     if(button?.disabled)return;
     setBusy(button,true,'Signing in…');
     try{
-      const { error } = await db.auth.signInWithPassword({ email: $('#email').value.trim().toLowerCase(), password: $('#password').value });
+      const { error } = await withinDeadline(db.auth.signInWithPassword({ email: $('#email').value.trim().toLowerCase(), password: $('#password').value }),'Sign-in request');
       if(error)throw error;
       $('#authMsg').textContent='Opening your coaching workspace…';
       await boot();
