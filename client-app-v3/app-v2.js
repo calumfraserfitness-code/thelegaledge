@@ -10,6 +10,7 @@ async function secureFetch(input, options = {}) {
   finally{clearTimeout(timer);signal?.removeEventListener('abort',abort);}
 }
 const db = window.supabase?.createClient?.(SUPABASE_URL, SUPABASE_KEY, {global:{fetch:secureFetch}}) ?? null;
+function withinDeadline(promise,label,ms=15000){let timer;return Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error(label+' took too long. Try again; your saved data is safe.')),ms);})]).finally(()=>clearTimeout(timer));}
 let bootRequest=null;
 function boot(){if(bootRequest)return bootRequest;bootRequest=bootAccount().finally(()=>bootRequest=null);return bootRequest;}
 let recoveryMode = new URLSearchParams(location.hash.slice(1)).get('type') === 'recovery';
@@ -128,16 +129,15 @@ async function loadCoach() {
     const rows=[],size=500;
     for(let offset=0;;offset+=size){const page=await query(label,build().range(offset,offset+size-1));rows.push(...page);if(page.length<size)return rows;}
   }
-  const [clients, memberships] = await Promise.all([
-    allRows('Clients',()=>db.from('clients').select('*,profile:profiles!clients_profile_id_fkey(full_name,email),private_details:client_private_details(coach_notes)').order('start_date').order('id')),
-    allRows('Corporate memberships',()=>db.from('firm_participants').select('client_id').order('id'))
-  ]);
+  const account=state.user?.id;
+  const clients=await withinDeadline(allRows('Clients',()=>db.from('clients').select('*').eq('coach_id',account).order('start_date').order('id')),'Client list');
+  state.corporateMemberships=[];
+  if(clients.length)query('Corporate memberships',db.from('firm_participants').select('client_id').in('client_id',clients.map(c=>c.id))).then(rows=>{if(state.user?.id===account&&state.role==='coach')state.corporateMemberships=rows;}).catch(()=>{});
   state.clients = clients.filter(c => c.source_system !== 'coach_health_test').map(normalizeClient);
   state.qaRows = [];
   state.qaStatus = 'loading';
-  state.corporateMemberships = memberships;
+
   // A slow optional completeness report must never turn a valid sign-in into an error.
-  const account = state.user?.id;
   const controller = new AbortController();
   const deadline = setTimeout(() => controller.abort(), 8000);
   query('Client QA', db.from('client_qa_summary').select('*').abortSignal(controller.signal))
@@ -174,10 +174,12 @@ async function loadClientData(clientId) {
     query('Imported workouts', db.from('client_health_workouts').select('*').eq('client_id', clientId).order('started_at', { ascending: false }).limit(100)),
     query('Health imports', db.from('client_health_imports').select('*').eq('client_id', clientId).order('imported_at', { ascending: false }).limit(20)),
     state.role === 'coach' ? query('Exercise Bank', db.from('exercise_bank').select('*').order('name').limit(1000)) : Promise.resolve([]),
+    state.role==='coach'?query('Private client details',db.from('client_private_details').select('coach_notes').eq('client_id',clientId)):Promise.resolve([]),
     Promise.resolve([]) // Meal bank is searched on demand by meal-library.js.
   ]);
   if (state.client?.id !== clientAtStart) return;
-  const [weeks, programs, nutritionPlans, habits, steps, checkins, progress, onboarding, legal, diagnostics, files, mealAssignments, exerciseLogs, healthConnections, healthDaily, healthWorkouts, healthImports, exerciseBank, mealBank] = requests;
+  const [weeks, programs, nutritionPlans, habits, steps, checkins, progress, onboarding, legal, diagnostics, files, mealAssignments, exerciseLogs, healthConnections, healthDaily, healthWorkouts, healthImports, exerciseBank, privateDetails, mealBank] = requests;
+  if(state.role==='coach')state.client.coach_notes=privateDetails[0]?.coach_notes||'';
   let sessions = [];
   let exercises = [];
   let nutritionDays = [];
@@ -223,11 +225,12 @@ async function bootAccount() {
     if (new URLSearchParams(location.search).get('onboarding') === 'demo'||new URLSearchParams(location.search).get('pilot') === 'demo'||new URLSearchParams(location.search).get('workspace') === 'demo') return;
     if (!db) throw new Error('The secure connection did not load. Refresh the page.');
     if (recoveryMode) return show('#recovery');
-    const { data: { user } } = await db.auth.getUser();
+    const { data: { user },error:authError } = await withinDeadline(db.auth.getUser(),'Secure sign-in');
+    if(authError)throw authError;
     if (recoveryMode) return show('#recovery');
     if (!user) return show('#auth');
     state.user = user;
-    state.profile = await query('Profile', db.from('profiles').select('*').eq('id', user.id).single());
+    state.profile = await withinDeadline(query('Profile', db.from('profiles').select('*').eq('id', user.id).single()),'Account profile');
     state.role = state.profile.role;
     if (state.role === 'coach') {
       await loadCoach();

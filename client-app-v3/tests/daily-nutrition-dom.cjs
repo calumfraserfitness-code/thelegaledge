@@ -26,7 +26,7 @@ dom.window.supabase={createClient:()=>({auth:{getUser:async()=>({data:{user:null
  }).then(resolve,reject);}};return q;}})};
 const ctx=dom.getInternalVMContext();
 for(const script of dom.window.document.querySelectorAll('script[src^="./"]')){
- const file=script.getAttribute('src').split('?')[0].slice(2);if(file.startsWith('vendor/'))continue;vm.runInContext(fs.readFileSync(path.join(root,file),'utf8'),ctx,{filename:file});
+ const file=script.getAttribute('src').split('?')[0].slice(2);if(file.startsWith('vendor/'))continue;if(file==='app-runtime.js'){for(const source of JSON.parse(fs.readFileSync(path.join(root,'runtime-manifest.json'),'utf8')).scripts)vm.runInContext(fs.readFileSync(path.join(root,source),'utf8'),ctx,{filename:source});continue;}vm.runInContext(fs.readFileSync(path.join(root,file),'utf8'),ctx,{filename:file});
 }
 const run=s=>vm.runInContext(s,ctx),doc=dom.window.document;
 run(`preview('client');state.client.onboarding_status='complete';state.client.plan_status='published';state.clientView='nutrition';state.selectedNutritionDate=null;
