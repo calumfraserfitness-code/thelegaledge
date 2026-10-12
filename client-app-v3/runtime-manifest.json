@@ -48,7 +48,8 @@
     "checkin-status-model.js",
     "coach-checkin-status.js",
     "legacy-transition.js",
-    "progress-photos.js"
+    "progress-photos.js",
+    "save-integrity.js"
   ],
   "styles": [
     "app.css",
