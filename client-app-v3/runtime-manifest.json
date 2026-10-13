@@ -57,7 +57,8 @@
     "coach-tools.js",
     "quick-training.js",
     "migration-readiness.js",
-    "simple-lift-logging.js"
+    "simple-lift-logging.js",
+    "checkin-video.js"
   ],
   "styles": [
     "app.css",
@@ -94,6 +95,7 @@
     "busy-week.css",
     "coach-tools.css",
     "quick-training.css",
-    "simple-lift-logging.css"
+    "simple-lift-logging.css",
+    "checkin-video.css"
   ]
 }
