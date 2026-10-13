@@ -1326,12 +1326,13 @@ function strengthProgressMarkup() {
     }
     const rows = [...bestByDay.values()], latest = rows.at(-1), previous = rows.at(-2);
     return { ...group, allRows: group.rows, rows, latest, previous, lastAt: latest?.performed_at || '' };
-  }).sort((a, b) => String(b.lastAt).localeCompare(String(a.lastAt))).slice(0, 6);
+  }).sort((a, b) => String(b.lastAt).localeCompare(String(a.lastAt)));
   if (!exercises.length) return `<section class="panel strength-progress"><div class="panel-head"><div><h3>Strength progress</h3><span class="sub">Your best working sets appear here automatically</span></div></div><div class="empty"><b>No strength sets logged yet.</b><p>Save the weight and reps after a workout to start the chart. No unverified history is shown or invented.</p></div></section>`;
-  return `<section class="panel strength-progress"><div class="panel-head"><div><h3>Strength progress</h3><span class="sub">Best estimated set per day; charts show its recorded weight and reps</span></div></div><div class="strength-progress-grid">${exercises.map((exercise) => {
+  const cards = exercises.map((exercise) => {
     const change = exercise.previous ? exercise.latest.estimate - exercise.previous.estimate : null;
     return `<article><span class="eyebrow">${esc(fmt(exercise.latest.performed_at))}</span><h4>${esc(exercise.name)}</h4><strong>${exercise.latest.load.toLocaleString(undefined,{maximumFractionDigits:1})} ${esc(exercise.unit)} × ${exercise.latest.reps.toLocaleString(undefined,{maximumFractionDigits:1})}</strong>${exercise.previous ? `<small>Previous best ${exercise.previous.load.toLocaleString(undefined,{maximumFractionDigits:1})} ${esc(exercise.unit)} × ${exercise.previous.reps.toLocaleString(undefined,{maximumFractionDigits:1})} · ${change >= 0 ? '+' : ''}${change.toFixed(1)} estimated</small>` : '<small>First recorded baseline</small>'}<p class="muted">Weight used (${esc(exercise.unit)})</p>${chart(exercise.rows.map(row=>row.load))}<p class="muted">Reps at that weight</p>${chart(exercise.rows.map(row=>row.reps))}<details><summary>All recorded sets</summary>${exercise.allRows.slice().reverse().map(row=>`<div class="note-row"><b>${esc(fmt(row.performed_at))} · Set ${esc(row.set_number??'—')}</b><span>${esc(row.load)} ${esc(exercise.unit)} × ${esc(row.reps)} reps</span></div>`).join('')}</details></article>`;
-  }).join('')}</div></section>`;
+  });
+  return `<section class="panel strength-progress"><div class="panel-head"><div><h3>Strength progress</h3><span class="sub">Best estimated set per day; charts show its recorded weight and reps</span></div></div><div class="strength-progress-grid">${cards.slice(0,6).join('')}</div>${cards.length>6?'<details class="strength-more"><summary>More exercise charts · '+(cards.length-6)+'</summary><div class="strength-progress-grid">'+cards.slice(6).join('')+'</div></details>':''}</section>`;
 }
 
 function progressDashboardMarkup() {
