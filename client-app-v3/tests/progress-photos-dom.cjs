@@ -33,7 +33,7 @@ const run=s=>vm.runInContext(s,ctx),doc=dom.window.document;
 run(`preview('client');state.client.goal_weight_kg=null;state.client.goal_summary='Maintain weight, build strength and improve recovery.';state.clientView='progress';state.data.files=[{file_type:'progress_photo',week_number:1,photo_view:'front',storage_path:'private/front1',created_at:'2026-10-01'},{file_type:'progress_photo',week_number:2,photo_view:'front',storage_path:'private/front2',created_at:'2026-10-08'}];renderClient();`);
 assert(run("clientRows([{id:'rounding',display_name:'Goal fixture',weight_unit:'lbs',goal_weight_kg:99.79}])").includes('220 lb'),'Roster rounds the saved goal instead of truncating it');
 assert(Number.isNaN(run('progressData().goal')),'Unset weight target stays unknown');
-assert(!doc.querySelector('.progress-metrics').textContent.includes('0.0 lb'));
+assert.equal([...doc.querySelectorAll('.progress-metrics > div')].find(el=>el.querySelector('span').textContent==='Goal').querySelector('strong').textContent,'—','Unset goal remains unknown even when check-in weights are included');
 run(`state.data.progress=[{entry_date:'2026-10-01',weight_kg:83.01},{entry_date:'2026-10-08',weight_kg:82.10}];state.data.exerciseLogs=[{exercise_name:'Bench press',performed_at:'2026-10-01T10:00:00Z',load:70,reps:8,load_unit:'kg'},{exercise_name:'Bench press',performed_at:'2026-10-08T10:00:00Z',load:72.5,reps:8,load_unit:'kg'}];clientProgress();`);
 assert(doc.querySelector('.progress-metrics').textContent.includes('Previous'),'Previous weigh-in is explicit');
 assert(doc.querySelector('.progress-metrics').textContent.includes('Since previous'),'Change since the previous weigh-in is explicit');

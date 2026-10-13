@@ -1274,7 +1274,20 @@ async function addCoachProgress(event) {
 }
 
 function progressData() {
-  const entries = [...state.data.progress].filter((entry) => entry.weight_kg != null).sort((a, b) => String(a.entry_date).localeCompare(String(b.entry_date)));
+  // Include weights recorded in check-ins even when no separate progress row exists.
+  const byDate = new Map();
+  for (const row of [...(state.data.checkins || [])].sort((a,b) => String(a.submitted_at).localeCompare(String(b.submitted_at)))) {
+    if (row.client_id && row.client_id !== state.client.id) continue;
+    const date = String(row.submitted_at || '').slice(0,10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(date) && row.weight_kg != null && row.weight_kg !== '' && Number.isFinite(Number(row.weight_kg)) && Number(row.weight_kg)>0)
+      byDate.set(date, {entry_date:date, weight_kg:Number(row.weight_kg), source:'checkin'});
+  }
+  for (const row of state.data.progress || []) {
+    if (row.client_id && row.client_id !== state.client.id) continue;
+    if (row.entry_date && row.weight_kg != null && row.weight_kg !== '' && Number.isFinite(Number(row.weight_kg)) && Number(row.weight_kg)>0)
+      byDate.set(String(row.entry_date).slice(0,10),row);
+  }
+  const entries = [...byDate.values()].sort((a,b) => String(a.entry_date).localeCompare(String(b.entry_date)));
   const start = Number(state.client.start_weight_kg ?? entries[0]?.weight_kg);
   const current = Number(entries.at(-1)?.weight_kg);
   const goal = state.client.goal_weight_kg == null || state.client.goal_weight_kg === '' || Number(state.client.goal_weight_kg) <= 0 ? NaN : Number(state.client.goal_weight_kg);
@@ -1451,7 +1464,7 @@ function clientToday() {
 }
 
 function milestones() {
-  const entries = [...state.data.progress].filter((entry) => entry.weight_kg != null).sort((a, b) => String(a.entry_date).localeCompare(String(b.entry_date)));
+  const entries = progressData().entries;
   const latest = entries.at(-1)?.weight_kg;
   const loss = latest != null && state.client.start_weight_kg != null ? (Number(state.client.start_weight_kg) - Number(latest)) * (state.client.weight_unit === 'lbs' ? 2.20462 : 1) : 0;
   const checkins = state.data.checkins;

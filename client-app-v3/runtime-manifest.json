@@ -55,7 +55,8 @@
     "busy-week-model.js",
     "busy-week.js",
     "coach-tools.js",
-    "quick-training.js"
+    "quick-training.js",
+    "migration-readiness.js"
   ],
   "styles": [
     "app.css",
