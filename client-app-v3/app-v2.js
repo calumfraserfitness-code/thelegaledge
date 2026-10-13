@@ -1292,11 +1292,41 @@ function rangeEntries(entries) {
   return entries.filter((entry) => new Date(`${entry.entry_date}T12:00:00`) >= cutoff);
 }
 
+function strengthProgressMarkup() {
+  const exerciseNames = new Map((state.data.exercises || []).map((exercise) => [exercise.id, exercise.name]));
+  const groups = new Map();
+  for (const log of state.data.exerciseLogs || []) {
+    const load = Number(log.load), reps = Number(log.reps);
+    if (!Number.isFinite(load) || load <= 0 || !Number.isFinite(reps) || reps <= 0 || !log.performed_at) continue;
+    const name = String(log.exercise_name || exerciseNames.get(log.program_exercise_id) || 'Exercise').trim();
+    const unit = String(log.load_unit || (state.client.weight_unit === 'lbs' ? 'lb' : 'kg'));
+    const key = `${name.toLowerCase()}|${unit}`;
+    if (!groups.has(key)) groups.set(key, { name, unit, rows: [] });
+    groups.get(key).rows.push({ ...log, load, reps, estimate: load * (1 + reps / 30) });
+  }
+  const exercises = [...groups.values()].map((group) => {
+    const bestByDay = new Map();
+    for (const row of group.rows.sort((a, b) => String(a.performed_at).localeCompare(String(b.performed_at)))) {
+      const day = String(row.performed_at).slice(0, 10), saved = bestByDay.get(day);
+      if (!saved || row.estimate > saved.estimate) bestByDay.set(day, row);
+    }
+    const rows = [...bestByDay.values()], latest = rows.at(-1), previous = rows.at(-2);
+    return { ...group, rows, latest, previous, lastAt: latest?.performed_at || '' };
+  }).sort((a, b) => String(b.lastAt).localeCompare(String(a.lastAt))).slice(0, 6);
+  if (!exercises.length) return `<section class="panel strength-progress"><div class="panel-head"><div><h3>Strength progress</h3><span class="sub">Your best working sets appear here automatically</span></div></div><div class="empty"><b>No strength sets logged yet.</b><p>Save the weight and reps after a workout to start the chart. No unverified history is shown or invented.</p></div></section>`;
+  return `<section class="panel strength-progress"><div class="panel-head"><div><h3>Strength progress</h3><span class="sub">Best estimated set by workout date</span></div></div><div class="strength-progress-grid">${exercises.map((exercise) => {
+    const change = exercise.previous ? exercise.latest.estimate - exercise.previous.estimate : null;
+    return `<article><span class="eyebrow">${esc(fmt(exercise.latest.performed_at))}</span><h4>${esc(exercise.name)}</h4><strong>${exercise.latest.load.toLocaleString(undefined,{maximumFractionDigits:1})} ${esc(exercise.unit)} × ${exercise.latest.reps.toLocaleString(undefined,{maximumFractionDigits:1})}</strong>${exercise.previous ? `<small>Previous best ${exercise.previous.load.toLocaleString(undefined,{maximumFractionDigits:1})} ${esc(exercise.unit)} × ${exercise.previous.reps.toLocaleString(undefined,{maximumFractionDigits:1})} · ${change >= 0 ? '+' : ''}${change.toFixed(1)} estimated</small>` : '<small>First recorded baseline</small>'}${chart(exercise.rows.map((row) => row.estimate))}</article>`;
+  }).join('')}</div></section>`;
+}
+
 function progressDashboardMarkup() {
   const model = progressData(), shown = rangeEntries(model.entries), factor = state.client.weight_unit === 'lbs' ? 2.20462 : 1;
   const value = (kg, signed = false) => Number.isFinite(kg) ? displayWeight(kg, signed) : '—';
+  const previous = model.entries.at(-2)?.weight_kg == null ? NaN : Number(model.entries.at(-2).weight_kg);
+  const sincePrevious = Number.isFinite(model.current) && Number.isFinite(previous) ? model.current - previous : NaN;
   const measures = ['waist_cm','chest_cm','hips_cm','arm_cm','thigh_cm'].map((key) => { const rows = state.data.progress.filter((entry) => entry[key] != null).sort((a,b) => String(a.entry_date).localeCompare(String(b.entry_date))); return rows.length ? { name: title(key.replace('_cm','')), start: Number(rows[0][key]), current: Number(rows.at(-1)[key]) } : null; }).filter(Boolean);
-  return `<div class="progress-hero"><div><span>Current</span><strong>${value(model.current)}</strong><small>${model.entries.at(-1) ? `Latest weigh-in ${fmt(model.entries.at(-1).entry_date)}` : 'No weigh-ins'}</small></div><div class="goal-progress"><span>Goal progress</span><strong>${model.progress == null ? '—' : `${model.progress}%`}</strong><div class="progress-bar"><i style="width:${model.progress || 0}%"></i></div></div></div><div class="progress-metrics"><div><span>Start</span><strong>${value(model.start)}</strong></div><div><span>Total change</span><strong>${value(model.change, true)}</strong></div><div><span>Goal</span><strong>${value(model.goal)}</strong></div><div><span>To goal</span><strong>${value(model.remaining, true)}</strong></div><div><span>Weekly rate</span><strong>${value(model.weeklyRate, true)}</strong></div><div><span>Weigh-ins</span><strong>${model.entries.length}</strong></div></div><section class="panel"><div class="panel-head"><h3>Weight trend</h3><div class="range-tabs">${['4','8','12','all'].map((range) => `<button data-progress-range="${range}" class="${state.progressRange === range ? 'active' : ''}">${range === 'all' ? 'All time' : `${range} weeks`}</button>`).join('')}</div></div>${chart(shown.map((entry) => Number(entry.weight_kg) * factor))}<div>${shown.slice().reverse().map((entry) => `<div class="note-row"><b>${fmt(entry.entry_date)}</b><span>${displayWeight(entry.weight_kg)}${entry.waist_cm ? ` · Waist ${entry.waist_cm} cm` : ''}</span></div>`).join('') || '<div class="empty">No entries in this range.</div>'}</div></section>${measures.length ? `<section class="panel measurement-panel"><div class="panel-head"><h3>Measurements</h3></div><div class="measurement-grid">${measures.map((measure) => `<div><span>${measure.name}</span><strong>${measure.current} cm</strong><small>${measure.start} cm start · ${(measure.current - measure.start).toFixed(1)} cm</small></div>`).join('')}</div></section>` : ''}${milestones()}`;
+  return `<div class="progress-hero"><div><span>Current</span><strong>${value(model.current)}</strong><small>${model.entries.at(-1) ? `Latest weigh-in ${fmt(model.entries.at(-1).entry_date)}` : 'No weigh-ins'}</small></div><div class="goal-progress"><span>Goal progress</span><strong>${model.progress == null ? '—' : `${model.progress}%`}</strong><div class="progress-bar"><i style="width:${model.progress || 0}%"></i></div></div></div><div class="progress-metrics"><div><span>Previous</span><strong>${value(previous)}</strong></div><div><span>Since previous</span><strong>${value(sincePrevious, true)}</strong></div><div><span>Start</span><strong>${value(model.start)}</strong></div><div><span>Total change</span><strong>${value(model.change, true)}</strong></div><div><span>Goal</span><strong>${value(model.goal)}</strong></div><div><span>To goal</span><strong>${value(model.remaining, true)}</strong></div><div><span>Weekly rate</span><strong>${value(model.weeklyRate, true)}</strong></div><div><span>Weigh-ins</span><strong>${model.entries.length}</strong></div></div><section class="panel"><div class="panel-head"><h3>Weight trend</h3><div class="range-tabs">${['4','8','12','all'].map((range) => `<button data-progress-range="${range}" class="${state.progressRange === range ? 'active' : ''}">${range === 'all' ? 'All time' : `${range} weeks`}</button>`).join('')}</div></div>${chart(shown.map((entry) => Number(entry.weight_kg) * factor))}<div>${shown.slice().reverse().map((entry) => `<div class="note-row"><b>${fmt(entry.entry_date)}</b><span>${displayWeight(entry.weight_kg)}${entry.waist_cm ? ` · Waist ${entry.waist_cm} cm` : ''}</span></div>`).join('') || '<div class="empty">No entries in this range.</div>'}</div></section>${strengthProgressMarkup()}${measures.length ? `<section class="panel measurement-panel"><div class="panel-head"><h3>Measurements</h3></div><div class="measurement-grid">${measures.map((measure) => `<div><span>${measure.name}</span><strong>${measure.current} cm</strong><small>${measure.start} cm start · ${(measure.current - measure.start).toFixed(1)} cm</small></div>`).join('')}</div></section>` : ''}${milestones()}`;
 }
 
 function bindProgressRange(render) { $$('[data-progress-range]').forEach((button) => button.onclick = () => { state.progressRange = button.dataset.progressRange; render(); }); }

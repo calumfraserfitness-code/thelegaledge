@@ -34,6 +34,11 @@ run(`preview('client');state.client.goal_weight_kg=null;state.client.goal_summar
 assert(run("clientRows([{id:'rounding',display_name:'Goal fixture',weight_unit:'lbs',goal_weight_kg:99.79}])").includes('220 lb'),'Roster rounds the saved goal instead of truncating it');
 assert(Number.isNaN(run('progressData().goal')),'Unset weight target stays unknown');
 assert(!doc.querySelector('.progress-metrics').textContent.includes('0.0 lb'));
+run(`state.data.progress=[{entry_date:'2026-10-01',weight_kg:83.01},{entry_date:'2026-10-08',weight_kg:82.10}];state.data.exerciseLogs=[{exercise_name:'Bench press',performed_at:'2026-10-01T10:00:00Z',load:70,reps:8,load_unit:'kg'},{exercise_name:'Bench press',performed_at:'2026-10-08T10:00:00Z',load:72.5,reps:8,load_unit:'kg'}];clientProgress();`);
+assert(doc.querySelector('.progress-metrics').textContent.includes('Previous'),'Previous weigh-in is explicit');
+assert(doc.querySelector('.progress-metrics').textContent.includes('Since previous'),'Change since the previous weigh-in is explicit');
+assert(doc.querySelector('.strength-progress').textContent.includes('Bench press'),'Verified strength logs receive their own trend card');
+assert(doc.querySelector('.strength-progress').textContent.includes('Previous best 70 kg × 8'),'Strength card keeps the previous working set visible');
 assert.equal(doc.querySelectorAll('.photo-compare-pair [data-photo-path]').length,2);
 run(`state.role='coach';clientProgress();`);assert(doc.querySelector('#clientMain [data-agreed-goal]'),'Coach viewing the client sees the same goal focus');assert.equal(doc.querySelectorAll('#clientMain .photo-compare-pair [data-photo-path]').length,2);run(`state.role='client';`);
 assert.equal(doc.querySelector('[data-photo-before]').value,'1');assert.equal(doc.querySelector('[data-photo-after]').value,'2');
