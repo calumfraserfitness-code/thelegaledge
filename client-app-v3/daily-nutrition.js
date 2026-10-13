@@ -25,6 +25,11 @@
     if(!result.some(r=>r.signature===signature))result.push({key,group,meal,plan,signature});
    });
   }
+  for(const assignment of (state.data.mealAssignments||[]).filter(a=>!a.nutrition_plan_id&&!a.historical&&a.meal&&(!a.client_id||a.client_id===state.client.id))){
+   const meal=assignment.meal,group=M.category(meal),key=String(meal.id||assignment.id);
+   const signature=JSON.stringify([group,String(meal.name||'').trim().toLowerCase(),...M.fields.map(k=>M.number(meal[k])),meal.ingredients||meal.items||[],meal.cooking_instructions||'']);
+   if(!result.some(r=>r.signature===signature))result.push({key,group,meal,plan:{name:'Optional meal swap'},signature});
+  }
   return result;
  }
  async function load(){
