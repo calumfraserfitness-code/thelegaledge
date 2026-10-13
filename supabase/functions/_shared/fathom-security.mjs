@@ -2,7 +2,7 @@ export const normalizedName=value=>String(value||'').normalize('NFKD').replace(/
 export function matchClient(meeting,clients){
  const invitees=Array.isArray(meeting.calendar_invitees)?meeting.calendar_invitees:[];
  const speakers=Array.isArray(meeting.transcript)?meeting.transcript:[];
- const matches=clients.filter(c=>c.profile_id&&invitees.some(i=>{
+ const matches=clients.filter(c=>c.profile_id&&c.profile_role==='client'&&String(c.email||'').trim().toLowerCase()!==String(meeting.recorded_by?.email||'').trim().toLowerCase()&&invitees.some(i=>{
   const email=String(i.email||'').trim().toLowerCase(),expected=String(c.email||'').trim().toLowerCase(),name=normalizedName(c.display_name);
   return email&&email===expected&&name.split(' ').length>=2&&(
    normalizedName(i.name)===name||normalizedName(i.matched_speaker_display_name)===name||speakers.some(s=>String(s.speaker?.matched_calendar_invitee_email||'').toLowerCase()===email&&normalizedName(s.speaker?.display_name)===name));

@@ -13,8 +13,9 @@ Deno.serve(async req=>{
   const meeting=JSON.parse(raw);if(!Number.isSafeInteger(meeting.recording_id)||meeting.recording_id<=0)return json({error:'Missing recording identity'},400);
   // A key for another Fathom account must never import that account's recordings.
   if(String(meeting.recorded_by?.email||'').toLowerCase()!==String(config.data.email||'').toLowerCase())return json({ignored:true});
-  const clients=await db.from('clients').select('id,profile_id,display_name,email').eq('coach_id',coach).eq('status','active');if(clients.error)return json({error:'Retry later'},503);
-  const match=matchClient(meeting,clients.data||[]);
+  const clients=await db.from('clients').select('id,profile_id,display_name,email').eq('coach_id',coach).eq('status','active').is('deleted_at',null);if(clients.error)return json({error:'Retry later'},503);
+  const profiles=await db.from('profiles').select('id,role').in('id',(clients.data||[]).map(c=>c.profile_id).filter(Boolean));if(profiles.error)return json({error:'Retry later'},503);
+  const match=matchClient(meeting,(clients.data||[]).map(c=>({...c,profile_role:profiles.data?.find(p=>p.id===c.profile_id)?.role}))); 
   const occurred=meeting.recording_start_time||meeting.created_at;if(!occurred||Number.isNaN(Date.parse(occurred)))return json({error:'Missing recording date'},400);
   const url=typeof meeting.url==='string'&&/^https:\/\/fathom\.video\//.test(meeting.url)?meeting.url:null;
   const captured=await db.rpc('capture_fathom_recording',{p_coach:coach,p_recording:String(meeting.recording_id),p_client:match.client?.id||null,p_matching:match.status,p_url:url,p_title:String(meeting.meeting_title||meeting.title||'Coaching call').slice(0,500),p_occurred:occurred,p_summary:String(meeting.default_summary?.markdown_formatted||'').slice(0,30000),p_actions:Array.isArray(meeting.action_items)?meeting.action_items.map((a:Record<string,unknown>)=>({description:String(a.description||'').slice(0,2000),timestamp:a.recording_timestamp})):[]});

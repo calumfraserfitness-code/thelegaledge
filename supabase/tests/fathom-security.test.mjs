@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {matchClient,verifySignature} from '../functions/_shared/fathom-security.mjs';
-const client={id:'client',profile_id:'profile',display_name:'Garrett Lyons',email:'client@example.invalid'};
+const client={id:'client',profile_id:'profile',profile_role:'client',display_name:'Garrett Lyons',email:'client@example.invalid'};
 test('email alone is insufficient; name and linked active-client candidate required',()=>{
  assert.equal(matchClient({calendar_invitees:[{email:client.email,name:'Other Person'}]},[client]).status,'unmatched');
  const meeting={calendar_invitees:[{email:client.email,name:'GARRETT LYONS'}]};
@@ -19,3 +19,6 @@ test('signed raw bytes, timestamp freshness and multiple signatures',async()=>{
  assert.equal(await verifySignature(headers,raw,secret,Date.now()+360000),false);
  headers.set('webhook-timestamp','NaN');assert.equal(await verifySignature(headers,raw,secret),false);
 });
+
+assert.equal(matchClient({recorded_by:{email:client.email},calendar_invitees:[{email:client.email,name:client.display_name}]},[client]).status,'unmatched');
+assert.equal(matchClient({calendar_invitees:[{email:client.email,name:client.display_name}]},[{...client,profile_role:'coach'}]).status,'unmatched');
