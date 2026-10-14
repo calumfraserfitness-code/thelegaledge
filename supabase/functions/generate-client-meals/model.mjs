@@ -24,7 +24,7 @@ export function validateGeneratedDraft(output,targets){
   for(const k of keys){const n=num(meal[k]);if(n===null||n<0)throw Error('A recipe has invalid nutrition estimates. Try again.');meal[k]=Math.round(n*10)/10;totals[k]+=meal[k];}
   const energy=meal.protein_g*4+meal.carbs_g*4+meal.fat_g*9;if(Math.abs(energy-meal.calories)>Math.max(100,meal.calories*.15))throw Error('Recipe calories and macros do not reconcile. Try again.');
  }
- if(Math.abs(totals.calories-targets.calories)>Math.max(100,targets.calories*.1)||Math.abs(totals.protein_g-targets.protein_g)>Math.max(10,targets.protein_g*.1))throw Error('The menu does not fit the coach calorie/protein targets closely enough. Try again.');
+ if(Math.abs(totals.calories-targets.calories)>Math.max(100,targets.calories*.1)||Math.abs(totals.protein_g-targets.protein_g)>10)throw Error('The menu does not fit the coach calorie/protein targets closely enough. Try again.');
  for(const k of ['carbs_g','fat_g'])if(targets[k]!==null&&Math.abs(totals[k]-targets[k])>10)throw Error('The menu does not fit the coach macro targets. Try again.');
  for(const k of keys)day[k]=targets[k]??Math.round(totals[k]*10)/10;
  day.coach_notes='AI draft — ingredient nutrition and portions are estimates. Reviewed by the coach before use. '+String(day.coach_notes||'').slice(0,1500);
