@@ -35,7 +35,16 @@ Deno.serve(async (req: Request) => {
   if(existingId){
     const {data,error}=await admin.from("clients").select("id,display_name,profile_id").eq("id",existingId).eq("coach_id",user.id).single();
     if(error||!data) return json({error:"Existing client not found for this coach"},404);
-    if(data.profile_id) return json({error:"This client already has an account"},409);
+    if(data.profile_id){
+      if(body.action!=="complete_new_login")return json({error:"This client already has an account"},409);
+      const {data:issued,error:issuedError}=await admin.auth.admin.getUserById(data.profile_id);
+      const account=issued?.user;
+      if(issuedError||!account||account.last_sign_in_at||Date.parse(account.created_at)<Date.now()-3600000||account.email?.toLowerCase()!==email||password.length<12)
+        return json({error:"Only an unused login issued by this coach within the last hour can be completed"},409);
+      const {error:issueError}=await admin.auth.admin.updateUserById(data.profile_id,{password});
+      if(issueError)return json({error:"The new login could not be completed"},400);
+      return json({client:data});
+    }
     existing=data;
   }
   const fullName=existing?.display_name||String(body.full_name||"").trim();

@@ -20,6 +20,12 @@ assert.equal(M.number(''),null);assert.equal(M.number(null),null);assert.equal(M
 assert.equal(M.targets({calorie_goal:2100},{calories:2000},{calorie_target:1900}).calories,1900);
 assert.equal(M.targets({protein_goal_g:150},{protein_g:null},null).protein_g,150);
 assert.equal(M.targets({},null,null).fat_g,null);
+const ranged={calorie_goal:2300,protein_goal_g:200,carbs_goal_g:250,fat_goal_g:70,nutrition_target_ranges:[{start_date:'2026-10-12',end_date:'2026-10-16',weekdays:[1,2,3,4,5],calorie_min:1700,calorie_max:1800,macro_review_required:true}]};
+assert.equal(M.targets(ranged,null,null,'2026-10-13').calories,1800);
+assert.equal(M.targets(ranged,null,null,'2026-10-13').protein_g,200);
+assert.equal(M.targets(ranged,null,null,'2026-10-13').carbs_g,null);
+assert.equal(M.targets(ranged,null,null,'2026-10-17').calories,2300,'Temporary weekday targets must expire');
+assert.equal(M.targetRange(ranged,'2026-10-11'),null);
 assert.equal(M.comparable(meals[1],{calories:630,protein_g:42}),true);
 assert.equal(M.comparable(meals[1],{calories:1100,protein_g:42}),false);
 assert.equal(M.comparable(meals[1],{calories:null,protein_g:42}),false);

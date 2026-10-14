@@ -21,9 +21,16 @@
   const selected=rows.filter(r=>!eatenOnly||r.eaten);
   return Object.fromEntries(fields.map(k=>{const values=selected.map(r=>number(r.meal[k]));return [k,values.some(v=>v===null)?null:values.reduce((n,v,i)=>n+v*selected[i].servings,0)];}));
  }
- function targets(client,plan,day){
+ function targetRange(client,date){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(date||''))return null;
+  const weekday=new Date(date+'T12:00:00Z').getUTCDay();
+  return (client?.nutrition_target_ranges||[]).find(r=>r.start_date<=date&&r.end_date>=date&&Array.isArray(r.weekdays)&&r.weekdays.includes(weekday)&&number(r.calorie_min)>0&&number(r.calorie_max)>=number(r.calorie_min))||null;
+ }
+ function targets(client,plan,day,date=day?.nutrition_date){
   const keys=['calorie_target','protein_target_g','carbs_target_g','fat_target_g'],clientKeys=['calorie_goal','protein_goal_g','carbs_goal_g','fat_goal_g'];
-  return Object.fromEntries(fields.map((k,i)=>[k,number(day?.[keys[i]])??number(plan?.[k])??number(client?.[clientKeys[i]])]));
+  const result=Object.fromEntries(fields.map((k,i)=>[k,number(day?.[keys[i]])??number(plan?.[k])??number(client?.[clientKeys[i]])]));
+  const range=targetRange(client,date);if(range){result.calories=Number(range.calorie_max);if(range.macro_review_required){result.carbs_g=null;result.fat_g=null;}}
+  return result;
  }
  function comparable(original,candidate){
   const a=number(original?.calories),b=number(candidate?.calories),p=number(original?.protein_g),q=number(candidate?.protein_g);
@@ -45,6 +52,6 @@
   }
   return [...families.values()].sort((a,b)=>a.score-b.score||String(a.meal.name).localeCompare(String(b.meal.name)));
  }
- const model={fields,number,category,snapshot,slots,totals,targets,comparable,mealIdeas};
+ const model={fields,number,category,snapshot,slots,totals,targets,targetRange,comparable,mealIdeas};
  root.DailyNutrition=model;if(typeof module!=='undefined')module.exports=model;
 })(typeof window==='undefined'?globalThis:window);
