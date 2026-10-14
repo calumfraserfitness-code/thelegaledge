@@ -1721,6 +1721,7 @@ function clientDiagnostics() {
 }
 
 function bindShell() {
+  if ($('#authMsg').textContent === 'Loading secure sign-in…') $('#authMsg').textContent = '';
   $('#loginForm').onsubmit = async (event) => {
     event.preventDefault();
     $('#authMsg').textContent = 'Signing in…';
