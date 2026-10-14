@@ -44,8 +44,29 @@ function renderJourney(j){
   return;
  }
  if(j.stage==='review'&&journeyConnecting){const main=$('#clientMain');main.classList.remove('journey-page');main.innerHTML='<button class="btn ghost" id="journeyBackToReview">← Back to your onboarding</button><div id="journeyPhoneHub"></div>';$('#journeyBackToReview').onclick=()=>{journeyConnecting=false;clearInterval(hubTimer);clearInterval(hubPhoneTimer);renderJourney(j);};renderConnectionsHub($('#journeyPhoneHub'));main.scrollIntoView({block:'start'});return;}
- if(j.stage==='review'){journeyFrame(j,'<h1>You’re all set.</h1><p>Your intake is saved. Calum will review your answers and prepare your personalised plan. Your coaching workspace unlocks when he publishes it.</p><button class="btn primary" id="journeyConnectPhone">Connect my phone or watch</button><button class="btn ghost" id="journeyRefresh">Check for my plan</button><div id="journeyStarter" class="journey-starter"></div>');renderJourneyStarter(j);$('#journeyConnectPhone').onclick=()=>{journeyConnecting=true;renderJourney(j);};$('#journeyRefresh').onclick=()=>{if(journeyDemo){j.stage='ready';renderJourney(j);}else boot();};return;}
+ if(j.stage==='review'){journeyFrame(j,'<h1>You’re all set.</h1><p>Your intake is saved. Calum will review your answers and prepare your personalised plan. Your coaching workspace unlocks when he publishes it.</p><button class="btn primary" id="journeyConnectPhone">Connect my phone or watch</button><button class="btn ghost" id="journeyRefresh">Check for my plan</button><p id="journeyPlanStatus" role="status" aria-live="polite"></p><div id="journeyStarter" class="journey-starter"></div>');renderJourneyStarter(j);$('#journeyConnectPhone').onclick=()=>{journeyConnecting=true;renderJourney(j);};$('#journeyRefresh').onclick=e=>checkForClientPlan(e.currentTarget,$('#journeyPlanStatus'));return;}
  if(journeyDemo)journeyFrame(j,'<h1>Your coaching starts here.</h1><p>Training, meals, weekly planning, check-ins and progress — together in your own workspace.</p><a class="btn primary" href="?workspace=demo&person=0&view=client&tab=health">Connect your apps ↗</a><a class="btn ghost" href="?workspace=demo&person=0&view=client&tab=training">Explore your coaching</a>');
+}
+async function checkForClientPlan(button,status){
+ if(button.disabled)return;const clientId=state.client?.id,userId=state.user?.id;
+ const active=()=>state.client?.id===clientId&&state.user?.id===userId&&button.isConnected;
+ setBusy(button,true,'Checking your plan…');status.textContent='Checking for a published plan…';
+ try{
+  if(journeyDemo){journeyCurrent.stage='ready';return renderJourney(journeyCurrent);}
+  const [client,rows]=await Promise.all([
+   query('Latest plan status',db.from('clients').select('*').eq('id',clientId).single()),
+   query('Latest coaching step',db.from('onboarding_journeys').select('*').eq('client_id',clientId))
+  ]);
+  if(!active())return;if(client?.id!==clientId)throw Error('Your plan status could not be confirmed.');
+  const journey=rows[0];
+  if(client.plan_status!=='published'||journey&&journey.stage!=='ready'){
+   status.textContent='Checked just now: Calum is still preparing your plan. Your profile is saved and there is nothing else to fill in.';return;
+  }
+  if(!client.portal_enabled){status.textContent='Your plan is published. Calum still needs to enable your coaching access.';return;}
+  state.client={...state.client,...client};journeyCurrent=journey||null;
+  await loadClientData(clientId);if(!active())return;state.clientView='today';await renderClient();
+ }catch(error){if(active())status.textContent='Couldn’t check your plan right now. Your profile is saved. Tap Check for my plan to retry.';}
+ finally{if(button.isConnected)setBusy(button,false);}
 }
 const beforeJourneyClient=renderClient;
 renderClient=async function(){
