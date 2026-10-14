@@ -59,7 +59,8 @@
     "migration-readiness.js",
     "simple-lift-logging.js",
     "checkin-video.js",
-    "workout-history.js"
+    "workout-history.js",
+    "coach-ai-meals.js"
   ],
   "styles": [
     "app.css",
