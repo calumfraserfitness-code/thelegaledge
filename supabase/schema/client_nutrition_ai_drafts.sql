@@ -40,6 +40,9 @@ begin
  or exists(select 1 from public.onboarding_responses r where r.client_id=d.client_id and r.version>(select version from public.onboarding_responses where id=d.source_onboarding_id)) then
   raise exception 'The onboarding answers changed. Generate a fresh draft before applying.';
  end if;
+ if exists(select 1 from public.clients c cross join lateral jsonb_array_elements(c.nutrition_target_ranges) r where c.id=d.client_id and r->>'start_date'<=current_date::text and r->>'end_date'>=current_date::text) and (d.requested_targets->>'calories')::numeric is distinct from (select calorie_goal from public.clients where id=d.client_id) then
+  raise exception 'This client has a temporary dated calorie range. Generate the repeatable menu using their base calorie target; review temporary weekday portions separately.';
+ end if;
  if exists(select 1 from public.onboarding_journeys j where j.client_id=d.client_id and j.screening_status='needs_review') then
   raise exception 'Record the flagged health-screen review before applying this menu.';
  end if;
