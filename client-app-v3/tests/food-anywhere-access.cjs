@@ -1,5 +1,5 @@
 const assert=require('assert'),fs=require('fs'),vm=require('vm'),{stripTypeScriptTypes}=require('module');
-const source=fs.readFileSync(require('path').resolve(__dirname,'../../supabase/functions/food-anywhere/index.ts'),'utf8').replace(/^import .*;\n/,'');
+const source=fs.readFileSync(require('path').resolve(__dirname,'../../supabase/functions/food-anywhere/index.ts'),'utf8').replace(/^import .*;\n/gm,'');
 async function attempt(role,body,rows){
  let handler,secretCalls=0,rateCalls=0;
  const caller={auth:{getUser:async()=>({data:{user:{id:'caller'}}})},from(table){const filters=[];const q={select(){return q;},eq(k,v){filters.push([k,v]);return q;},async single(){return{data:{role}};},async maybeSingle(){return{data:rows.find(row=>filters.every(([k,v])=>row[k]===v))||null};}};return q;}};
