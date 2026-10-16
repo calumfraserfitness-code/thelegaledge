@@ -24,6 +24,10 @@ The enabled Legal Edge app review runs around 08:00 Europe/Dublin. It uses bound
 
 Phone sign-in after the October 11 auth hotfix, actual device notification display, wearable ingestion, backup restoration and AI-provider responses still need direct evidence. Some active clients lack approved published plans or a configured check-in day. Do not label all clients ready until these are resolved.
 
+October 16 recovery evidence narrows the backup gap: the current scoped snapshot passed an exact PostgreSQL temporary-table replay, hash check and all 130 relationships between included collections (78 tables, 3,637 rows), with every temporary change rolled back. Full-project/offsite recovery, excluded auth/credentials and uploaded file bytes remain unverified.
+
+Phone-alert setup must confirm both the browser subscription and its enabled current-account database registration. Bound service-worker waits and make failures retryable; capture the account before asynchronous setup and recheck before server writes. Backup downloads likewise require an unchanged account and a confirmed scoped bundle. Monitor both submit_client_checkin and save_checkin_review RPCs; PATCH-checkins alone misses reviews.
+
 ## October 12 transition evidence
 
 A full-app login wrapper disabled the submit button before the base handler’s duplicate-submit check, suppressing the provider call. Test login through every loaded module; isolated auth tests are insufficient. Runtime bundling must preserve separate global script boundaries and DOM-ready registration.
