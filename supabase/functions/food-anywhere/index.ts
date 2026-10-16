@@ -21,7 +21,13 @@ Deno.serve(async(req)=>{
   if(!check.ok)return reply({error:'The key could not access the configured AI model. Check provider permissions and billing.'},400);
   const {error:saveError}=await admin.rpc('food_ai_secret',{p_coach:user.id,p_secret:apiKey});if(saveError)throw Error('Provider connection could not be saved.');return reply({configured:true});
  }
- const {data:client}=await db.from('clients').select('*').eq('profile_id',user.id).maybeSingle();
+ // Keep all client reads under the caller's RLS and explicitly verify ownership.
+ const selected=typeof body.client_id==='string'?body.client_id:null;
+ let clientQuery=db.from('clients').select('*');
+ if(selected&&profile?.role==='coach')clientQuery=clientQuery.eq('id',selected).eq('coach_id',user.id);
+ else clientQuery=clientQuery.eq('profile_id',user.id);
+ const {data:client}=await clientQuery.maybeSingle();
+ if(selected&&(!client||client.id!==selected||(profile?.role==='coach'?client.coach_id!==user.id:client.profile_id!==user.id)))return reply({error:'This client is unavailable to your account.'},403);
  const coach=client?.coach_id||(profile?.role==='coach'?user.id:null);
  const {data:storedKey}=coach?await admin.rpc('food_ai_secret',{p_coach:coach}):{data:null};
  const apiKey=Deno.env.get('OPENAI_API_KEY')||storedKey;
