@@ -1,0 +1,5 @@
+// No authenticated pages or client records are cached on shared devices.
+self.addEventListener('install',()=>self.skipWaiting());
+self.addEventListener('activate',event=>event.waitUntil(self.clients.claim()));
+self.addEventListener('push',event=>{let p={};try{p=event.data?.json()||{};}catch{}event.waitUntil(self.registration.showNotification(p.title||'Legal Edge',{body:p.body||'Your coaching workspace has an update.',icon:'/assets/app-icon-192.png',badge:'/assets/app-icon-192.png',tag:p.tag||'coaching-update',data:{url:p.url||'/'}}));});
+self.addEventListener('notificationclick',event=>{event.notification.close();event.waitUntil((async()=>{const url=new URL(event.notification.data?.url||'/',self.location.origin);if(url.origin!==self.location.origin)return;const windows=await self.clients.matchAll({type:'window',includeUncontrolled:true});const existing=windows.find(w=>new URL(w.url).origin===url.origin);if(existing){await existing.navigate(url.href);await existing.focus();}else await self.clients.openWindow(url.href);})());});

@@ -1,0 +1,10 @@
+const assert=require('assert'),M=require('../daily-nutrition-model.js');
+const recipe=(name,cal,p,group='Lunch')=>({key:name+cal,group,plan:{name:'Assigned'},meal:{name,calories:cal,protein_g:p,carbs_g:50,fat_g:10}});
+const recipes=[recipe('Bowl',1000,60),recipe('Bowl',400,30),recipe('Wrap',500,35),recipe('Eggs',300,20,'Breakfast')];
+const rows=[{eaten:true,servings:1,meal:{calories:1400,protein_g:100,carbs_g:150,fat_g:40}},{eaten:false,servings:1,meal:{calories:400,protein_g:30,carbs_g:50,fat_g:10}}];
+const goals={calories:1800,protein_g:130,carbs_g:200,fat_g:50};
+const ideas=M.mealIdeas(recipes,rows,goals,'Lunch');
+assert.equal(ideas[0].meal.name,'Bowl');assert.equal(ideas[0].meal.calories,400);assert.equal(ideas.filter(x=>x.meal.name==='Bowl').length,1);assert.equal(ideas[0].after.calories,0);assert(!ideas.some(x=>x.group==='Breakfast'));assert.equal(ideas[1].fits,false);
+const unknown=M.mealIdeas(recipes,[{eaten:true,servings:1,meal:{calories:100,protein_g:null}}],{calories:null,protein_g:100},'Lunch');assert(unknown.every(x=>x.after.calories===null&&x.after.protein_g===null&&!x.comparable));
+assert.deepEqual(goals,{calories:1800,protein_g:130,carbs_g:200,fat_g:50});assert.equal(rows[1].eaten,false);
+console.log('PASS: meal ideas use actual remaining intake, assigned portions, group filters and family deduplication; unknown nutrients remain unknown and prescriptions stay unchanged.');
