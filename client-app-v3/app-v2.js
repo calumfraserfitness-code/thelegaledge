@@ -153,8 +153,11 @@ async function loadCoach() {
     });
 }
 
+let clientDataLoadSequence = 0;
 async function loadClientData(clientId) {
   const clientAtStart = clientId;
+  const loadSequence = ++clientDataLoadSequence, accountAtStart = state.user?.id, roleAtStart = state.role;
+  const currentLoad = () => loadSequence === clientDataLoadSequence && state.client?.id === clientAtStart && state.user?.id === accountAtStart && state.role === roleAtStart;
   const requests = await Promise.all([
     query('Weeks', db.from('program_weeks').select('*').eq('client_id', clientId).order('week_start', { ascending: false }).limit(104)),
     query('Programmes', db.from('training_programs').select('*,days:training_program_days(*,exercises:program_exercises(*,bank:exercise_bank(video_url,image_url,instructions)))').eq('client_id', clientId).order('created_at', { ascending: false })),
@@ -177,7 +180,7 @@ async function loadClientData(clientId) {
     state.role==='coach'?query('Private client details',db.from('client_private_details').select('coach_notes').eq('client_id',clientId)):Promise.resolve([]),
     Promise.resolve([]) // Meal bank is searched on demand by meal-library.js.
   ]);
-  if (state.client?.id !== clientAtStart) return;
+  if (!currentLoad()) return false;
   const [weeks, programs, nutritionPlans, habits, steps, checkins, progress, onboarding, legal, diagnostics, files, mealAssignments, exerciseLogs, healthConnections, healthDaily, healthWorkouts, healthImports, exerciseBank, privateDetails, mealBank] = requests;
   if(state.role==='coach')state.client.coach_notes=privateDetails[0]?.coach_notes||'';
   let sessions = [];
@@ -193,10 +196,11 @@ async function loadClientData(clientId) {
     if (sessions.length) exercises = await query('Exercises', db.from('exercises').select('*').in('session_id', sessions.map((s) => s.id)).order('sort_order'));
     if (nutritionDays.length) meals = await query('Meals', db.from('meals').select('*').in('nutrition_day_id', nutritionDays.map((d) => d.id)).order('sort_order'));
   }
-  if (state.client?.id !== clientAtStart) return;
+  if (!currentLoad()) return false;
   const recoveredExercises = programs.flatMap((program) => (program.days || []).flatMap((day) => day.exercises || []));
   const exerciseIndex = new Map([...recoveredExercises, ...exercises].map((exercise) => [exercise.id, exercise]));
   state.data = { weeks, programs, nutritionPlans, habits, habitLogs: [], steps, checkins, progress, onboarding, legal, diagnostics, files, mealAssignments, exerciseLogs, exerciseBank, mealBank, healthConnections, healthDaily, healthWorkouts, healthImports, sessions, exercises: [...exerciseIndex.values()], nutritionDays, meals };
+  return true;
 }
 
 function demoData() {

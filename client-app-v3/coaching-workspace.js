@@ -80,10 +80,10 @@ function bindClientScheduling(){
  try{const saved=state.preview?{...session,session_date:fd.get('session_date'),scheduled_time:fd.get('scheduled_time')||null,schedule_timezone:fd.get('schedule_timezone')} :await query('Personal session timing',db.rpc('schedule_client_session',{target_session_id:id,new_date:fd.get('session_date'),new_time:fd.get('scheduled_time')||null,new_timezone:fd.get('schedule_timezone')}));if(!saved?.id)throw new Error('Session was not updated');if(state.client.id!==clientId)return;Object.assign(session,saved);clientPlanner();toast(state.preview?'Sample timing updated':'Session timing saved');}catch(error){toast(error.message,'error');setBusy(event.submitter,false);}
  });
 }
-const originalLoadCoachingClient=loadClientData;
-loadClientData=async function(id){await originalLoadCoachingClient(id);if(state.client?.id!==id)return;
+const originalLoadCoachingClient=loadClientData;let coachingLoadSequence=0;
+loadClientData=async function(id){const request=++coachingLoadSequence,user=state.user?.id,role=state.role,active=()=>request===coachingLoadSequence&&state.client?.id===id&&state.user?.id===user&&state.role===role;if(await originalLoadCoachingClient(id)===false||!active())return false;
  const result=await Promise.all([['client_coaching_goals','coachingGoals','created_at'],['client_coaching_calls','coachingCalls','scheduled_at'],['client_coaching_guidance','coachingGuidance','created_at']].map(async([table,key,order])=>[key,await query('Personal coaching '+key,db.from(table).select('*').eq('client_id',id).order(order).limit(200))]));
- if(state.client?.id===id)for(const[key,rows]of result)state.data[key]=rows;
+ if(!active())return false;for(const[key,rows]of result)state.data[key]=rows;return true;
 };
 COACH_TABS.push('goals','support');
 const originalCoachingWorkspace=renderClientWorkspace;

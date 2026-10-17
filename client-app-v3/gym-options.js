@@ -29,8 +29,8 @@ function swapChoiceMarkup(ex){
  const logged=(state.data.exerciseLogs||[]).some(l=>l.training_session_id===state.selectedSessionId&&l.program_exercise_id===ex.id);
  return `<details class="gym-swap"><summary>Equipment busy? Swap exercise</summary><label>Exercise for this session<select data-exercise-choice="${esc(ex.id)}" ${logged?'disabled':''}>${options.map(n=>`<option value="${esc(n)}" ${name===n?'selected':''}>${esc(n)}</option>`).join('')}</select></label><p class="muted">${logged?'This session already has logged sets. Your recorded exercise stays attached to them.':'Keep the prescribed sets, reps and effort. Choose a comfortable starting weight for the different equipment. This changes only this session.'}</p></details>`;
 }
-const gymLoadBefore=loadClientData;
-loadClientData=async function(id){await gymLoadBefore(id);if(state.client?.id!==id)return;const choices=state.preview?[]:await query('Saved exercise choices',db.from('session_exercise_choices').select('*').eq('client_id',id));if(state.client?.id===id)state.data.exerciseChoices=choices;};
+const gymLoadBefore=loadClientData;let gymLoadSequence=0;
+loadClientData=async function(id){const request=++gymLoadSequence,user=state.user?.id,role=state.role,active=()=>request===gymLoadSequence&&state.client?.id===id&&state.user?.id===user&&state.role===role;if(await gymLoadBefore(id)===false||!active())return false;const choices=state.preview?[]:await query('Saved exercise choices',db.from('session_exercise_choices').select('*').eq('client_id',id));if(!active())return false;state.data.exerciseChoices=choices;return true;};
 const gymRowsBefore=workoutSetRows;
 workoutSetRows=function(ex,session,fd,client){return gymRowsBefore(ex,session,fd,client).map(row=>({...row,exercise_name:currentExerciseChoice(ex,session.id)}));};
 const gymCardBefore=exerciseCard;

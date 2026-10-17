@@ -20,6 +20,6 @@
  }
  const progress=progressDashboardMarkup;progressDashboardMarkup=function(){return progress()+historyMarkup();};
  const training=clientTraining;clientTraining=function(){const result=training(),host=$('#clientMain');if(host&&state.client){host.querySelector('.wh-history')?.remove();host.insertAdjacentHTML('beforeend',historyMarkup());}return result;};
- const load=loadClientData;loadClientData=async function(id){await load(id);if(state.preview||state.client?.id!==id)return;const user=state.user?.id;const rows=await query('Recorded workout history',db.rpc('client_recorded_workouts',{p_client:id}));if(state.user?.id!==user||state.client?.id!==id)return;const merged=new Map((state.data.sessions||[]).map(s=>[s.id,s]));for(const row of rows)merged.set(row.id,row);state.data.sessions=[...merged.values()];};
+ let historyLoadSequence=0;const load=loadClientData;loadClientData=async function(id){const request=++historyLoadSequence,user=state.user?.id,role=state.role;if(await load(id)===false||request!==historyLoadSequence||state.client?.id!==id||state.user?.id!==user||state.role!==role)return false;if(state.preview)return true;const rows=await query('Recorded workout history',db.rpc('client_recorded_workouts',{p_client:id}));if(request!==historyLoadSequence||state.user?.id!==user||state.client?.id!==id||state.role!==role)return false;const merged=new Map((state.data.sessions||[]).map(s=>[s.id,s]));for(const row of rows)merged.set(row.id,row);state.data.sessions=[...merged.values()];return true;};
  window.WorkoutHistory={markup:historyMarkup};
 })();

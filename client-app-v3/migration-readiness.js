@@ -9,9 +9,19 @@
     const strength=(d.exerciseLogs||[]).filter(owned);
     const names=new Set((d.mealAssignments||[]).filter(r=>owned(r)&&!r.historical&&r.meal).map(r=>String(r.meal.name).trim().toLowerCase()));
     const health=(d.healthDaily||[]).filter(owned);
+    const today=localCoachingDate(),first=iso(new Date(new Date(today+'T12:00:00Z').getTime()-6*864e5));
+    const currentWeeks=(d.weeks||[]).filter(w=>owned(w)&&w.published&&w.week_start>=first&&w.week_start<=today);
+    const currentWeekIds=new Set(currentWeeks.map(w=>w.id));
+    const todayMeal=(d.nutritionDays||[]).some(day=>currentWeekIds.has(day.week_id)&&day.nutrition_date===today&&(d.nutritionPlans||[]).some(plan=>plan.id===day.nutrition_plan_id&&owned(plan)&&plan.is_active!==false));
+    let timezoneReady=false;try{if(c.timezone){new Intl.DateTimeFormat('en',{timeZone:c.timezone}).format(new Date());timezoneReady=true;}}catch{}
+    const deadlineReady=c.checkin_day!==null&&c.checkin_day!==undefined&&c.checkin_day!==''&&Number.isInteger(Number(c.checkin_day))&&Number(c.checkin_day)>=0&&Number(c.checkin_day)<=6&&!!c.checkin_due_time&&timezoneReady;
     const rows=[
       ['Login',c.profile_id?'Account linked; client sign-in still needs testing':'No login linked'],
-      ['Published access',c.portal_enabled&&c.plan_status==='published'?'Plan published; portal enabled':'Portal or plan needs coach setup'],
+      ['Portal access',c.portal_enabled&&c.plan_status==='published'?'Portal enabled; workspace published':'Portal or workspace publication needs coach setup'],
+      ['Onboarding',c.onboarding_status==='complete'?'Coaching profile complete':'Client onboarding needs completion'],
+      ['Current published week',currentWeeks.length?'Published week covers '+today:'No published week covers '+today],
+      ['Today’s nutrition',todayMeal?'Published menu assigned for '+today:'No published menu assigned for '+today],
+      ['Check-in deadline',c.weekly_checkin_enabled===false?'Weekly check-ins disabled':deadlineReady?'Day, time and timezone configured':'Check-in day, due time or timezone needs coach setup'],
       ['Weight history',weights.length+' dated weigh-ins, including check-in weights'],
       ['Progress photos',photos.length+' saved photo records'],
       ['Strength history',strength.length?strength.length+' recorded sets':'No recorded sets saved; prescriptions are separate'],
