@@ -34,7 +34,18 @@
   test.onclick=async()=>{test.disabled=true;try{sameAccount(owner);await pushCall({action:'test'},owner);if(current())status.textContent='Test accepted by the push service. Check your phone notifications; acceptance does not confirm it appeared.';}catch(e){if(current())status.textContent=e.message;}finally{if(current())test.disabled=false;}};
   disable.onclick=async()=>{disable.disabled=true;try{sameAccount(owner);await disconnectPush();if(current()){test.disabled=true;status.textContent='Notifications turned off on this device.';}}catch(e){if(current()){status.textContent=e.message;disable.disabled=false;}}};
  }
- async function disconnectPush(){if(!('serviceWorker' in navigator))return;const reg=await navigator.serviceWorker.getRegistration(),sub=await reg?.pushManager.getSubscription();if(!sub)return;await sub.unsubscribe();localStorage.removeItem('lec-push-account');try{await pushCall({action:'unsubscribe',endpoint:sub.endpoint});}catch{ /* An unsubscribed endpoint cannot receive another account's alerts. */ }}
+ async function disconnectPush(owner=state.user?.id){
+  sameAccount(owner);if(!('serviceWorker' in navigator))return;
+  const reg=await bounded(navigator.serviceWorker.getRegistration(),'Device disconnect timed out. Try again.');sameAccount(owner);
+  const sub=await bounded(reg?.pushManager.getSubscription(),'Device disconnect timed out. Try again.');sameAccount(owner);if(!sub)return;
+  const removed=await bounded(sub.unsubscribe(),'Device disconnect timed out. Try again.');sameAccount(owner);
+  if(!removed){
+   const remaining=await bounded(reg.pushManager.getSubscription(),'Device disconnect timed out. Try again.');sameAccount(owner);
+   if(remaining)throw Error('Device alerts could not be disconnected. Try again before signing out.');
+  }
+  localStorage.removeItem('lec-push-account');
+  try{await pushCall({action:'unsubscribe',endpoint:sub.endpoint},owner);}catch{ /* The confirmed unsubscribed endpoint cannot receive alerts. */ }
+ }
  async function refreshCheckins(){if(refreshing||!state.user||state.preview||document.hidden)return;const user=state.user.id,id=state.client?.id;refreshing=true;try{
   if(id){const rows=await query('Latest check-ins',db.from('checkins').select('*').eq('client_id',id).order('submitted_at',{ascending:false}).limit(250));if(state.user?.id!==user||state.client?.id!==id)return;state.data.checkins=rows;if(state.role==='client')reviewCard();}
   if(state.role==='coach'&&!state.client&&state.coachView==='reviews'&&!document.activeElement?.matches('input,textarea,select'))await renderReviewQueue(0);
@@ -68,5 +79,5 @@
  renderCoach=function(){const r=originalCoach();Promise.resolve(r).then(controls).catch(()=>{});return r;};
  renderClient=function(){const r=originalClient();Promise.resolve(r).then(()=>{controls();reviewCard();}).catch(()=>{});return r;};
  // Disable this account's subscription before sign-out, rather than leaving alerts on a shared phone.
- document.addEventListener('click',async e=>{const b=e.target.closest('.logout');if(!b||state.preview)return;e.preventDefault();e.stopImmediatePropagation();try{await disconnectPush();}catch{toast('Could not disable device alerts. Reconnect before signing out.','error');return;}if(channel)db.removeChannel(channel);clearInterval(timer);await db.auth.signOut();location.reload();},true);
+ document.addEventListener('click',async e=>{const b=e.target.closest('.logout');if(!b||state.preview)return;e.preventDefault();e.stopImmediatePropagation();const owner=state.user?.id;try{await disconnectPush(owner);sameAccount(owner);}catch(err){toast(err.message||'Could not disable device alerts. Try again before signing out.','error');return;}if(channel)db.removeChannel(channel);clearInterval(timer);await db.auth.signOut();location.reload();},true);
 })();

@@ -24,6 +24,15 @@ function setup(){
  h=setup();h.setSub(null);const pending=deferred();h.setSubscribe(pending);await h.open();d=h.w.document;const enabling=d.querySelector('#csEnable').onclick({target:d.querySelector('#csEnable')});await tick();h.w.state.user={id:'coach-b'};pending.resolve({toJSON:()=>({endpoint:'synthetic'})});await enabling;
  assert.deepEqual(h.calls,['config'],'An account switch during browser registration must not register against the next session');assert.equal(h.w.localStorage.getItem('lec-push-account'),null);h.dom.window.close();
  h=setup();h.setSaved(true);await h.open();assert(!h.w.document.querySelector('#csTest').disabled);h.dom.window.close();
+ h=setup();await h.open();d=h.w.document;h.w.localStorage.setItem('lec-push-account','coach-a');
+ let device=await h.reg.pushManager.getSubscription();device.unsubscribe=async()=>false;
+ await d.querySelector('#csDisable').onclick();
+ assert(d.querySelector('#csPushStatus').textContent.includes('could not be disconnected'),'A browser refusing unsubscribe must not claim alerts are off');
+ assert.equal(h.w.localStorage.getItem('lec-push-account'),'coach-a');assert(!h.calls.includes('unsubscribe'));h.dom.window.close();
+ h=setup();await h.open();d=h.w.document;device=await h.reg.pushManager.getSubscription();device.unsubscribe=()=>new Promise(()=>{});
+ const disabling=d.querySelector('#csDisable').onclick();await tick();
+ const stopTimer=h.timers.filter(t=>t.ms===12000).at(-1);assert(stopTimer,'Push cleanup must have a finite wait');stopTimer.fn();await disabling;
+ assert(d.querySelector('#csPushStatus').textContent.includes('timed out'));assert(!d.querySelector('#csDisable').disabled);h.dom.window.close();
  h=setup();await h.backup();d=h.w.document;await d.querySelector('#csExport').onclick({target:d.querySelector('#csExport')});assert.equal(h.downloads(),0);assert(d.querySelector('#csBackupStatus').textContent.includes('not confirmed'));
  const old=deferred();h.setExport(old);const exporting=d.querySelector('#csExport').onclick({target:d.querySelector('#csExport')});await tick();h.w.state.user={id:'coach-b'};old.resolve({data:{format:'legal-edge-coaching-backup',coach_id:'coach-a',tables:{checkins:[]}}});await exporting;assert.equal(h.downloads(),0,'Do not download an old account backup into a changed account');h.dom.window.close();
  console.log('PASS: server-confirmed device registration, retry after stalled service worker, registration account-switch guard, missing-save rejection and account-scoped backup export.');
