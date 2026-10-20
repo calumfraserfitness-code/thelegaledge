@@ -1,6 +1,6 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert'),path=require('path');
 const source=fs.readFileSync(path.join(__dirname,'../../supabase/functions/provision-client/index.ts'),'utf8')
- .replace(/^import .*;\n/gm,'').replace('body: unknown','body').replace('req: Request','req')
+ .replace(/^import .*;\n/gm,'').replace('body: unknown','body').replace('req: Request','req').replace('onboardingSettings:any','onboardingSettings')
  .replace(/let existing: \{[^}]+\} \| null = null;/,'let existing = null;').replace(/Deno.env.get\(([^)]+)\)!/g,'Deno.env.get($1)');
 async function run(options={}){
  let handler,created=0;const deleted=[];

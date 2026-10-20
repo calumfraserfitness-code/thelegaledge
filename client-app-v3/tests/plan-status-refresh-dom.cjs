@@ -1,0 +1,13 @@
+const fs=require('fs'),path=require('path'),vm=require('vm'),assert=require('assert'),{JSDOM}=require('jsdom');
+const dom=new JSDOM('<button id="check">Check for my plan</button><p id="status"></p>',{url:'https://example.invalid/',runScripts:'outside-only'}),w=dom.window;
+let client={id:'owner-client',plan_status:'coach_building',portal_enabled:false},journey={stage:'review'},fail=false,loads=0,renders=0,resolveRead;
+Object.assign(w,{state:{user:{id:'owner'},client:{id:'owner-client'},role:'client'},setBusy:(b,value,text)=>{b.disabled=value;b.textContent=value?text:'Check for my plan';},query:async(_,q)=>q,db:{from(table){const q={select(){return q},eq(){return q},single(){return q},then(resolve,reject){if(fail)return Promise.reject(Error('Offline')).then(resolve,reject);if(resolveRead)return new Promise(r=>resolveRead.push(()=>r(table==='clients'?client:[journey]))).then(resolve,reject);return Promise.resolve(table==='clients'?client:[journey]).then(resolve,reject)}};return q}},loadClientData:async()=>loads++,renderClient:async()=>renders++});
+const source=fs.readFileSync(path.join(__dirname,'../onboarding-journey.js'),'utf8');vm.runInContext('const journeyDemo=false;let journeyCurrent=null;'+source.slice(source.indexOf('async function checkForClientPlan('),source.indexOf('const beforeJourneyClient=')),dom.getInternalVMContext());
+const button=w.document.querySelector('#check'),status=w.document.querySelector('#status');
+(async()=>{
+ resolveRead=[];const checking=w.checkForClientPlan(button,status);assert(button.disabled);assert(status.textContent.includes('Checking'));await w.checkForClientPlan(button,status);assert.equal(resolveRead.length,2,'Repeated taps do not duplicate requests');resolveRead.forEach(r=>r());resolveRead=null;await checking;assert(status.textContent.includes('still preparing'));assert(!button.disabled);assert.equal(loads,0);
+ fail=true;await w.checkForClientPlan(button,status);assert(status.textContent.includes('retry'));assert(!button.disabled);fail=false;
+ client={...client,plan_status:'published',portal_enabled:true};journey={stage:'ready'};await w.checkForClientPlan(button,status);assert.equal(loads,1);assert.equal(renders,1);assert.equal(w.state.clientView,'today');
+ resolveRead=[];const stale=w.checkForClientPlan(button,status);w.state.client={id:'different-client'};resolveRead.forEach(r=>r());resolveRead=null;await stale;assert.equal(loads,1,'An old account response cannot open another client plan');
+ dom.window.close();console.log('PASS: visible checking/pending/error states, duplicate-click protection, published plan opens Today, account-switch isolation.');
+})().catch(e=>{console.error(e);dom.window.close();process.exitCode=1});

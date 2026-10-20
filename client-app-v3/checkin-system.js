@@ -1,0 +1,83 @@
+/* Saved check-ins, private phone alerts and coach reviews share one account boundary. */
+(() => {
+ let account='',channel=null,timer=null,refreshing=false,routed=false;
+ const originalCoach=renderCoach,originalClient=renderClient;
+ const reportError=e=>toast(e.message||'This action could not complete.','error');
+ function bounded(promise,message,ms=12000){let timeout;return Promise.race([promise,new Promise((_,reject)=>{timeout=setTimeout(()=>reject(Error(message)),ms);})]).finally(()=>clearTimeout(timeout));}
+ function sameAccount(owner){if(!owner||state.user?.id!==owner)throw Error('Account changed. Reopen notification settings.');}
+ async function pushCall(body,owner=state.user?.id){sameAccount(owner);const {data:{session}}=await bounded(db.auth.getSession(),'Sign-in check timed out. Try again.');sameAccount(owner);if(!session||session.user?.id!==owner)throw Error('Sign in again.');const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),15000);try{const r=await fetch(SUPABASE_URL+'/functions/v1/coaching-push',{method:'POST',headers:{Authorization:'Bearer '+session.access_token,apikey:SUPABASE_KEY,'Content-Type':'application/json'},body:JSON.stringify(body),signal:controller.signal});const data=await r.json();sameAccount(owner);if(!r.ok)throw Error(data.error||'Notification setup failed.');return data;}catch(e){if(e.name==='AbortError')throw Error('Notification setup timed out. Try again.');throw e;}finally{clearTimeout(timeout);}}
+ function panel(content){document.querySelector('#csModal')?.remove();const el=document.createElement('div');el.id='csModal';el.className='cs-modal';el.innerHTML='<section role="dialog" aria-modal="true" aria-labelledby="csTitle"><button class="text-btn cs-close" aria-label="Close">Close ×</button>'+content+'</section>';document.body.append(el);el.querySelector('.cs-close').onclick=()=>el.remove();el.addEventListener('click',e=>{if(e.target===el)el.remove();});el.querySelector('button')?.focus();}
+ const installed=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+ const ios=()=>/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+ async function alerts(){
+  panel('<span class="eyebrow">YOUR DEVICE</span><h2 id="csTitle">Phone notifications</h2><p>Get an alert when '+(state.role==='coach'?'a client submits a check-in. Tap it to open your review queue.':'your coach posts a completed review.')+'</p>'+(ios()&&!installed()?'<div class="cs-note"><strong>One-time iPhone setup</strong><ol><li>Open this app in Safari.</li><li>Tap Share → Add to Home Screen.</li><li>Open Legal Edge from that icon, sign in, then enable notifications here.</li></ol></div>':'')+'<p id="csPushStatus" role="status">Checking this device…</p><div class="cs-actions"><button class="btn primary" id="csEnable">Enable notifications</button><button class="btn ghost" id="csTest">Send me a test alert</button><button class="text-btn" id="csDisable">Turn off on this device</button></div><p class="muted">Alerts contain no health readings, check-in answers or client names. Delivery depends on your phone, browser and Focus settings.</p>');
+  const owner=state.user?.id,status=document.querySelector('#csPushStatus'),current=()=>state.user?.id===owner&&status.isConnected;
+  const enable=document.querySelector('#csEnable'),test=document.querySelector('#csTest'),disable=document.querySelector('#csDisable');
+  enable.disabled=true;test.disabled=true;disable.disabled=true;
+  const retry=document.createElement('button');retry.className='btn ghost';retry.textContent='Retry device check';retry.hidden=true;status.after(retry);retry.onclick=()=>alerts().catch(reportError);
+  if(!('serviceWorker' in navigator)||!('PushManager' in window)||!('Notification' in window)||(ios()&&!installed())){status.textContent='Install the Home Screen app to enable iPhone alerts. Other supported browsers can enable alerts here.';document.querySelector('#csEnable').disabled=true;document.querySelector('#csTest').disabled=true;return;}
+  let reg,sub;
+  try{reg=await bounded(navigator.serviceWorker.register('./service-worker.js',{scope:'./'}),'Device setup timed out. Retry the device check.');await bounded(navigator.serviceWorker.ready,'Device setup timed out. Retry the device check.');sameAccount(owner);sub=await bounded(reg.pushManager.getSubscription(),'Device check timed out. Try again.');sameAccount(owner);if(!current())return;
+   let saved=false;if(sub){const row=await bounded(query('Notification registration',db.from('coaching_push_subscriptions').select('id').eq('user_id',owner).eq('endpoint',sub.endpoint).eq('enabled',true).maybeSingle()),'Registration check timed out. Retry the device check.');sameAccount(owner);saved=!!row?.id;}
+   if(!current())return;enable.disabled=false;disable.disabled=!sub;test.disabled=!(saved&&Notification.permission==='granted');
+   status.textContent=Notification.permission==='denied'?'Notifications are blocked. Allow them in your browser or phone settings.':saved&&Notification.permission==='granted'?'This device is saved for this account. Send a test alert, then confirm it appears on your phone.':sub?'This browser has a subscription, but it is not enabled for this account. Tap Enable notifications to reconnect it.':'Notifications are not enabled on this device yet.';
+  }catch(e){if(current()){status.textContent=e.message;retry.hidden=false;}return;}
+  enable.onclick=async e=>{e.target.disabled=true;test.disabled=true;try{
+   // Request permission directly inside the tap, before any network await.
+   sameAccount(owner);const permission=await Notification.requestPermission();sameAccount(owner);if(permission!=='granted')throw Error('Notifications were not allowed.');
+   const config=await pushCall({action:'config'},owner);sameAccount(owner);
+   const raw=atob(config.publicKey.replace(/-/g,'+').replace(/_/g,'/')),key=Uint8Array.from(raw,c=>c.charCodeAt(0));
+   const existing=await bounded(reg.pushManager.getSubscription(),'Device check timed out. Try again.');sameAccount(owner);
+   const subscription=existing||await bounded(reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:key}),'Device permission timed out. Retry Enable notifications.');sameAccount(owner);
+   if(!current())return;const saved=await pushCall({action:'subscribe',subscription:subscription.toJSON()},owner);if(!saved.saved)throw Error('Device registration was not confirmed. Try again.');if(!current())return;localStorage.setItem('lec-push-account',owner);test.disabled=false;disable.disabled=false;status.textContent='Saved for this account. Send a test alert to confirm it reaches your phone.';
+  }catch(e){if(current())status.textContent=e.message;}finally{if(current())e.target.disabled=false;}};
+  test.onclick=async()=>{test.disabled=true;try{sameAccount(owner);await pushCall({action:'test'},owner);if(current())status.textContent='Test accepted by the push service. Check your phone notifications; acceptance does not confirm it appeared.';}catch(e){if(current())status.textContent=e.message;}finally{if(current())test.disabled=false;}};
+  disable.onclick=async()=>{disable.disabled=true;try{sameAccount(owner);await disconnectPush();if(current()){test.disabled=true;status.textContent='Notifications turned off on this device.';}}catch(e){if(current()){status.textContent=e.message;disable.disabled=false;}}};
+ }
+ async function disconnectPush(owner=state.user?.id){
+  sameAccount(owner);if(!('serviceWorker' in navigator))return;
+  const reg=await bounded(navigator.serviceWorker.getRegistration(),'Device disconnect timed out. Try again.');sameAccount(owner);
+  const sub=await bounded(reg?.pushManager.getSubscription(),'Device disconnect timed out. Try again.');sameAccount(owner);if(!sub)return;
+  const removed=await bounded(sub.unsubscribe(),'Device disconnect timed out. Try again.');sameAccount(owner);
+  if(!removed){
+   const remaining=await bounded(reg.pushManager.getSubscription(),'Device disconnect timed out. Try again.');sameAccount(owner);
+   if(remaining)throw Error('Device alerts could not be disconnected. Try again before signing out.');
+  }
+  localStorage.removeItem('lec-push-account');
+  try{await pushCall({action:'unsubscribe',endpoint:sub.endpoint},owner);}catch{ /* The confirmed unsubscribed endpoint cannot receive alerts. */ }
+ }
+ async function refreshCheckins(){if(refreshing||!state.user||state.preview||document.hidden)return;const user=state.user.id,id=state.client?.id;refreshing=true;try{
+  if(id){const rows=await query('Latest check-ins',db.from('checkins').select('*').eq('client_id',id).order('submitted_at',{ascending:false}).limit(250));if(state.user?.id!==user||state.client?.id!==id)return;state.data.checkins=rows;if(state.role==='client')reviewCard();}
+  if(state.role==='coach'&&!state.client&&state.coachView==='reviews'&&!document.activeElement?.matches('input,textarea,select'))await renderReviewQueue(0);
+ }catch{ /* Retain last saved content when offline. */ }finally{refreshing=false;}}
+ function reviewCard(){if(state.role!=='client'||state.client?.onboarding_status!=='complete')return;const c=state.data.checkins.find(c=>c.reviewed_at&&(c.coach_response||c.voice_note_url));let card=document.querySelector('#csCoachReview');if(!c){card?.remove();return;}
+  const url=safeMediaUrl(c.voice_note_url),loom=url?.match(/^https:\/\/(?:www\.)?loom\.com\/share\/([a-f0-9]{32})(?:[?/#]|$)/i);
+  const stamp=[c.id,c.reviewed_at,c.coach_response,url].join('|');if(card?.dataset.stamp===stamp)return;if(!card){card=document.createElement('section');card.id='csCoachReview';card.className='panel cs-review';document.querySelector('#clientMain')?.prepend(card);}card.dataset.stamp=stamp;
+  card.innerHTML='<span class="eyebrow">YOUR COACH REVIEW</span><h2>Your coach’s next steps</h2><p class="muted">'+esc(fmt(c.reviewed_at))+' · Your submitted check-in stays saved.</p>'+(loom?'<button type="button" class="cs-play" data-cs-play><span>▶</span><strong>Your weekly video review</strong><small>Watch your coach’s feedback</small></button>':'')+(url?'<a class="btn primary" href="'+esc(url)+'" target="_blank" rel="noopener">Watch your coach’s review ↗</a>':'')+(c.coach_response?'<p class="cw-lines">'+esc(c.coach_response)+'</p>':'')+(c.focus_next_week?'<h3>Agreed next steps</h3><p class="cw-lines">'+esc(c.focus_next_week)+'</p>':'');
+  if(loom)card.querySelector('[data-cs-play]').onclick=e=>{e.currentTarget.outerHTML='<div class="cs-video"><iframe src="https://www.loom.com/embed/'+loom[1]+'" title="Your private coach review" allow="fullscreen; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>';};
+ }
+ function connect(){if(state.preview||!state.user||!['coach','client'].includes(state.role)||typeof db.channel!=='function')return;const key=state.user.id;if(account===key)return;if(channel)db.removeChannel(channel);clearInterval(timer);account=key;
+  channel=db.channel('checkin-account-'+key).on('postgres_changes',{event:'*',schema:'public',table:'checkins',...(state.role==='client'&&state.client?{filter:'client_id=eq.'+state.client.id}:{})},payload=>{if(state.user?.id!==key)return;if(state.role==='coach'&&payload.eventType==='INSERT')toast('New client check-in received. Open Check-ins to review.');refreshCheckins();}).subscribe();
+  timer=setInterval(refreshCheckins,30000);document.addEventListener('visibilitychange',refreshCheckins);
+ }
+ async function backups(){
+  const owner=state.user?.id;
+  panel('<span class="eyebrow">COACH OPERATIONS</span><h2 id="csTitle">Saved data & backups</h2><p>Download a private coaching-data snapshot. It includes check-ins, reviews, plans and saved client records. Keep it somewhere secure.</p><button class="btn primary" id="csExport">Download coaching backup</button><p id="csBackupStatus" role="status"></p><p class="muted">Check-in edits are also versioned in private recovery storage. This export excludes login passwords, provider credentials and uploaded file bytes. Those require a separate full-project backup.</p>');
+  const status=document.querySelector('#csBackupStatus'),current=()=>state.user?.id===owner&&status.isConnected;
+  document.querySelector('#csExport').onclick=async e=>{e.target.disabled=true;try{
+   sameAccount(owner);if(state.role!=='coach')throw Error('Coach access required.');
+   const data=await query('Coaching backup',db.rpc('export_coaching_backup'));sameAccount(owner);if(!current())return;
+   if(data?.format!=='legal-edge-coaching-backup'||data.coach_id!==owner||!Array.isArray(data.tables?.checkins))throw Error('A complete backup for this account was not confirmed. Retry the export.');
+   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='Legal-Edge-Coaching-Backup-'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+   status.textContent='Backup exported. '+data.tables.checkins.length+' saved check-ins included.';
+  }catch(e){if(current())status.textContent=e.message;}finally{if(current())e.target.disabled=false;}};
+ }
+ function controls(){connect();const history=document.querySelector('#coachCheckinForm')?.closest('.data-entry-panel');if(history&&!history.closest('.cs-history')){const d=document.createElement('details');d.className='cs-history';d.innerHTML='<summary>Add a past check-in</summary>';history.before(d);d.append(history);}if(state.role==='coach'&&!document.querySelector('#csCoachTools')){const nav=document.querySelector('#coachNav');if(nav){nav.insertAdjacentHTML('beforeend','<div id="csCoachTools" class="cs-tools"><button class="side-link" id="csPhoneAlerts">Phone alerts</button><button class="side-link" id="csBackups">Backups</button><a class="side-link" href="./firms-walkthrough.html" target="_blank" rel="noopener">Corporate walkthrough ↗</a></div>');document.querySelector('#csPhoneAlerts').onclick=()=>alerts().catch(reportError);document.querySelector('#csBackups').onclick=()=>backups();}}
+  if(state.role==='client'&&!document.querySelector('#csClientAlerts')){const menu=document.querySelector('#clientApp .account-menu > div');if(menu){const b=document.createElement('button');b.id='csClientAlerts';b.textContent='Notifications';b.onclick=()=>alerts().catch(reportError);menu.append(b);}}
+  if(!routed&&state.user){routed=true;const q=new URLSearchParams(location.search);if(q.get('section')==='reviews'&&state.role==='coach'){state.client=null;state.coachView='reviews';const checkin=q.get('checkin');Promise.resolve(renderReviewQueue(0)).then(async()=>{if(!checkin||! /^[0-9a-f-]{36}$/i.test(checkin))return;const {data,error}=await db.from('checkins').select('id,client_id').eq('id',checkin).maybeSingle();if(error||!data){toast('This check-in is unavailable for this account.','error');return;}const button=document.createElement('button');button.dataset.reviewClient=data.client_id;button.dataset.reviewCheckin=data.id;await openQueuedReview(button);}).catch(reportError);}else if(q.get('section')==='checkin'&&state.role==='client'){state.clientView='checkin';renderClient();}}
+ }
+ renderCoach=function(){const r=originalCoach();Promise.resolve(r).then(controls).catch(()=>{});return r;};
+ renderClient=function(){const r=originalClient();Promise.resolve(r).then(()=>{controls();reviewCard();}).catch(()=>{});return r;};
+ // Disable this account's subscription before sign-out, rather than leaving alerts on a shared phone.
+ document.addEventListener('click',async e=>{const b=e.target.closest('.logout');if(!b||state.preview)return;e.preventDefault();e.stopImmediatePropagation();const owner=state.user?.id;try{await disconnectPush(owner);sameAccount(owner);}catch(err){toast(err.message||'Could not disable device alerts. Try again before signing out.','error');return;}if(channel)db.removeChannel(channel);clearInterval(timer);await db.auth.signOut();location.reload();},true);
+})();

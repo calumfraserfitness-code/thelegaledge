@@ -55,7 +55,7 @@ function reviewFacts(c) {
 }
 async function loadReviewQueue(page = 0) {
   if(state.preview){const records=state.sampleClientData?.size?[...state.sampleClientData].flatMap(([id,data])=>(data.checkins||[]).map(c=>({...c,client_id:id}))):(state.data.checkins||[]).map(c=>({...c,client_id:c.client_id || state.clients[0]?.id}));state.reviewRows=records.filter(c=>!c.reviewed_at);state.reviewCount=state.reviewRows.length;return;}
-  const result=await db.from('checkins').select('id,client_id,submitted_at,period_start,week_number,energy,sleep,stress,workload,training_adherence,nutrition_adherence,busy_week,support_needed,coach_response,reviewed_at,source_system',{count:'exact'}).is('reviewed_at',null).order('submitted_at',{ascending:false}).order('id',{ascending:false}).range(page*50,page*50+49);
+  const result=await db.from('checkins').select('id,client_id,submitted_at,period_start,weight_kg,week_number,energy,sleep,stress,workload,training_adherence,nutrition_adherence,busy_week,support_needed,coach_response,reviewed_at,source_system',{count:'exact'}).is('reviewed_at',null).order('submitted_at',{ascending:false}).order('id',{ascending:false}).range(page*50,page*50+49);
   if(result.error)throw new Error('Review queue: '+result.error.message);
   state.reviewRows=result.data || [];state.reviewCount=result.count ?? state.reviewRows.length;state.reviewPage=page;
 }

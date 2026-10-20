@@ -1,0 +1,11 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+let rows=[],reports=[];
+const ctx=vm.createContext({Date,Number,Math,Set,state:{preview:false},clientToday(){},healthSummaryMarkup(){},recentHealthRows:()=>rows,weeklyReports:()=>reports,weeklyReportCard:r=>'<p>'+r.period_end+'</p>',finiteRecorded:v=>v!==null&&v!==undefined&&v!==''&&Number.isFinite(Number(v)),esc:String,fmt:x=>x,displayWeight:x=>x+' kg'});
+vm.runInContext(fs.readFileSync(__dirname+'/../calm-experience.js','utf8'),ctx);
+reports=[{provider:'Fitbit',period_start:'2026-09-12',period_end:'2026-09-18',metrics:{average_steps:8172,sleep_hours:6.7,resting_heart_rate:78,weight_kg:74.4}},{provider:'Fitbit',period_start:'2026-09-05',period_end:'2026-09-11',metrics:{average_steps:8306,sleep_hours:7.1,resting_heart_rate:76,weight_kg:74.9}}];
+let h=ctx.healthSummaryMarkup();assert(h.includes('8,172'));assert(h.includes('6h 42m'));assert(h.includes('74.4 kg'));assert(h.includes('2026-09-18'));assert(h.includes('-134 steps'));assert(h.includes('weekly reports'));assert(!h.includes('No readings yet'));
+rows=[{date:'2026-10-12',steps:4000}];h=ctx.healthSummaryMarkup();assert(h.includes('>4,000<'));assert(h.includes('6h 42m'));
+reports[1].provider='Other';assert.equal(ctx.calmWeeklyMetric(reports,'average_steps').change,null);
+reports[0].metrics.sleep_hours=null;reports[1].metrics.sleep_hours=null;assert(ctx.healthSummaryMarkup().includes('Not recorded'));
+assert.equal(ctx.calmWeeklySeries([reports[0],reports[0]],'average_steps').length,1);
+console.log('PASS: weekly summaries populate missing daily metrics; dated charts, genuine changes, provenance and missing values.');

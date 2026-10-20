@@ -7,8 +7,8 @@ function workoutSetRows(exercise,session,formData,client){
 saveExerciseLog=async function(event){
  event.preventDefault();const client=state.client,session=state.data.sessions.find(s=>s.id===state.selectedSessionId),exercise=state.data.exercises.find(e=>e.id===event.target.dataset.exerciseLog);let rows;
  try{if(!session||!exercisesForSession(session).some(e=>e.id===exercise?.id))throw Error('This exercise is not part of the selected workout.');rows=workoutSetRows(exercise,session,new FormData(event.target),client);if(!rows.length)throw Error('Enter your actual reps or seconds before saving.');}catch(e){return toast(e.message,'error');}
- setBusy(event.submitter,true);
- try{const saved=state.preview?rows.map(r=>({...r,id:'sample-'+session.id+'-'+exercise.id+'-'+r.set_number})):await query('Save workout sets',db.from('exercise_set_logs').upsert(rows,{onConflict:'client_id,training_session_id,program_exercise_id,set_number'}).select());if(state.client?.id!==client.id)return;const keys=new Set(saved.map(r=>r.training_session_id+'|'+r.program_exercise_id+'|'+r.set_number));state.data.exerciseLogs=[...saved,...state.data.exerciseLogs.filter(r=>!keys.has(r.training_session_id+'|'+r.program_exercise_id+'|'+r.set_number))];toast(state.preview?'Actual sample sets saved':'Workout sets saved');clientTraining();}catch(e){toast(e.message,'error');}finally{setBusy(event.submitter,false);}
+ const form=event.target,user=state.user?.id;if(form.dataset.saving==='true')return;form.dataset.saving='true';setBusy(event.submitter,true);
+ try{const saved=state.preview?rows.map(r=>({...r,id:'sample-'+session.id+'-'+exercise.id+'-'+r.set_number})):await query('Save workout sets',db.from('exercise_set_logs').upsert(rows,{onConflict:'client_id,training_session_id,program_exercise_id,set_number'}).select());if(saved.length!==rows.length||rows.some(row=>!saved.some(s=>s.client_id===row.client_id&&s.training_session_id===row.training_session_id&&s.program_exercise_id===row.program_exercise_id&&s.set_number===row.set_number)))throw Error('All workout sets were not confirmed. Your entries are still here; retry.');if(state.client?.id!==client.id||state.user?.id!==user)return;const keys=new Set(saved.map(r=>r.training_session_id+'|'+r.program_exercise_id+'|'+r.set_number));state.data.exerciseLogs=[...saved,...state.data.exerciseLogs.filter(r=>!keys.has(r.training_session_id+'|'+r.program_exercise_id+'|'+r.set_number))];toast(state.preview?'Actual sample sets saved':'Workout sets saved');if(form.isConnected&&state.selectedSessionId===session.id)clientTraining();}catch(e){if(state.client?.id===client.id&&state.user?.id===user)toast(e.message,'error');}finally{delete form.dataset.saving;setBusy(event.submitter,false);}
 };
 const completionExerciseCard=exerciseCard;
 exerciseCard=function(ex,loggable=false){
@@ -28,17 +28,18 @@ exerciseCard=function(ex,loggable=false){
  if(/dumbbell|\bdb\b/i.test(ex.name))html=html.replace('<form class="set-log"','<p class="muted">Load is the combined weight when using two dumbbells: 2 × 20 = 40. For one dumbbell, enter its weight. Use '+(state.client.weight_unit==='lbs'?'lb':'kg')+'.</p><form class="set-log"');
  return html;
 };
-function checkinWeekChoices(){const now=iso(monday()),date=new Date(now+'T12:00:00');const past=Array.from({length:52},(_,i)=>iso(new Date(+date-i*7*86400000))).filter(d=>!state.client.start_date||d>=state.client.start_date);return [...new Set([now,...past,...state.data.weeks.filter(w=>w.week_start<=now).map(w=>w.week_start)])].sort().reverse();}
+function checkinClientWeek(){return window.CheckinStatus?window.CheckinStatus.week(state.client):iso(monday());}
+function checkinWeekChoices(){const now=checkinClientWeek(),date=new Date(now+'T12:00:00');const past=Array.from({length:52},(_,i)=>iso(new Date(+date-i*7*86400000))).filter(d=>!state.client.start_date||d>=state.client.start_date);return [...new Set([now,...past,...state.data.weeks.filter(w=>w.week_start<=now).map(w=>w.week_start)])].sort().reverse();}
 const completionCheckin=clientCheckin;
 clientCheckin=function(){
- completionCheckin();const host=$('#clientMain'),weeks=checkinWeekChoices(),selected=state.checkinWeek||iso(monday());
+ completionCheckin();const host=$('#clientMain'),weeks=checkinWeekChoices(),selected=state.checkinWeek||checkinClientWeek();
  host.insertAdjacentHTML('afterbegin','<section class="panel"><label>Week to review<select id="checkinWeekChoice">'+weeks.map(d=>'<option value="'+d+'" '+(d===selected?'selected':'')+'>Week beginning '+esc(fmt(d))+'</option>').join('')+'</select></label></section>');
  $('#checkinWeekChoice').onchange=e=>{state.checkinWeek=e.target.value;clientCheckin();};
- if(selected===iso(monday()))return;
+ if(selected===checkinClientWeek())return;
  const record=state.data.checkins.find(c=>c.period_start===selected);
  if(record){host.innerHTML='<section class="panel"><button id="checkinChooseAnother" class="btn ghost">Choose another week</button><h2>Week beginning '+esc(fmt(selected))+'</h2>'+checkinCard(record)+'</section>';$('#checkinChooseAnother').onclick=()=>{state.checkinWeek=null;clientCheckin();};return;}
  // Reuse the established staged form for an unsubmitted past week, without current-week readings.
- const current=state.data.checkins,now=iso(monday());state.data.checkins=current.filter(c=>c.period_start!==now);completionCheckin();state.data.checkins=current;
+ const current=state.data.checkins,now=checkinClientWeek();state.data.checkins=current.filter(c=>c.period_start!==now);completionCheckin();state.data.checkins=current;
  host.insertAdjacentHTML('afterbegin','<section class="panel"><h2>Missed check-in · '+esc(fmt(selected))+'</h2><p>Your answers will be saved against this week.</p><button id="checkinChooseAnother" class="btn ghost">Choose another week</button></section>');$('#checkinChooseAnother').onclick=()=>{state.checkinWeek=null;clientCheckin();};
  const form=$('#checkinForm');form.elements.namedItem('period_start').value=selected;form.elements.namedItem('week_number').value=state.data.weeks.find(w=>w.week_start===selected)?.week_number||1;form.querySelector('[name="average_steps"]')?.remove();form.querySelector('.refresh-connected')?.remove();
 };
@@ -49,9 +50,9 @@ coachNutrition=function(){
  const lookup=(...keys)=>{for(const [k,v]of Object.entries(answers)){if(keys.includes(k.toLowerCase().replace(/[^a-z0-9]/g,''))){const match=String(v).match(/^\s*(\d+(?:\.\d+)?)\s*(?:cm|years?|yrs?)?\s*$/i);if(match)return Number(match[1]);}}return null;};
  form.elements.namedItem('weight').closest('label').firstChild.textContent='Current weight ('+(metric?'kg':'lb')+')';form.elements.namedItem('height').closest('label').firstChild.textContent='Height ('+(metric?'cm':'inches')+')';
  const latest=[...state.data.progress].filter(p=>finiteRecorded(p.weight_kg)).sort((a,b)=>String(b.entry_date).localeCompare(String(a.entry_date)))[0]?.weight_kg;
- const kg=latest??state.client.start_weight_kg,cm=lookup('heightcm','height'),age=lookup('age');if(finiteRecorded(kg))form.weight.value=(Number(kg)*(metric?1:2.2046226218)).toFixed(1);if(cm)form.height.value=(cm/(metric?1:2.54)).toFixed(1);if(age)form.age.value=age;
+ const kg=latest??state.client.start_weight_kg,cm=lookup('heightcm','height'),age=lookup('age');if(finiteRecorded(kg))form.elements.namedItem('weight').value=(Number(kg)*(metric?1:2.2046226218)).toFixed(1);if(cm)form.elements.namedItem('height').value=(cm/(metric?1:2.54)).toFixed(1);if(age)form.elements.namedItem('age').value=age;
  form.insertAdjacentHTML('afterbegin','<p class="muted wide">Saved measurements are prefilled where available. Confirm they are current before calculating.</p>');
- const old=form.onsubmit;form.onsubmit=e=>{const w=form.weight.value,h=form.height.value;if(metric){form.weight.value=Number(w)*2.2046226218;form.height.value=Number(h)/2.54;}try{old(e);}finally{form.weight.value=w;form.height.value=h;}};
+ const old=form.onsubmit;form.onsubmit=e=>{const w=form.elements.namedItem('weight').value,h=form.elements.namedItem('height').value;if(metric){form.elements.namedItem('weight').value=Number(w)*2.2046226218;form.elements.namedItem('height').value=Number(h)/2.54;}try{old(e);}finally{form.elements.namedItem('weight').value=w;form.elements.namedItem('height').value=h;}};
 };
 const completionPrompt=nutritionImportPrompt;
 nutritionImportPrompt=function(){const prompt=completionPrompt();return state.client?.weight_unit==='kg'?prompt.replace('using US ounces, cups, teaspoons, tablespoons and whole-food counts','using grams, millilitres and whole-food counts; distinguish raw, dry and cooked amounts'):prompt;};

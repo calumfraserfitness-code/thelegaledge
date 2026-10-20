@@ -11,6 +11,12 @@ ctx.state.data.checkins=[{average_steps:6500,sleep_hours:7,energy:8}];
 assert.equal(vm.runInContext("coachingGoalValue({metric:'steps'})",ctx),6500);
 assert.equal(vm.runInContext("coachingGoalValue({metric:'sleep_minutes'})",ctx),420);
 assert.equal(vm.runInContext("coachingGoalValue({metric:'energy'})",ctx),8);
+ctx.state.client={id:'client-a',weight_unit:'lbs',goal_summary:'Build strength'};ctx.esc=v=>String(v??'').replaceAll('<','&lt;');ctx.fmt=v=>v;ctx.clientGoalText=v=>v;
+ctx.state.data.progress=[{entry_date:'2026-10-01',weight_kg:90}];ctx.state.data.checkins=[{submitted_at:'2026-10-08',weight_kg:89}];
+ctx.state.data.coachingGoals=[{title:'Weight milestone',metric:'weight_kg',baseline:95,target:85,unit:'kg',status:'active'}];
+ctx.state.data.coachingGuidance=[{client_id:'client-a',published:true,title:'Agreed focus · Sleep routine',body:'Use a bedtime reminder'},{client_id:'client-b',published:true,title:'Agreed focus · Other client',body:'PRIVATE OTHER CLIENT'},{client_id:'client-a',published:false,title:'Agreed focus · Draft',body:'UNPUBLISHED DRAFT'},{client_id:'client-a',published:true,title:'Previous focus · Travel week',body:'Historical instruction'}];
+assert.equal(vm.runInContext("coachingGoalValue({metric:'weight_kg'})",ctx),89,'Latest check-in weight supersedes older progress record');
+const markup=vm.runInContext('coachingGoalsMarkup()',ctx);assert(markup.includes('196.2 / 187.4 lb'));assert(markup.includes('Sleep routine'));assert(markup.includes('Historical instruction'));assert(!markup.includes('PRIVATE OTHER CLIENT'));assert(!markup.includes('UNPUBLISHED DRAFT'));
 console.log('PASS: missing health readings excluded, decreasing goals, no-data goals, distinct strength-session counts and check-in metric fallback.');
 
 ctx.firmState={participants:Array.from({length:6},(_,i)=>({id:'member-'+i,client_id:'person-'+i,status:'active'})),consents:Array.from({length:6},(_,i)=>({participant_id:'member-'+i}))};

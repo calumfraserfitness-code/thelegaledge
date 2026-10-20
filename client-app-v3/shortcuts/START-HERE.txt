@@ -1,0 +1,15 @@
+LEGAL EDGE — PREPARED STEPS PILOT
+
+This file is prepared, not yet tested on an iPhone. No Developer Program membership or exporter subscription is needed.
+
+ON YOUR MAC
+1. Unzip this folder. Check that your Mac is signed into iCloud.
+2. Open sign-on-mac.command. It signs the prepared shortcut with Apple; it contains no private key or Health readings. If macOS blocks the command file, open Terminal in this folder and run: bash sign-on-mac.command
+3. AirDrop the resulting Legal-Edge-Steps.shortcut to your iPhone.
+
+ON YOUR IPHONE
+Add the shortcut. Paste your own private setup key from Devices & apps in Legal Edge and enter one exact Health step-source name. Garmin is often Connect. Run once while unlocked and approve Health/network access.
+
+A saved_days server response proves receipt. Check the previous complete day against the selected source in Health or its original device app. Errors list available sources; they do not mean connected. Do not share your completed shortcut or key.
+
+After the first upload is verified, add a personal automation to run Legal Edge Steps on your chosen days, with an App Opened catch-up while unlocked. iOS may block Health access while locked. Do not roll out to clients until these checks pass.
