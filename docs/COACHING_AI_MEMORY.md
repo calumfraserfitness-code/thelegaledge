@@ -1,5 +1,7 @@
 # Legal Edge operating memory
 
+Playbook is temporarily paused in the 26 October transition interface. Preserve its content and approved workout records; route stale navigation safely without deleting data. Food search stays in Nutrition and strength charts use recorded lift logs. Retained feature tests run separately from the paused production-navigation test. A client roster can be plan-ready while source check-ins/lifts remain stale: compare actual source dates before claiming migration complete. Never represent a saved supplied-password note as a verified working credential.
+
 Use client-app-v3/RELEASE_20261009.md as the authoritative release checklist. Production source is release/daily-nutrition-20261009, root client-app-v3. Do not substitute the older main branch.
 
 ## Evidence and safeguards

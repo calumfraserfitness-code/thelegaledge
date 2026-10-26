@@ -60,7 +60,8 @@
     "simple-lift-logging.js",
     "checkin-video.js",
     "workout-history.js",
-    "coach-ai-meals.js"
+    "coach-ai-meals.js",
+    "transition-ui.js"
   ],
   "styles": [
     "app.css",
