@@ -63,7 +63,8 @@
     "coach-ai-meals.js",
     "transition-ui.js",
     "coach-activity.js",
-    "easy-swaps.js"
+    "easy-swaps.js",
+    "progress-first.js"
   ],
   "styles": [
     "app.css",
@@ -103,6 +104,7 @@
     "simple-lift-logging.css",
     "checkin-video.css",
     "workout-history.css",
-    "coach-activity.css"
+    "coach-activity.css",
+    "progress-first.css"
   ]
 }

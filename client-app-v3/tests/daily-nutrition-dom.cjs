@@ -43,6 +43,8 @@ async function tick(){await new Promise(r=>setTimeout(r,0));}
  assert.deepEqual([...doc.querySelectorAll('#clientNav button')].map(b=>b.dataset.clientView),['today','training','nutrition','checkin','progress','support']);
  doc.querySelector('#dnIdeas').click();assert(doc.querySelector('#dnIdeaGroup'));assert(doc.querySelector('[role=dialog]').textContent.includes('No AI credits needed'));const intakeBefore=doc.querySelector('.dn-intake strong').textContent;[...doc.querySelectorAll('[data-idea-choose]')].find(b=>b.closest('article').textContent.includes('Egg wrap')).click();await tick();assert.equal(doc.querySelectorAll('.dn-eaten').length,0,'Choosing idea does not mark eaten');assert.equal(doc.querySelector('.dn-intake strong').textContent,intakeBefore);doc.querySelector('#dnAnywhere').click();doc.querySelector('#faMealIdeas').click();assert(doc.querySelector('#dnIdeaGroup'),'Credit-free ideas accessible from food search');doc.querySelector('#dnClose').click();
  assert.ok(doc.querySelector('.dn-target-panel'));assert.ok(!doc.querySelector('.dn-week').open);
+ assert(!doc.querySelector('.dn-intake').closest('details').open,'Food intake tracking starts optional and collapsed without eaten logs');
+ assert(doc.querySelector('.dn-intake').closest('details').textContent.includes('No logs does not mean no food eaten'));
  assert(doc.querySelector('.dn-meals').textContent.includes('Protein drink & soft-boiled eggs'),'Ambiguous saved meal names are presented clearly');
  assert(doc.querySelector('.dn-meals').textContent.includes('3 eggs'),'Meal cards show an ingredient-based description');
  assert.ok(!doc.querySelector('.dn-meals .ingredient-list'),'Recipes collapsed initially');

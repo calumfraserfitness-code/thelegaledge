@@ -78,6 +78,9 @@
    <details class="dn-details dn-week"><summary>Shopping list</summary>${shoppingListMarkup(weeklyNutritionSelection().days)}</details>
 
    <div id="dnSheetHost"></div></div>`;
+  const intake=host().querySelector('.dn-intake');
+  if(intake){const optional=document.createElement('details');optional.className='dn-optional-tracking';optional.open=eaten>0;optional.innerHTML='<summary>Optional food tracking</summary><p>Use this only if tracking helps you or Calum has asked you to. No logs does not mean no food eaten. Your meals, targets and weekly check-in still work without daily logging.</p>';intake.before(optional);optional.append(intake);const count=intake.querySelector('p');if(count)count.textContent=eaten+' '+(eaten===1?'meal':'meals')+' logged · not a complete intake record';}
+  const mealsHeading=host().querySelector('.dn-section-heading');if(mealsHeading){const note=document.createElement('p');note.className='dn-optional-tracking';note.textContent='Follow your agreed meals and use swaps when useful. You do not need to log food every day to use your plan or see strength progress.';mealsHeading.before(note);}
   $('#dnLibrary').onclick=()=>openLibrary();$('#dnEmptyLibrary')?.addEventListener('click',()=>openLibrary());
   $('#dnDate').onchange=e=>{if(e.target.value)changeDate(e.target.value);};
   $('#dnToday')?.addEventListener('click',()=>changeDate(null));

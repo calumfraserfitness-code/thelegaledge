@@ -38,7 +38,7 @@ run(`state.data.progress=[{entry_date:'2026-10-01',weight_kg:83.01},{entry_date:
 assert(doc.querySelector('.progress-metrics').textContent.includes('Previous'),'Previous weigh-in is explicit');
 assert(doc.querySelector('.progress-metrics').textContent.includes('Since previous'),'Change since the previous weigh-in is explicit');
 assert(doc.querySelector('.strength-progress').textContent.includes('Bench press'),'Verified strength logs receive their own trend card');
-assert(doc.querySelector('.strength-progress').textContent.includes('Previous best 70 kg × 8'),'Strength card keeps the previous working set visible');
+assert(doc.querySelector('.strength-progress').textContent.includes('PREVIOUS TRAINING DATE')&&doc.querySelector('.strength-progress').textContent.includes('70 kg × 8 reps'),'Strength card keeps the previous working set visible');
 assert.equal(doc.querySelectorAll('.photo-compare-pair [data-photo-path]').length,2);
 run(`state.role='coach';clientProgress();`);assert(doc.querySelector('#clientMain [data-agreed-goal]'),'Coach viewing the client sees the same goal focus');assert.equal(doc.querySelectorAll('#clientMain .photo-compare-pair [data-photo-path]').length,2);run(`state.role='client';`);
 assert.equal(doc.querySelector('[data-photo-before]').value,'1');assert.equal(doc.querySelector('[data-photo-after]').value,'2');
