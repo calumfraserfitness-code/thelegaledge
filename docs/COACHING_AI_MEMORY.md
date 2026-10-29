@@ -1,5 +1,7 @@
 # Legal Edge operating memory
 
+Activity UI separates auth sign-ins, non-legacy lift saves, native check-ins and food saves. Last sign-in is not last page-open, and a saved row is not proof of who entered it. Never conflate absent attribution with no use. Coach activity RPC is an intentional, explicitly coach-role/ownership-scoped metadata definer; anonymous/client denial requires regression verification. Exercise alternatives remain coach-reviewed; don't auto-fill rehab or silently change approved prescriptions. Simplified prior-set history must match the actual exercise choice after swaps.
+
 Playbook is temporarily paused in the 26 October transition interface. Preserve its content and approved workout records; route stale navigation safely without deleting data. Food search stays in Nutrition and strength charts use recorded lift logs. Retained feature tests run separately from the paused production-navigation test. A client roster can be plan-ready while source check-ins/lifts remain stale: compare actual source dates before claiming migration complete. Never represent a saved supplied-password note as a verified working credential.
 
 Use client-app-v3/RELEASE_20261009.md as the authoritative release checklist. Production source is release/daily-nutrition-20261009, root client-app-v3. Do not substitute the older main branch.

@@ -61,7 +61,9 @@
     "checkin-video.js",
     "workout-history.js",
     "coach-ai-meals.js",
-    "transition-ui.js"
+    "transition-ui.js",
+    "coach-activity.js",
+    "easy-swaps.js"
   ],
   "styles": [
     "app.css",
@@ -100,6 +102,7 @@
     "quick-training.css",
     "simple-lift-logging.css",
     "checkin-video.css",
-    "workout-history.css"
+    "workout-history.css",
+    "coach-activity.css"
   ]
 }

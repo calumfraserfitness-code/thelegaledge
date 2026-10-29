@@ -13,4 +13,7 @@ assert.equal(d.querySelectorAll('.lift-target')[1].textContent,'Target: 10-12 re
 assert(d.querySelector('.lift-effort input[name=rir_1]'),'Optional effort remains loggable');
 assert(!d.querySelector('.lift-effort').open);assert.equal(d.querySelector('form button').textContent,'Save sets');
 assert.equal(d.querySelector('.set-log-row>label input').name,'load_1');
-console.log('PASS: open set logging, weight before reps, unit conversion, latest-session-only history, ownership and current values preserved.');dom.window.close();
+w.currentExerciseChoice=()=> 'Machine chest press';
+w.document.body.innerHTML=w.exerciseCard({id:'e',name:'Dumbbell bench press',sets:2,reps:'8'},true);
+assert(w.document.querySelector('.last-set').textContent.includes('no recorded set'),'Different movement history must not follow a swap');
+console.log('PASS: open set logging, weight before reps, unit conversion, latest-session-only and movement-specific history, ownership and current values preserved.');dom.window.close();

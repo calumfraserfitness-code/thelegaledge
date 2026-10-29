@@ -10,7 +10,8 @@
   form.classList.add('simple-lift-log');
   for(let parent=form.parentElement;parent;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
   const unit=state.client?.weight_unit==='lbs'?'lb':'kg';
-  const history=(state.data.exerciseLogs||[]).filter(r=>(!r.client_id||r.client_id===state.client?.id)&&r.training_session_id!==state.selectedSessionId&&(r.program_exercise_id===ex.id||(ex.exercise_bank_id&&r.exercise_bank_id===ex.exercise_bank_id))).sort((a,b)=>String(b.performed_at).localeCompare(String(a.performed_at)));
+  const choice=typeof currentExerciseChoice==='function'?currentExerciseChoice(ex):ex.name;
+  const history=(state.data.exerciseLogs||[]).filter(r=>(!r.client_id||r.client_id===state.client?.id)&&r.training_session_id!==state.selectedSessionId&&(r.program_exercise_id===ex.id||(ex.exercise_bank_id&&r.exercise_bank_id===ex.exercise_bank_id))&&(r.exercise_name||ex.name)===choice).sort((a,b)=>String(b.performed_at).localeCompare(String(a.performed_at)));
   const last=history[0],prior=last?history.filter(r=>last.training_session_id?r.training_session_id===last.training_session_id:String(r.performed_at).slice(0,10)===String(last.performed_at).slice(0,10)):[];
   const targets=String(ex.reps||'').split(',').map(s=>s.trim());
   form.querySelectorAll('.set-log-row').forEach(row=>{
