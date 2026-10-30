@@ -1,5 +1,7 @@
 # Legal Edge operating memory
 
+Keep client destinations distinct: Progress owns recorded strength/weight/watch measurements; Coach owns feedback, calls and approved actions. Today is a short overview linking to each. Removing duplicate presentation must never delete saved measurements or coaching guidance; full action completion remains available in Coach with captured account/client/view guards.
+
 Call linkage alone does not deliver client follow-through. Keep coach-private decisions/tasks separate from explicitly published client recaps/actions, and show applied prescription changes only from actual receipts. Mount approved action UI after final Today layout and subsequent refreshes; otherwise later overrides can erase the checklist. Capture account, role, client and connected host across reads/writes. An unmatched recording needs verified source identity or explicit audited coach confirmation, never recorder-as-client matching.
 
 Today must prioritise the next current-published-week session, owned dated meals, actual weekly deadline and latest completed feedback. Missing configuration is explicit. Coach attention reads must preserve unavailable states, account/view guards and bounded owner scope. Separate auth events from saved activity and do not treat optional food logs as adherence. A weight-and-reps table helps interpret load plots without invented 1RM or aggregate strength scores.
