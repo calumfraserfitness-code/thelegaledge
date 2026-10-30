@@ -64,7 +64,8 @@
     "transition-ui.js",
     "coach-activity.js",
     "easy-swaps.js",
-    "progress-first.js"
+    "progress-first.js",
+    "clear-priorities.js"
   ],
   "styles": [
     "app.css",
@@ -105,6 +106,7 @@
     "checkin-video.css",
     "workout-history.css",
     "coach-activity.css",
-    "progress-first.css"
+    "progress-first.css",
+    "clear-priorities.css"
   ]
 }

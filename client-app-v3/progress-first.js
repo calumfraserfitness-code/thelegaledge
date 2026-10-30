@@ -55,8 +55,15 @@
   const metrics=[['STEPS',value('steps','steps')],['SLEEP',valid(r.sleep_minutes)?(Number(r.sleep_minutes)/60).toFixed(1)+' hours':'Not shared'],['RESTING HEART RATE',value('resting_heart_rate','bpm')],['BODY WEIGHT',valid(r.weight_kg)?(Number(r.weight_kg)*(lbs?2.2046226218:1)).toFixed(1)+(lbs?' lb':' kg'):'Not shared']];
   return '<section class="panel pf-watch"><span class="eyebrow">RECEIVED WATCH DATA</span><h2>Your latest readings</h2><p>Recorded '+esc(r.date)+' · '+esc(r.source.replaceAll('_',' '))+'. Received records, not a promise of live syncing.</p><div class="pf-lift-summary">'+metrics.map(([label,v])=>'<div><small>'+label+'</small><strong>'+esc(v)+'</strong></div>').join('')+'</div><button type="button" class="btn ghost" data-pf-route="health">View health reports</button></section>';
  }
- window.LegalEdgeStrength={series,classification};
+ function datedTable(host){
+  const chart=host.querySelector('.pf-strength');if(!chart||chart.querySelector('.pf-dates'))return;
+  const all=series(state.client,state.data,state.preview),choice=chart.querySelector('[data-strength-exercise]')?.value,g=all.find(g=>g.key===choice);if(!g)return;
+  const rows=g.rows.slice(-12).reverse();
+  chart.querySelector('.pf-charts').insertAdjacentHTML('afterend','<div class="pf-dates"><table><caption>Weight and reps together · latest '+rows.length+' dates</caption><thead><tr><th>Date</th><th>Recorded load</th><th>Reps at that load</th></tr></thead><tbody>'+rows.map(r=>'<tr><th scope="row">'+esc(r.day)+'</th><td>'+esc(Number(r.load.toFixed(1))+' '+g.unit)+'</td><td>'+esc(r.reps)+'</td></tr>').join('')+'</tbody></table></div>');
+ }
+ window.LegalEdgeStrength={series,classification,watchMarkup};
  function bind(host){if(!host)return;const client=state.client?.id,user=state.user?.id,active=()=>state.client?.id===client&&state.user?.id===user;
+  datedTable(host);
   host.querySelectorAll('[data-strength-exercise]').forEach(select=>select.onchange=()=>{if(!active()||!select.isConnected)return;selected.set(client,select.value);select.closest('.pf-strength').outerHTML=strengthProgressMarkup();bind(host);});
   host.querySelectorAll('[data-strength-group]').forEach(button=>button.onclick=()=>{if(!active()||!button.isConnected)return;filters.set(client,button.dataset.strengthGroup);button.closest('.pf-strength').outerHTML=strengthProgressMarkup();bind(host);});
   host.querySelectorAll('[data-pf-route]').forEach(b=>b.onclick=()=>{if(!active()||!b.isConnected)return;if(state.role==='coach'&&!document.querySelector('#clientApp:not(.hidden)')){state.clientTab=({training:'training',health:'connections',checkin:'check-ins'})[b.dataset.pfRoute]||'progress';renderCoach();}else{state.clientView=b.dataset.pfRoute;renderClient();}});
