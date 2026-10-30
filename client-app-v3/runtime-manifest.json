@@ -65,7 +65,8 @@
     "coach-activity.js",
     "easy-swaps.js",
     "progress-first.js",
-    "clear-priorities.js"
+    "clear-priorities.js",
+    "call-followthrough.js"
   ],
   "styles": [
     "app.css",
@@ -107,6 +108,7 @@
     "workout-history.css",
     "coach-activity.css",
     "progress-first.css",
-    "clear-priorities.css"
+    "clear-priorities.css",
+    "call-followthrough.css"
   ]
 }

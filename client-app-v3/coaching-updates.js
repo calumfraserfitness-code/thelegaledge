@@ -73,6 +73,5 @@
      box.querySelectorAll('[data-cu-focus]').forEach(input=>input.onchange=async()=>{const checked=input.checked;input.disabled=true;try{await query('Complete focus',db.rpc('complete_coaching_focus',{p_id:input.dataset.cuFocus,p_complete:checked}));}catch(error){input.checked=!checked;toast(error.message,'error');}finally{input.disabled=false;}});
    }catch(error){if(box.isConnected&&state.client?.id===clientId)box.querySelector('p').textContent='Your priorities could not load. Please refresh to try again.';}
  }
- const oldToday=clientToday;
- clientToday=function(){const result=oldToday();Promise.resolve(result).then(()=>focusScreen($('#clientMain'))).catch(()=>{});return result;};
+ // The final call-followthrough module owns Today placement after all layout overrides.
 })();
