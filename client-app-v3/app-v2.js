@@ -40,7 +40,7 @@ const state = {
   profile: null,
   role: null,
   preview: false,
-  coachView: 'clients',
+  coachView: 'dashboard',
   clientView: 'today',
   hasPilot: false,
   selectedSessionId: null,
@@ -238,7 +238,7 @@ async function bootAccount() {
     state.role = state.profile.role;
     if (state.role === 'coach') {
       await loadCoach();
-      state.coachView = new URLSearchParams(location.search).get('section') === 'corporate' ? 'firms' : 'clients';
+      state.coachView = new URLSearchParams(location.search).get('section') === 'corporate' ? 'firms' : 'dashboard';
       $('#coachName').textContent = state.profile.full_name || 'Coach';
       show('#coachApp');
       renderCoach();
