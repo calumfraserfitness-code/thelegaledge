@@ -1,6 +1,18 @@
 const SUPABASE_URL = 'https://baxvhilvrhshlfizakak.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_DRoPSo_3TPlU8mMeLQNruw_82hanHNi';
-const db = window.supabase?.createClient?.(SUPABASE_URL, SUPABASE_KEY) ?? null;
+async function secureFetch(input, options = {}) {
+  const url=String(input?.url||input),timeout=url.includes('/auth/v1/')?15000:url.includes('/storage/v1/')?120000:url.includes('/functions/v1/')?100000:25000;
+  const controller=new AbortController(),signal=options.signal;
+  const abort=()=>controller.abort(signal?.reason);
+  if(signal?.aborted)abort();else signal?.addEventListener('abort',abort,{once:true});
+  const timer=setTimeout(()=>controller.abort(),timeout);
+  try{return await fetch(input,{...options,signal:controller.signal});}
+  finally{clearTimeout(timer);signal?.removeEventListener('abort',abort);}
+}
+const db = window.supabase?.createClient?.(SUPABASE_URL, SUPABASE_KEY, {global:{fetch:secureFetch}}) ?? null;
+function withinDeadline(promise,label,ms=15000){let timer;return Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error(label+' took too long. Try again; your saved data is safe.')),ms);})]).finally(()=>clearTimeout(timer));}
+let bootRequest=null;
+function boot(){if(bootRequest)return bootRequest;bootRequest=bootAccount().finally(()=>bootRequest=null);return bootRequest;}
 let recoveryMode = new URLSearchParams(location.hash.slice(1)).get('type') === 'recovery';
 
 const $ = (selector) => document.querySelector(selector);
@@ -28,7 +40,7 @@ const state = {
   profile: null,
   role: null,
   preview: false,
-  coachView: 'clients',
+  coachView: 'dashboard',
   clientView: 'today',
   hasPilot: false,
   selectedSessionId: null,
@@ -104,7 +116,7 @@ function safeStepGoal(client = state.client) {
   const goal = Number(client?.daily_steps_goal);
   return Number.isFinite(goal) && goal > 0 ? goal : 8000;
 }
-function normalizeClient(client){return {...client,display_name:client.display_name||client.profile?.full_name||'Unnamed client',daily_steps_goal:safeStepGoal(client)};}
+function normalizeClient(client){return {...client,display_name:client.display_name||client.profile?.full_name||'Unnamed client',email:client.email||client.profile?.email||null,coach_notes:client.private_details?.coach_notes??client.coach_notes,daily_steps_goal:safeStepGoal(client)};}
 
 async function query(label, promise) {
   const result = await promise;
@@ -113,29 +125,39 @@ async function query(label, promise) {
 }
 
 async function loadCoach() {
-  const [clients, memberships] = await Promise.all([query('Clients', db.from('clients')
-    .select('*,profile:profiles!clients_profile_id_fkey(full_name,email)')
-    .order('start_date')), query('Corporate memberships', db.from('firm_participants').select('client_id'))]);
+  async function allRows(label,build){
+    const rows=[],size=500;
+    for(let offset=0;;offset+=size){const page=await query(label,build().range(offset,offset+size-1));rows.push(...page);if(page.length<size)return rows;}
+  }
+  const account=state.user?.id;
+  const clients=await withinDeadline(allRows('Clients',()=>db.from('clients').select('*').eq('coach_id',account).order('start_date').order('id')),'Client list');
+  state.corporateMemberships=[];
+  if(clients.length)query('Corporate memberships',db.from('firm_participants').select('client_id').in('client_id',clients.map(c=>c.id))).then(rows=>{if(state.user?.id===account&&state.role==='coach')state.corporateMemberships=rows;}).catch(()=>{});
   state.clients = clients.filter(c => c.source_system !== 'coach_health_test').map(normalizeClient);
   state.qaRows = [];
   state.qaStatus = 'loading';
-  state.corporateMemberships = memberships;
-  // Completeness reporting is optional and must never gate successful sign-in.
-  const coachId = state.user?.id;
-  query('Client QA', db.from('client_qa_summary').select('*')).then(rows => {
-    if (state.user?.id !== coachId || state.preview || state.role !== 'coach') return;
-    state.qaRows = rows.filter(row => state.clients.some(c => c.id === row.client_id));
-    state.qaStatus = 'ready';
-    if (!$('#coachApp').classList.contains('hidden')) renderCoach();
-  }).catch(() => {
-    if (state.user?.id !== coachId || state.preview || state.role !== 'coach') return;
-    state.qaStatus = 'unavailable';
-    if (!$('#coachApp').classList.contains('hidden')) renderCoach();
-  });
+
+  // A slow optional completeness report must never turn a valid sign-in into an error.
+  const controller = new AbortController();
+  const deadline = setTimeout(() => controller.abort(), 8000);
+  query('Client QA', db.from('client_qa_summary').select('*').abortSignal(controller.signal))
+    .then(rows => {
+      if (state.user?.id !== account || state.role !== 'coach') return;
+      state.qaRows = rows.filter(row => state.clients.some(c => c.id === row.client_id));
+      state.qaStatus = 'ready';
+    }).catch(() => {
+      if (state.user?.id === account && state.role === 'coach') state.qaStatus = 'unavailable';
+    }).finally(() => {
+      clearTimeout(deadline);
+      if (state.user?.id === account && state.role === 'coach' && !state.client && state.coachView === 'dashboard' && !document.activeElement?.matches('input,textarea,select')) renderCoach();
+    });
 }
 
+let clientDataLoadSequence = 0;
 async function loadClientData(clientId) {
   const clientAtStart = clientId;
+  const loadSequence = ++clientDataLoadSequence, accountAtStart = state.user?.id, roleAtStart = state.role;
+  const currentLoad = () => loadSequence === clientDataLoadSequence && state.client?.id === clientAtStart && state.user?.id === accountAtStart && state.role === roleAtStart;
   const requests = await Promise.all([
     query('Weeks', db.from('program_weeks').select('*').eq('client_id', clientId).order('week_start', { ascending: false }).limit(104)),
     query('Programmes', db.from('training_programs').select('*,days:training_program_days(*,exercises:program_exercises(*,bank:exercise_bank(video_url,image_url,instructions)))').eq('client_id', clientId).order('created_at', { ascending: false })),
@@ -155,10 +177,12 @@ async function loadClientData(clientId) {
     query('Imported workouts', db.from('client_health_workouts').select('*').eq('client_id', clientId).order('started_at', { ascending: false }).limit(100)),
     query('Health imports', db.from('client_health_imports').select('*').eq('client_id', clientId).order('imported_at', { ascending: false }).limit(20)),
     state.role === 'coach' ? query('Exercise Bank', db.from('exercise_bank').select('*').order('name').limit(1000)) : Promise.resolve([]),
+    state.role==='coach'?query('Private client details',db.from('client_private_details').select('coach_notes').eq('client_id',clientId)):Promise.resolve([]),
     Promise.resolve([]) // Meal bank is searched on demand by meal-library.js.
   ]);
-  if (state.client?.id !== clientAtStart) return;
-  const [weeks, programs, nutritionPlans, habits, steps, checkins, progress, onboarding, legal, diagnostics, files, mealAssignments, exerciseLogs, healthConnections, healthDaily, healthWorkouts, healthImports, exerciseBank, mealBank] = requests;
+  if (!currentLoad()) return false;
+  const [weeks, programs, nutritionPlans, habits, steps, checkins, progress, onboarding, legal, diagnostics, files, mealAssignments, exerciseLogs, healthConnections, healthDaily, healthWorkouts, healthImports, exerciseBank, privateDetails, mealBank] = requests;
+  if(state.role==='coach')state.client.coach_notes=privateDetails[0]?.coach_notes||'';
   let sessions = [];
   let exercises = [];
   let nutritionDays = [];
@@ -172,10 +196,11 @@ async function loadClientData(clientId) {
     if (sessions.length) exercises = await query('Exercises', db.from('exercises').select('*').in('session_id', sessions.map((s) => s.id)).order('sort_order'));
     if (nutritionDays.length) meals = await query('Meals', db.from('meals').select('*').in('nutrition_day_id', nutritionDays.map((d) => d.id)).order('sort_order'));
   }
-  if (state.client?.id !== clientAtStart) return;
+  if (!currentLoad()) return false;
   const recoveredExercises = programs.flatMap((program) => (program.days || []).flatMap((day) => day.exercises || []));
   const exerciseIndex = new Map([...recoveredExercises, ...exercises].map((exercise) => [exercise.id, exercise]));
   state.data = { weeks, programs, nutritionPlans, habits, habitLogs: [], steps, checkins, progress, onboarding, legal, diagnostics, files, mealAssignments, exerciseLogs, exerciseBank, mealBank, healthConnections, healthDaily, healthWorkouts, healthImports, sessions, exercises: [...exerciseIndex.values()], nutritionDays, meals };
+  return true;
 }
 
 function demoData() {
@@ -199,20 +224,21 @@ function demoData() {
   };
 }
 
-async function boot() {
+async function bootAccount() {
   try {
     if (new URLSearchParams(location.search).get('onboarding') === 'demo'||new URLSearchParams(location.search).get('pilot') === 'demo'||new URLSearchParams(location.search).get('workspace') === 'demo') return;
     if (!db) throw new Error('The secure connection did not load. Refresh the page.');
     if (recoveryMode) return show('#recovery');
-    const { data: { user } } = await db.auth.getUser();
+    const { data: { user },error:authError } = await withinDeadline(db.auth.getUser(),'Secure sign-in');
+    if(authError&&authError.name!=='AuthSessionMissingError')throw authError;
     if (recoveryMode) return show('#recovery');
     if (!user) return show('#auth');
     state.user = user;
-    state.profile = await query('Profile', db.from('profiles').select('*').eq('id', user.id).single());
+    state.profile = await withinDeadline(query('Profile', db.from('profiles').select('*').eq('id', user.id).single()),'Account profile');
     state.role = state.profile.role;
     if (state.role === 'coach') {
       await loadCoach();
-      state.coachView = new URLSearchParams(location.search).get('section') === 'corporate' ? 'firms' : 'clients';
+      state.coachView = new URLSearchParams(location.search).get('section') === 'corporate' ? 'firms' : 'dashboard';
       $('#coachName').textContent = state.profile.full_name || 'Coach';
       show('#coachApp');
       renderCoach();
@@ -237,6 +263,7 @@ async function boot() {
 }
 
 function preview(role) {
+  if (window.legalEdgeProduction) return;
   state.preview = true;
   state.role = role;
   const demoClient = {
@@ -273,7 +300,7 @@ function clientRows(clients) {
     <span class="avatar">${esc(client.display_name.split(' ').map((part) => part[0]).slice(0, 2).join(''))}</span>
     <span><span class="name">${esc(client.display_name)}</span><span class="sub">${esc(title(client.status || 'active'))} · ${client.weight_unit === 'lbs' ? 'US / lb' : 'Ireland / kg'}</span></span>
     <span class="hide-mobile"><span class="sub">Daily steps</span>${safeStepGoal(client).toLocaleString()}</span>
-    <span class="hide-mobile"><span class="sub">Goal</span>${client.track_weight === false ? 'Performance / health' : (client.goal_weight_kg ? `${Number(client.goal_weight_kg) * (client.weight_unit === 'lbs' ? 2.20462 : 1) | 0} ${client.weight_unit === 'lbs' ? 'lb' : 'kg'}` : 'Not set')}</span>
+    <span class="hide-mobile"><span class="sub">Goal</span>${client.track_weight === false ? 'Performance / health' : (client.goal_weight_kg ? `${Math.round(Number(client.goal_weight_kg) * (client.weight_unit === 'lbs' ? 2.20462 : 1))} ${client.weight_unit === 'lbs' ? 'lb' : 'kg'}` : 'Not set')}</span>
     <span class="status">Open</span>
   </button>`).join('');
 }
@@ -330,7 +357,7 @@ function directCoachingClients() {
 
 function renderRoster() {
   const clients = directCoachingClients();
-  const past = client => ['past','inactive'].includes(client.status) || Boolean(client.archived_at);
+  const past = client => ['past','inactive','archived'].includes(client.status) || Boolean(client.archived_at);
   const current = clients.filter(client => !past(client));
   const historical = clients.filter(past);
   $('#coachMain').innerHTML = pageHead('1-TO-1 COACHING', '1-to-1 Clients', '<input id="clientSearch" class="search" placeholder="Search your clients…"><button class="btn primary" data-add-client>+ Add client</button>') + `<section class="panel"><div class="panel-head"><div><h3>Current clients · ${current.length}</h3><p class="muted">Your personal coaching roster. Firm participants are managed in Corporate.</p></div></div>${clientRows(current)}</section>${historical.length ? `<details class="le-fold" id="pastClientRoster"><summary>Past clients · ${historical.length}</summary><section class="panel">${clientRows(historical)}</section></details>` : ''}`;
@@ -348,19 +375,28 @@ function bindAddClient() { $$('[data-add-client]').forEach((button) => button.on
 
 function showAddClient() {
   const modal = document.createElement('div'); modal.className='modal-backdrop';
-  modal.innerHTML=`<section class="modal-card"><div class="panel-head"><div><span class="eyebrow">5-MINUTE SETUP</span><h2>Add a client</h2></div><button class="icon-btn" data-close-modal>✕</button></div><form id="addClientForm" class="editor-grid"><label>Full name<input name="full_name" required></label><label>Email<input name="email" type="email" required></label><label>Phone<input name="phone" type="tel"></label><label>Temporary password<input name="password" type="password" minlength="12" autocomplete="new-password" required></label><label>Region<select name="market_region"><option value="us">United States · lb/oz</option><option value="ireland">Ireland · kg/g</option><option value="uk">United Kingdom</option><option value="other">Other</option></select></label><label>Check-in day<select name="checkin_day">${DAYS.map((day,index)=>`<option value="${index}" ${index===5?'selected':''}>${day}</option>`).join('')}</select></label><label>Daily steps<input name="daily_steps_goal" type="number" min="1" step="1" value="8000"></label><label>Starting weight<input name="start_weight_display" type="number" min="1" step="0.1" required></label><label class="wide">Goals<textarea name="goal_summary" rows="3" required></textarea></label><label class="toggle-field"><input name="cardio_enabled" type="checkbox"> Cardio required</label><label class="toggle-field"><input name="mobility_enabled" type="checkbox" checked> Mobility required</label><p class="wide muted">The client must accept legal/privacy terms and complete onboarding before their plan unlocks.</p><button class="btn primary wide">Create secure client login</button></form></section>`;
+  modal.innerHTML=`<section class="modal-card"><div class="panel-head"><div><span class="eyebrow">CLIENT SETUP</span><h2>Create login & start onboarding</h2></div><button class="icon-btn" data-close-modal>✕</button></div><form id="addClientForm" class="editor-grid"><label>Full name<input name="full_name" autocomplete="name" required></label><label>Email<input name="email" type="email" autocomplete="email" required></label><label>Region<select name="market_region"><option value="us">United States · lb/oz</option><option value="ireland">Ireland · kg/g</option><option value="uk">United Kingdom</option><option value="other">Other</option></select></label><input name="password" type="hidden"><label class="toggle-field wide"><input name="start_onboarding" type="checkbox" checked>Start their welcome and coaching profile immediately</label><p class="wide muted">Your saved, approved agreement and privacy notice are used. Payment is handled on your call. Share the login details after creation; no invitation email is sent automatically.</p><details class="wide"><summary>Optional coaching defaults</summary><label>Phone<input name="phone" type="tel"></label><label>Check-in day<select name="checkin_day">${DAYS.map((day,index)=>`<option value="${index}" ${index===5?'selected':''}>${day}</option>`).join('')}</select></label><label>Daily steps<input name="daily_steps_goal" type="number" min="1" step="1" value="8000"></label><label>Starting weight<input name="start_weight_display" type="number" min="1" step="0.1"></label><label>Goals<textarea name="goal_summary" rows="3"></textarea></label><label class="toggle-field"><input name="cardio_enabled" type="checkbox"> Cardio required</label><label class="toggle-field"><input name="mobility_enabled" type="checkbox" checked> Mobility required</label></details><button class="btn primary wide">Create login & onboarding</button></form></section>`;
+  modal.querySelector('[name=password]').value=Array.from(crypto.getRandomValues(new Uint8Array(18)),n=>n.toString(16).padStart(2,'0')).join('');
   document.body.append(modal); modal.querySelector('[data-close-modal]').onclick=()=>modal.remove(); modal.onclick=(e)=>{if(e.target===modal)modal.remove();}; modal.querySelector('form').onsubmit=createClientAccount;
 }
 
 async function createClientAccount(event) {
-  event.preventDefault(); const fd=new FormData(event.target); const payload=Object.fromEntries(fd.entries()); payload.cardio_enabled=fd.has('cardio_enabled'); payload.mobility_enabled=fd.has('mobility_enabled'); payload.daily_steps_goal=Number(payload.daily_steps_goal); payload.checkin_day=Number(payload.checkin_day); payload.start_weight_display=Number(payload.start_weight_display);
+  event.preventDefault(); const fd=new FormData(event.target); const payload=Object.fromEntries(fd.entries()); payload.cardio_enabled=fd.has('cardio_enabled'); payload.mobility_enabled=fd.has('mobility_enabled'); payload.daily_steps_goal=Number(payload.daily_steps_goal); payload.checkin_day=Number(payload.checkin_day); payload.start_weight_display=payload.start_weight_display===''?null:Number(payload.start_weight_display);payload.start_onboarding=fd.has('start_onboarding');
   setBusy(event.submitter,true);
   try {
     if (state.preview) {
       state.clients.unshift(normalizeClient({id:`preview-${Date.now()}`,display_name:payload.full_name,email:payload.email,phone:payload.phone,market_region:payload.market_region,status:'active',daily_steps_goal:payload.daily_steps_goal,checkin_day:payload.checkin_day,goal_summary:payload.goal_summary,cardio_enabled:payload.cardio_enabled,mobility_enabled:payload.mobility_enabled,onboarding_status:'pending',plan_status:'draft'}));
       event.target.closest('.modal-backdrop').remove(); toast('Preview client created locally'); renderCoach(); return;
     }
-    const client = await provisionClientAccount(payload); state.clients.unshift(normalizeClient(client)); event.target.closest('.modal-backdrop').remove(); toast('Client login created'); renderCoach();
+    const coachId=state.user?.id;
+    const client = await provisionClientAccount(payload);if(state.user?.id!==coachId)return;state.clients.unshift(normalizeClient(client));
+    const modal=event.target.closest('.modal-backdrop');renderCoach();
+    modal.querySelector('.modal-card').innerHTML=`<div class="panel-head"><h2>Client login created</h2><button class="icon-btn" data-close-modal>✕</button></div><p>${payload.start_onboarding?'Their first sign-in opens a personal welcome, then the agreement and coaching profile.':'Their first sign-in opens the existing onboarding flow.'} No email has been sent.</p><label>Email<input readonly value="${esc(payload.email)}"></label><label>Temporary password<input type="password" readonly autocomplete="off" id="createdClientPassword"></label><button class="btn ghost" type="button" id="revealClientPassword">Show password</button><p>Share these details privately with your client. You can copy them now; the password is not saved in your browser.</p><a class="btn ghost" href="https://legal-edge-client-app.vercel.app/" target="_blank" rel="noopener">Open client sign-in</a><button class="btn primary" type="button" id="copyClientAccess">Copy login details</button><p id="clientAccessStatus" role="status"></p>`;
+    modal.querySelector('#createdClientPassword').value=payload.password;
+    modal.querySelector('[data-close-modal]').onclick=()=>modal.remove();
+    modal.querySelector('#revealClientPassword').onclick=e=>{const p=modal.querySelector('#createdClientPassword');p.type=p.type==='password'?'text':'password';e.target.textContent=p.type==='password'?'Show password':'Hide password';};
+    modal.querySelector('#copyClientAccess').onclick=async()=>{try{await navigator.clipboard.writeText(`Your Legal Edge account is ready.\nSign in: https://legal-edge-client-app.vercel.app/\nEmail: ${payload.email}\nTemporary password: ${payload.password}\nComplete your agreement and coaching profile after signing in.`);modal.querySelector('#clientAccessStatus').textContent='Copied. Share privately with this client.';}catch{modal.querySelector('#clientAccessStatus').textContent='Copy unavailable. Select the details above.';}};
+
   }
   catch(error){toast(error.message||'Could not create client','error');setBusy(event.submitter,false);}
 }
@@ -922,7 +958,7 @@ function nutritionUnit(amount, unit) {
   const raw = `${amount}${unit ? ` ${unit}` : ''}`;
   if (!Number.isFinite(n)) return raw;
   const us = (state.foodUnits || (state.client?.weight_unit === 'lbs' ? 'us' : 'metric')) === 'us';
-  const rounded = value => Number(value.toFixed(2));
+  const rounded = value => Number(value.toFixed(1));
   if (us) {
     if (u === 'g') return `${rounded(n / 28.349523125)} oz`;
     if (u === 'kg') return `${rounded(n * 35.27396195)} oz`;
@@ -1242,10 +1278,23 @@ async function addCoachProgress(event) {
 }
 
 function progressData() {
-  const entries = [...state.data.progress].filter((entry) => entry.weight_kg != null).sort((a, b) => String(a.entry_date).localeCompare(String(b.entry_date)));
+  // Include weights recorded in check-ins even when no separate progress row exists.
+  const byDate = new Map();
+  for (const row of [...(state.data.checkins || [])].sort((a,b) => String(a.submitted_at).localeCompare(String(b.submitted_at)))) {
+    if (row.client_id && row.client_id !== state.client.id) continue;
+    const date = String(row.submitted_at || '').slice(0,10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(date) && row.weight_kg != null && row.weight_kg !== '' && Number.isFinite(Number(row.weight_kg)) && Number(row.weight_kg)>0)
+      byDate.set(date, {entry_date:date, weight_kg:Number(row.weight_kg), source:'checkin'});
+  }
+  for (const row of state.data.progress || []) {
+    if (row.client_id && row.client_id !== state.client.id) continue;
+    if (row.entry_date && row.weight_kg != null && row.weight_kg !== '' && Number.isFinite(Number(row.weight_kg)) && Number(row.weight_kg)>0)
+      byDate.set(String(row.entry_date).slice(0,10),row);
+  }
+  const entries = [...byDate.values()].sort((a,b) => String(a.entry_date).localeCompare(String(b.entry_date)));
   const start = Number(state.client.start_weight_kg ?? entries[0]?.weight_kg);
   const current = Number(entries.at(-1)?.weight_kg);
-  const goal = Number(state.client.goal_weight_kg);
+  const goal = state.client.goal_weight_kg == null || state.client.goal_weight_kg === '' || Number(state.client.goal_weight_kg) <= 0 ? NaN : Number(state.client.goal_weight_kg);
   const change = Number.isFinite(start) && Number.isFinite(current) ? current - start : null;
   const remaining = Number.isFinite(goal) && Number.isFinite(current) ? goal - current : null;
   const journey = Number.isFinite(goal) && Number.isFinite(start) ? goal - start : null;
@@ -1260,11 +1309,43 @@ function rangeEntries(entries) {
   return entries.filter((entry) => new Date(`${entry.entry_date}T12:00:00`) >= cutoff);
 }
 
+function strengthProgressMarkup() {
+  const exerciseNames = new Map((state.data.exercises || []).map((exercise) => [exercise.id, exercise.name]));
+  const groups = new Map();
+  for (const log of state.data.exerciseLogs || []) {
+    if (log.client_id && log.client_id !== state.client.id) continue;
+    const load = Number(log.load), reps = Number(log.reps);
+    if (!finiteRecorded(log.load) || load < 0 || !Number.isFinite(reps) || reps <= 0 || !log.performed_at) continue;
+    const name = String(log.exercise_name || exerciseNames.get(log.program_exercise_id) || 'Exercise').trim();
+    const unit = String(log.load_unit || (state.client.weight_unit === 'lbs' ? 'lb' : 'kg'));
+    const key = `${name.toLowerCase()}|${unit}`;
+    if (!groups.has(key)) groups.set(key, { name, unit, rows: [] });
+    groups.get(key).rows.push({ ...log, load, reps, estimate: load * (1 + reps / 30) });
+  }
+  const exercises = [...groups.values()].map((group) => {
+    const bestByDay = new Map();
+    for (const row of group.rows.sort((a, b) => String(a.performed_at).localeCompare(String(b.performed_at)))) {
+      const day = String(row.performed_at).slice(0, 10), saved = bestByDay.get(day);
+      if (!saved || row.estimate > saved.estimate) bestByDay.set(day, row);
+    }
+    const rows = [...bestByDay.values()], latest = rows.at(-1), previous = rows.at(-2);
+    return { ...group, allRows: group.rows, rows, latest, previous, lastAt: latest?.performed_at || '' };
+  }).sort((a, b) => String(b.lastAt).localeCompare(String(a.lastAt)));
+  if (!exercises.length) return `<section class="panel strength-progress"><div class="panel-head"><div><h3>Strength progress</h3><span class="sub">Your best working sets appear here automatically</span></div></div><div class="empty"><b>No strength sets logged yet.</b><p>Save the weight and reps after a workout to start the chart. No unverified history is shown or invented.</p></div></section>`;
+  const cards = exercises.map((exercise) => {
+    const change = exercise.previous ? exercise.latest.estimate - exercise.previous.estimate : null;
+    return `<article><span class="eyebrow">${esc(fmt(exercise.latest.performed_at))}</span><h4>${esc(exercise.name)}</h4><strong>${exercise.latest.load.toLocaleString(undefined,{maximumFractionDigits:1})} ${esc(exercise.unit)} × ${exercise.latest.reps.toLocaleString(undefined,{maximumFractionDigits:1})}</strong>${exercise.previous ? `<small>Previous best ${exercise.previous.load.toLocaleString(undefined,{maximumFractionDigits:1})} ${esc(exercise.unit)} × ${exercise.previous.reps.toLocaleString(undefined,{maximumFractionDigits:1})} · ${change >= 0 ? '+' : ''}${change.toFixed(1)} estimated</small>` : '<small>First recorded baseline</small>'}<p class="muted">Weight used (${esc(exercise.unit)})</p>${chart(exercise.rows.map(row=>row.load))}<p class="muted">Reps at that weight</p>${chart(exercise.rows.map(row=>row.reps))}<details><summary>All recorded sets</summary>${exercise.allRows.slice().reverse().map(row=>`<div class="note-row"><b>${esc(fmt(row.performed_at))} · Set ${esc(row.set_number??'—')}</b><span>${esc(row.load)} ${esc(exercise.unit)} × ${esc(row.reps)} reps</span></div>`).join('')}</details></article>`;
+  });
+  return `<section class="panel strength-progress"><div class="panel-head"><div><h3>Strength progress</h3><span class="sub">Best estimated set per day; charts show its recorded weight and reps</span></div></div><div class="strength-progress-grid">${cards.slice(0,6).join('')}</div>${cards.length>6?'<details class="strength-more"><summary>More exercise charts · '+(cards.length-6)+'</summary><div class="strength-progress-grid">'+cards.slice(6).join('')+'</div></details>':''}</section>`;
+}
+
 function progressDashboardMarkup() {
   const model = progressData(), shown = rangeEntries(model.entries), factor = state.client.weight_unit === 'lbs' ? 2.20462 : 1;
   const value = (kg, signed = false) => Number.isFinite(kg) ? displayWeight(kg, signed) : '—';
+  const previous = model.entries.at(-2)?.weight_kg == null ? NaN : Number(model.entries.at(-2).weight_kg);
+  const sincePrevious = Number.isFinite(model.current) && Number.isFinite(previous) ? model.current - previous : NaN;
   const measures = ['waist_cm','chest_cm','hips_cm','arm_cm','thigh_cm'].map((key) => { const rows = state.data.progress.filter((entry) => entry[key] != null).sort((a,b) => String(a.entry_date).localeCompare(String(b.entry_date))); return rows.length ? { name: title(key.replace('_cm','')), start: Number(rows[0][key]), current: Number(rows.at(-1)[key]) } : null; }).filter(Boolean);
-  return `<div class="progress-hero"><div><span>Current</span><strong>${value(model.current)}</strong><small>${model.entries.at(-1) ? `Latest weigh-in ${fmt(model.entries.at(-1).entry_date)}` : 'No weigh-ins'}</small></div><div class="goal-progress"><span>Goal progress</span><strong>${model.progress == null ? '—' : `${model.progress}%`}</strong><div class="progress-bar"><i style="width:${model.progress || 0}%"></i></div></div></div><div class="progress-metrics"><div><span>Start</span><strong>${value(model.start)}</strong></div><div><span>Total change</span><strong>${value(model.change, true)}</strong></div><div><span>Goal</span><strong>${value(model.goal)}</strong></div><div><span>To goal</span><strong>${value(model.remaining, true)}</strong></div><div><span>Weekly rate</span><strong>${value(model.weeklyRate, true)}</strong></div><div><span>Weigh-ins</span><strong>${model.entries.length}</strong></div></div><section class="panel"><div class="panel-head"><h3>Weight trend</h3><div class="range-tabs">${['4','8','12','all'].map((range) => `<button data-progress-range="${range}" class="${state.progressRange === range ? 'active' : ''}">${range === 'all' ? 'All time' : `${range} weeks`}</button>`).join('')}</div></div>${chart(shown.map((entry) => Number(entry.weight_kg) * factor))}<div>${shown.slice().reverse().map((entry) => `<div class="note-row"><b>${fmt(entry.entry_date)}</b><span>${displayWeight(entry.weight_kg)}${entry.waist_cm ? ` · Waist ${entry.waist_cm} cm` : ''}</span></div>`).join('') || '<div class="empty">No entries in this range.</div>'}</div></section>${measures.length ? `<section class="panel measurement-panel"><div class="panel-head"><h3>Measurements</h3></div><div class="measurement-grid">${measures.map((measure) => `<div><span>${measure.name}</span><strong>${measure.current} cm</strong><small>${measure.start} cm start · ${(measure.current - measure.start).toFixed(1)} cm</small></div>`).join('')}</div></section>` : ''}${milestones()}`;
+  return `<div class="progress-hero"><div><span>Current</span><strong>${value(model.current)}</strong><small>${model.entries.at(-1) ? `Latest weigh-in ${fmt(model.entries.at(-1).entry_date)}` : 'No weigh-ins'}</small></div><div class="goal-progress"><span>Goal progress</span><strong>${model.progress == null ? '—' : `${model.progress}%`}</strong><div class="progress-bar"><i style="width:${model.progress || 0}%"></i></div></div></div><div class="progress-metrics"><div><span>Previous</span><strong>${value(previous)}</strong></div><div><span>Since previous</span><strong>${value(sincePrevious, true)}</strong></div><div><span>Start</span><strong>${value(model.start)}</strong></div><div><span>Total change</span><strong>${value(model.change, true)}</strong></div><div><span>Goal</span><strong>${value(model.goal)}</strong></div><div><span>To goal</span><strong>${value(model.remaining, true)}</strong></div><div><span>Weekly rate</span><strong>${value(model.weeklyRate, true)}</strong></div><div><span>Weigh-ins</span><strong>${model.entries.length}</strong></div></div><section class="panel"><div class="panel-head"><h3>Weight trend</h3><div class="range-tabs">${['4','8','12','all'].map((range) => `<button data-progress-range="${range}" class="${state.progressRange === range ? 'active' : ''}">${range === 'all' ? 'All time' : `${range} weeks`}</button>`).join('')}</div></div>${chart(shown.map((entry) => Number(entry.weight_kg) * factor))}<div>${shown.slice().reverse().map((entry) => `<div class="note-row"><b>${fmt(entry.entry_date)}</b><span>${displayWeight(entry.weight_kg)}${entry.waist_cm ? ` · Waist ${entry.waist_cm} cm` : ''}</span></div>`).join('') || '<div class="empty">No entries in this range.</div>'}</div></section>${strengthProgressMarkup()}${measures.length ? `<section class="panel measurement-panel"><div class="panel-head"><h3>Measurements</h3></div><div class="measurement-grid">${measures.map((measure) => `<div><span>${measure.name}</span><strong>${measure.current} cm</strong><small>${measure.start} cm start · ${(measure.current - measure.start).toFixed(1)} cm</small></div>`).join('')}</div></section>` : ''}${milestones()}`;
 }
 
 function bindProgressRange(render) { $$('[data-progress-range]').forEach((button) => button.onclick = () => { state.progressRange = button.dataset.progressRange; render(); }); }
@@ -1389,7 +1470,7 @@ function clientToday() {
 }
 
 function milestones() {
-  const entries = [...state.data.progress].filter((entry) => entry.weight_kg != null).sort((a, b) => String(a.entry_date).localeCompare(String(b.entry_date)));
+  const entries = progressData().entries;
   const latest = entries.at(-1)?.weight_kg;
   const loss = latest != null && state.client.start_weight_kg != null ? (Number(state.client.start_weight_kg) - Number(latest)) * (state.client.weight_unit === 'lbs' ? 2.20462 : 1) : 0;
   const checkins = state.data.checkins;
@@ -1595,8 +1676,9 @@ async function hydrateProgressPhotos() {
   if (!db || state.preview) return;
   for (const card of $$('[data-photo-path]')) {
     const { data, error } = await db.storage.from('client-files').createSignedUrl(card.dataset.photoPath, 900);
-    if (!error && data?.signedUrl) card.querySelector('.photo-placeholder').outerHTML = `<img src="${esc(data.signedUrl)}" alt="Private progress photo" loading="lazy">`;
-    else card.querySelector('.photo-placeholder').textContent = 'Photo unavailable';
+    const placeholder=card.querySelector('.photo-placeholder');if(!card.isConnected||!placeholder)continue;
+    if (!error && data?.signedUrl) placeholder.outerHTML = `<img src="${esc(data.signedUrl)}" alt="Private progress photo" loading="lazy">`;
+    else placeholder.textContent = 'Photo unavailable';
   }
 }
 
@@ -1643,13 +1725,22 @@ function clientDiagnostics() {
 }
 
 function bindShell() {
+  if ($('#authMsg').textContent === 'Loading secure sign-in…') $('#authMsg').textContent = '';
   $('#loginForm').onsubmit = async (event) => {
     event.preventDefault();
     $('#authMsg').textContent = 'Signing in…';
     if (!db) return $('#authMsg').textContent = 'Secure login failed to load. Refresh the page.';
-    const { error } = await db.auth.signInWithPassword({ email: $('#email').value.trim(), password: $('#password').value });
-    if (error) return $('#authMsg').textContent = error.message;
-    await boot();
+    const button=event.submitter||$('#loginForm button[type="submit"]');
+    if(button?.disabled)return;
+    setBusy(button,true,'Signing in…');
+    try{
+      const { error } = await withinDeadline(db.auth.signInWithPassword({ email: $('#email').value.trim().toLowerCase(), password: $('#password').value }),'Sign-in request');
+      if(error)throw error;
+      $('#authMsg').textContent='Opening your coaching workspace…';
+      await boot();
+    }catch(error){$('#authMsg').textContent=/abort|timeout|fetch|network/i.test(error.message||'')?'The connection timed out. Your records are safe. Tap Sign in to retry.':error.message||'Sign-in could not complete. Try again.';}
+    finally{setBusy(button,false);}
+
   };
   $('#resetBtn').onclick = async () => {
     const email = $('#email').value.trim();

@@ -1,0 +1,22 @@
+name: Validate prepared Apple steps shortcut
+on:
+  push:
+    branches: [release/daily-nutrition-20261009]
+    paths: ['client-app-v3/shortcuts/**', '.github/workflows/apple-steps-shortcut.yml']
+  pull_request:
+    paths: ['client-app-v3/shortcuts/**', '.github/workflows/apple-steps-shortcut.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: macos-15
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Validate prepared plist
+        run: plutil -lint client-app-v3/shortcuts/Legal-Edge-Steps.unsigned.shortcut
+      - name: Explain device release gate
+        run: echo 'Apple signing requires an iCloud-signed-in Mac. Use the included Mac helper, then verify on a physical iPhone before client rollout.'

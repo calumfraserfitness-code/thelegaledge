@@ -1,0 +1,26 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert'),{JSDOM}=require('jsdom');
+const dom=new JSDOM('<main id="coachMain"></main>',{runScripts:'outside-only'}),w=dom.window;
+Object.assign(w,{$:s=>w.document.querySelector(s),state:{role:'coach',client:null,coachView:'dashboard',user:{id:'coach-a'}},renderCoach(){}});
+vm.runInContext(fs.readFileSync(__dirname+'/../coach-home-focus.js','utf8'),dom.getInternalVMContext());
+const host=w.$('#coachMain');
+host.innerHTML='<header class="page-head">Directory</header><div class="stats">9 clients</div><section class="panel" id="priorityAttention"><h2>Needs attention</h2><button id="review">Review</button></section><section id="coachActivity"><button id="activityRetry">Refresh</button></section><section id="psInbox"><button id="intake">Review answers</button></section><section id="bwCoachQueue">Busy week</section><section id="psWatchFeed"><div class="ps-watch-grid"><article><strong>No receipt</strong><small>No automatic phone upload received yet</small></article><article><strong>Recorded zero</strong><small>Phone upload received yesterday</small><dl><dd>0</dd></dl></article></div></section><section class="panel"><h3>Client plan QA</h3><div class="qa-table">Plan checks</div></section>';
+let clicks=0;w.$('#activityRetry').onclick=()=>clicks++;
+(async()=>{
+ w.CoachHomeFocus.mount();assert(w.$('[data-home-primary] #priorityAttention'));assert(w.$('[data-home-content="activity"] #coachActivity'));assert(w.$('[data-home-content="setup"] #psInbox'));assert(w.$('[data-home-content="setup"] .qa-table'));assert(w.$('[data-home-content="watch"] #psWatchFeed'));
+ assert.equal(w.$('details[open]'),null);assert(w.$('.ps-watch-grid article').hidden);assert(!w.$('.ps-watch-grid article:last-child').hidden,'real zero reading is preserved');w.$('#activityRetry').click();assert.equal(clicks,1,'moving retains handlers');
+ w.state.clients=[{id:'disabled',portal_enabled:false},{id:'live',portal_enabled:true}];
+ w.$('#priorityAttention').innerHTML='<div data-priority-status><article class="priority-issue">Overdue<button data-priority-client="live"></button></article><article class="priority-issue">Setup<button data-priority-client="disabled"></button></article><article class="priority-issue">Check-in ready to review<button data-priority-client="live"></button></article><small>Checked today</small></div>';
+ await new Promise(r=>setTimeout(r,20));assert(w.$('[data-home-pending-setup] .priority-issue').textContent.includes('Setup'));assert(w.$('[data-priority-status] > .priority-issue').textContent.includes('ready to review'));
+ w.CheckinStatus={stamp:(v,z)=>v+' · '+z};w.state.clients.find(c=>c.id==='live').display_name='Client <safe>';
+ w.$('#priorityAttention').dataset.homeCheckins=JSON.stringify({available:true,checked_at:'2026-10-31T16:00:00Z',rows:[{client_id:'live',submitted_at:'2026-10-30T14:20:36Z',reviewed_at:null},{client_id:'peer',submitted_at:'2026-10-31T14:00:00Z'}]});w.CoachHomeFocus.arrange();
+ assert(w.$('[data-home-checkins]').textContent.includes('1 check-in ready'));assert(w.$('[data-home-checkins]').textContent.includes('2026-10-30T14:20:36Z'));assert(w.$('[data-home-checkins]').innerHTML.includes('Client &lt;safe&gt;'));assert.equal(w.$('[data-home-checkins]').querySelectorAll('article').length,1);assert(w.$('[data-priority-status] > .priority-issue').hidden);
+ w.$('#priorityAttention').dataset.homeCheckins=JSON.stringify({available:false,rows:[]});w.CoachHomeFocus.arrange();assert(w.$('[data-home-checkins]').textContent.includes('status unavailable'));assert(!w.$('[data-home-checkins]').textContent.includes('0 check-ins'));
+ const activity=w.$('[data-home-group="activity"]');activity.open=true;
+ const fresh=w.document.createElement('section');fresh.id='coachActivity';fresh.textContent='Refreshed';w.$('#coachActivity').remove();host.prepend(fresh);
+ await new Promise(r=>setTimeout(r,20));assert.equal(w.$('[data-home-content="activity"] #coachActivity'),fresh);assert(activity.open,'refresh does not close an open tool');
+ const empty=w.$('#psWatchFeed');empty.innerHTML='<div class="ps-watch-grid"><article><small>No automatic phone upload received yet</small></article></div>';await new Promise(r=>setTimeout(r,20));assert(w.$('[data-home-watch-empty]').textContent.includes('No client readings'));assert(w.$('.ps-watch-grid article').hidden);
+ const stale=w.$('[data-home-route="clients"]');w.state.user.id='coach-b';stale.click();assert.equal(w.state.coachView,'dashboard');
+ w.state.coachView='clients';host.innerHTML='<p id="roster">Roster is unchanged</p>';w.CoachHomeFocus.mount();assert(w.$('#roster'));assert(!w.$('#coachHomeFocus'));
+ w.state.role='client';w.state.coachView='dashboard';w.CoachHomeFocus.arrange();assert(!w.$('#coachHomeFocus'));
+ dom.window.close();console.log('PASS coach action-first Home, collapsed tools, preserved handlers, late refresh, real zero, missing watch, account guard and other views');
+})().catch(e=>{console.error(e);dom.window.close();process.exitCode=1;});
