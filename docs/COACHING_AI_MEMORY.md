@@ -1,5 +1,7 @@
 # Legal Edge operating memory
 
+Test layout extensions together at phone widths. Independent mutation observers must respect one DOM owner per panel: the legacy mobile collapse wrapper skips Coach Home-owned panels. Isolated passing tests can miss a cross-module move/re-wrap loop; assert the combined DOM settles after asynchronous updates.
+
 Check-in visibility must show the saved submission timestamp, pending/Reviewed state and explicit current-week scope. A failed or capped read must not show zero. Push jobs with zero attempts may simply have no enabled recipient subscription: inspect the scheduler and claim predicate before diagnosing a failed worker. An unsigned steps shortcut is not an installable phone sync; a saved food-provider key is not evidence of billing readiness or a working search.
 
 Coach Home is one action inbox, not repeated rosters. Keep Needs attention visible; preserve activity, setup, watch status and directory tools behind closed disclosures. Move existing DOM nodes rather than rebuilding their handlers. Async refreshes must return to the same disclosure without closing it. Suppress empty watch cards, never genuine recorded zero readings; no receipt remains explicitly unconnected, not a successful sync.
