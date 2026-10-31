@@ -46,6 +46,7 @@
     ]);if(!active())return;
     const capped=results.some((r,i)=>r.status==='fulfilled'&&r.value.length>=(i?500:1000));
     const checks=results[0].status==='fulfilled'&&results[0].value.length<1000?results[0].value:null,weeks=results[1].status==='fulfilled'&&results[1].value.length<500?results[1].value:null;
+    panel.dataset.homeCheckins=JSON.stringify({available:!!checks,checked_at:new Date().toISOString(),rows:checks?clients.map(c=>{const cs=currentCheckin(c,checks);return cs.saved?{client_id:c.id,submitted_at:cs.saved.submitted_at,reviewed_at:cs.saved.reviewed_at||null}:null;}).filter(Boolean):[]});
     const issues=clients.map(c=>{const notes=[];let date;try{date=M.localDate(new Date(),c.timezone||'Europe/Dublin');}catch{notes.push('Timezone needs setup');}
      const cs=checks?currentCheckin(c,checks):null;
      if(!checks)notes.push('Check-in status unavailable');else if(cs.saved&&!cs.saved.reviewed_at)notes.push('Check-in ready to review');else if(['Overdue','Deadline not configured','Timezone needs setup'].includes(cs.label)&&c.weekly_checkin_enabled!==false)notes.push(cs.label);
@@ -53,7 +54,7 @@
      return {c,cs,notes};}).filter(r=>r.notes.length);
     status.innerHTML=(capped?'<p>Result limit reached. Open Check-ins and individual plans for complete evidence.</p>':'')+'<p>Saved records only. Disabled portals stay visible for setup; food logging is never an adherence requirement.</p>'+ (issues.length?issues.map(({c,cs,notes})=>'<article class="priority-issue"><div><strong>'+esc(c.display_name)+'</strong><p>'+notes.map(esc).join(' · ')+'</p>'+(cs?.saved?'<small>Submitted '+esc(M.stamp(cs.saved.submitted_at,c.timezone||'Europe/Dublin'))+'</small>':cs?.due?'<small>Due '+esc(M.stamp(cs.due,c.timezone||'Europe/Dublin'))+'</small>':'')+'</div><button type="button" class="btn ghost small" data-priority-client="'+esc(c.id)+'">Open client</button></article>').join(''):'<p>No outstanding item was found in these current-week records. This is not a device test.</p>')+'<small>Checked '+esc(M.stamp(new Date(),'Europe/Dublin'))+'</small><p><button type="button" class="btn primary" data-priority-reviews>Open check-in reviews & comparisons</button></p>';
     status.querySelectorAll('[data-priority-client]').forEach(b=>{b.dataset.clientId=b.dataset.priorityClient;});bindClientRows();status.querySelector('[data-priority-reviews]').onclick=()=>{if(!active())return;state.client=null;state.coachView='reviews';renderCoach();};
-   }catch{if(active())status.textContent='Attention status could not load. Refresh to retry; unavailable is not zero.';}finally{if(active())button.disabled=false;}
+   }catch{if(active()){panel.dataset.homeCheckins=JSON.stringify({available:false,rows:[]});status.textContent='Attention status could not load. Refresh to retry; unavailable is not zero.';}}finally{if(active())button.disabled=false;}
   }
   panel.querySelector('button').onclick=load;load();
  }
