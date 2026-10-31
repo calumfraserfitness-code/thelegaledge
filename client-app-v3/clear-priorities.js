@@ -59,5 +59,5 @@
   panel.querySelector('button').onclick=load;load();
  }
  const beforeCoach=renderCoach;renderCoach=function(){const r=beforeCoach();Promise.resolve(r).then(attention).catch(()=>{});return r;};
- window.LegalEdgePriorities={currentCheckin,home};
+ window.LegalEdgePriorities={currentCheckin,home,refreshAttention:attention};
 })();

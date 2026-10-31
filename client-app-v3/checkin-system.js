@@ -49,6 +49,7 @@
  async function refreshCheckins(){if(refreshing||!state.user||state.preview||document.hidden)return;const user=state.user.id,id=state.client?.id;refreshing=true;try{
   if(id){const rows=await query('Latest check-ins',db.from('checkins').select('*').eq('client_id',id).order('submitted_at',{ascending:false}).limit(250));if(state.user?.id!==user||state.client?.id!==id)return;state.data.checkins=rows;if(state.role==='client')reviewCard();}
   if(state.role==='coach'&&!state.client&&state.coachView==='reviews'&&!document.activeElement?.matches('input,textarea,select'))await renderReviewQueue(0);
+  if(state.role==='coach'&&!state.client&&state.coachView==='dashboard'&&!document.activeElement?.matches('input,textarea,select'))await window.LegalEdgePriorities?.refreshAttention?.();
  }catch{ /* Retain last saved content when offline. */ }finally{refreshing=false;}}
  function reviewCard(){if(state.role!=='client'||state.client?.onboarding_status!=='complete')return;if(state.clientView==='today'&&window.LegalEdgePriorities){window.LegalEdgePriorities.home();return;}const c=state.data.checkins.find(c=>c.reviewed_at&&(c.coach_response||c.voice_note_url));let card=document.querySelector('#csCoachReview');if(!c){card?.remove();return;}
   const url=safeMediaUrl(c.voice_note_url),loom=url?.match(/^https:\/\/(?:www\.)?loom\.com\/share\/([a-f0-9]{32})(?:[?/#]|$)/i);
