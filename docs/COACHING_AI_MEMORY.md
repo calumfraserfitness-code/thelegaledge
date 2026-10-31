@@ -1,5 +1,7 @@
 # Legal Edge operating memory
 
+Coach Home is one action inbox, not repeated rosters. Keep Needs attention visible; preserve activity, setup, watch status and directory tools behind closed disclosures. Move existing DOM nodes rather than rebuilding their handlers. Async refreshes must return to the same disclosure without closing it. Suppress empty watch cards, never genuine recorded zero readings; no receipt remains explicitly unconnected, not a successful sync.
+
 Keep client destinations distinct: Progress owns recorded strength/weight/watch measurements; Coach owns feedback, calls and approved actions. Today is a short overview linking to each. Removing duplicate presentation must never delete saved measurements or coaching guidance; full action completion remains available in Coach with captured account/client/view guards.
 
 Call linkage alone does not deliver client follow-through. Keep coach-private decisions/tasks separate from explicitly published client recaps/actions, and show applied prescription changes only from actual receipts. Mount approved action UI after final Today layout and subsequent refreshes; otherwise later overrides can erase the checklist. Capture account, role, client and connected host across reads/writes. An unmatched recording needs verified source identity or explicit audited coach confirmation, never recorder-as-client matching.

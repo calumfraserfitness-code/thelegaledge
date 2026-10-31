@@ -1,0 +1,10 @@
+#coachHomeFocus{max-width:1120px;margin:0 auto;display:grid;gap:24px}
+.home-focus-heading{padding:12px 0 0}.home-focus-heading h1{font-size:clamp(28px,4vw,40px);margin:8px 0 10px;color:var(--navy,#142438)}
+.home-focus-heading p{color:#526173;max-width:620px;line-height:1.6}.home-focus-heading>div{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+.home-focus-tools{display:grid;gap:12px}.home-focus-tools>details{background:#fff;border:1px solid #dce2e9;border-radius:14px;overflow:hidden}
+.home-focus-tools>details>summary{display:flex;align-items:center;justify-content:space-between;padding:20px;cursor:pointer;list-style:none;gap:16px;color:#142438}
+.home-focus-tools summary::-webkit-details-marker{display:none}.home-focus-tools summary strong{display:block;font-size:17px}.home-focus-tools summary small{display:block;margin-top:5px;color:#526173;line-height:1.5}.home-focus-tools details[open]>summary{border-bottom:1px solid #e3e8ed}
+.home-focus-tools [data-home-content]{padding:0 18px}.home-focus-tools [data-home-content]>.panel{margin:16px 0;box-shadow:none}.home-focus-tools .stats{display:none}
+#coachHomeFocus [hidden]{display:none!important}#coachHomeFocus .priority-attention{margin:0}#coachHomeFocus .priority-issue{gap:14px;padding:16px 0}
+#coachHomeFocus .priority-attention .panel-head .eyebrow{display:none}#coachHomeFocus .activity-scroll{max-width:100%;overflow:auto}
+@media(max-width:600px){#coachHomeFocus{gap:18px}.home-focus-tools>details>summary{padding:17px}.home-focus-tools [data-home-content]{padding:0 12px}#coachHomeFocus .priority-issue{align-items:flex-start;flex-wrap:wrap}}

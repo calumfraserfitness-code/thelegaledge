@@ -66,7 +66,8 @@
     "easy-swaps.js",
     "progress-first.js",
     "clear-priorities.js",
-    "call-followthrough.js"
+    "call-followthrough.js",
+    "coach-home-focus.js"
   ],
   "styles": [
     "app.css",
@@ -109,6 +110,7 @@
     "coach-activity.css",
     "progress-first.css",
     "clear-priorities.css",
-    "call-followthrough.css"
+    "call-followthrough.css",
+    "coach-home-focus.css"
   ]
 }
