@@ -19,13 +19,13 @@ const trainingBeforeClarity=coachTraining;
 coachTraining=function(){trainingBeforeClarity();simplifyCoachTraining();};
 function simplifyCoachTabs(){
  const tabs=$('#clientTabs');if(!tabs)return;
- const more=document.createElement('details');more.className='le-more-tabs';more.innerHTML='<summary>More</summary><div></div>';
+ let more=tabs.querySelector(':scope > .le-more-tabs');if(!more){more=document.createElement('details');more.className='le-more-tabs';more.innerHTML='<summary>More</summary><div></div>';}
  const advanced=['onboarding','legal','diagnostics','goals','support'];
- for(const button of [...tabs.querySelectorAll('button')])if(advanced.includes(button.dataset.clientTab)){more.lastElementChild.append(button);if(button.classList.contains('active'))more.open=true;}
- if(more.lastElementChild.childElementCount)tabs.append(more);
+ for(const button of [...tabs.querySelectorAll('button')])if(advanced.includes(button.dataset.clientTab)){if(button.parentElement!==more.lastElementChild)more.lastElementChild.append(button);if(button.classList.contains('active'))more.open=true;}
+ if(more.lastElementChild.childElementCount&&more.parentElement!==tabs)tabs.append(more);
 }
 const workspaceBeforeClarity=renderClientWorkspace;
-renderClientWorkspace=function(){workspaceBeforeClarity();simplifyCoachTabs();};
+renderClientWorkspace=function(){const result=workspaceBeforeClarity();simplifyCoachTabs();return result;};
 const firmsBeforeClarity=paintFirmPilots;
 paintFirmPilots=async function(){await firmsBeforeClarity();const main=$('#coachMain');if(state.client||state.coachView!=='firms')return;
  const roster=main.querySelector('#firmPilotEditForm')?.closest('.panel');
@@ -112,7 +112,7 @@ async function checkFitbitAvailability(main){
 }
 
 const clientRenderBeforeClarity=renderClient;
-renderClient=function(){clientRenderBeforeClarity();selectPreviewScene('participant');};
+renderClient=function(){const result=clientRenderBeforeClarity();selectPreviewScene('participant');return result;};
 const coachRenderBeforeClarity=renderCoach;
-renderCoach=function(){coachRenderBeforeClarity();selectPreviewScene(state.coachView==='firms'?'firms':'clients');};
+renderCoach=function(){const result=coachRenderBeforeClarity();selectPreviewScene(state.coachView==='firms'?'firms':'clients');return result;};
 

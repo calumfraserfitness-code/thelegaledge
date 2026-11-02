@@ -172,14 +172,21 @@
  const previousRender=renderClient;
  renderClient=function(){
   if(owner!==ownerKey())reset();
-  previousRender();
-  const ready=state.preview||(state.client?.onboarding_status==='complete'&&state.client?.plan_status==='published');if(!ready)return;
+  const identity=ownerKey(),view=state.clientView,role=state.role;
+  function decorate(){
+   if(ownerKey()!==identity||state.clientView!==view||state.role!==role)return;
+   if(!state.preview&&role==='client'&&typeof journeyCache==='function'&&!journeyCache().ready)return;
+  const ready=state.preview||(state.client?.onboarding_status==='complete'&&state.client?.plan_status==='published');if(!ready||host()?.classList.contains('journey-page'))return;
   const routes=['progress','diagnostics','health'];
   if(routes.includes(state.clientView)&&!$('#dnProgressNav')){
    const nav=document.createElement('nav');nav.id='dnProgressNav';nav.className='dn-subnav';nav.setAttribute('aria-label','Progress sections');nav.innerHTML=[['progress','Overview'],['diagnostics','Diagnostics'],['health','Devices']].map(([k,label])=>`<button type="button" class="btn ${k===state.clientView?'primary':'ghost'} small" data-dn-route="${k}">${label}</button>`).join('');host().prepend(nav);nav.querySelectorAll('button').forEach(b=>b.onclick=()=>openRoute(b.dataset.dnRoute));
   }
   if(state.clientView==='training'&&!$('#dnSchedule')){const b=document.createElement('button');b.id='dnSchedule';b.className='btn ghost small dn-schedule';b.textContent='Arrange my week';b.onclick=()=>openRoute('planner');host().prepend(b);}
   updateClientNav();
+  }
+  const result=previousRender();decorate();
+  if(result?.then)result.then(decorate).catch(()=>{});
+  return result;
  };
  document.addEventListener('DOMContentLoaded',()=>{document.querySelectorAll('.logout').forEach(b=>b.addEventListener('click',()=>{owner=null;logs=[];favourites=[];loaded=false;sheet=null;}));});
 })();

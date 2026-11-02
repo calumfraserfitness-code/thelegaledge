@@ -69,6 +69,6 @@
   }
  }
  for(const name of ['coachOverview','coachTraining','coachNutrition']){const previous=window[name];if(typeof previous==='function')window[name]=function(...args){const result=previous(...args);mount();return result;};}
- const before=renderClientWorkspace;renderClientWorkspace=function(){const result=before();mount();return result;};
+ const before=renderClientWorkspace;renderClientWorkspace=function(){const result=before();mount();window.CoachMobile?.sync();return result;};
  window.PersonalCoachingContextUI={context,load,mount};
 })();

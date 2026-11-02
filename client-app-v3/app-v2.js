@@ -176,7 +176,7 @@ async function loadClientData(clientId) {
     query('Health summaries', db.from('client_health_daily').select('*').eq('client_id', clientId).order('date', { ascending: false }).limit(90)),
     query('Imported workouts', db.from('client_health_workouts').select('*').eq('client_id', clientId).order('started_at', { ascending: false }).limit(100)),
     query('Health imports', db.from('client_health_imports').select('*').eq('client_id', clientId).order('imported_at', { ascending: false }).limit(20)),
-    state.role === 'coach' ? query('Exercise Bank', db.from('exercise_bank').select('*').order('name').limit(1000)) : Promise.resolve([]),
+    Promise.resolve([]), // Exercise/video library loads only when opened in Training.
     state.role==='coach'?query('Private client details',db.from('client_private_details').select('coach_notes').eq('client_id',clientId)):Promise.resolve([]),
     Promise.resolve([]) // Meal bank is searched on demand by meal-library.js.
   ]);
@@ -193,8 +193,10 @@ async function loadClientData(clientId) {
       query('Scheduled sessions', db.from('training_sessions').select('*').in('week_id', ids).order('session_date')),
       query('Nutrition days', db.from('nutrition_days').select('*').in('week_id', ids).order('nutrition_date'))
     ]);
-    if (sessions.length) exercises = await query('Exercises', db.from('exercises').select('*').in('session_id', sessions.map((s) => s.id)).order('sort_order'));
-    if (nutritionDays.length) meals = await query('Meals', db.from('meals').select('*').in('nutrition_day_id', nutritionDays.map((d) => d.id)).order('sort_order'));
+    [exercises,meals]=await Promise.all([
+      sessions.length?query('Exercises',db.from('exercises').select('*').in('session_id',sessions.map(s=>s.id)).order('sort_order')):Promise.resolve([]),
+      nutritionDays.length?query('Meals',db.from('meals').select('*').in('nutrition_day_id',nutritionDays.map(d=>d.id)).order('sort_order')):Promise.resolve([])
+    ]);
   }
   if (!currentLoad()) return false;
   const recoveredExercises = programs.flatMap((program) => (program.days || []).flatMap((day) => day.exercises || []));
@@ -305,21 +307,18 @@ function clientRows(clients) {
   </button>`).join('');
 }
 
+let clientWorkspaceOpenSequence=0;
 function bindClientRows() {
-  $$('[data-client-id]').forEach((row) => row.onclick = async () => {
-    const client = state.clients.find((item) => item.id === row.dataset.clientId);
-    if (!client) return;
-    state.client = client;
-    state.data = emptyData();
-    state.clientTab = 'overview';
-    $('#coachMain').innerHTML = '<div class="loading-state">Loading client workspace…</div>';
-    try {
-      if (!state.preview) await loadClientData(client.id);
-      else state.data = state.sampleClientData?.get(client.id) || demoData();
-      renderCoach();
-    } catch (error) {
-      renderError($('#coachMain'), error, () => row.click());
-    }
+  $$('[data-client-id]').forEach(row=>row.onclick=async()=>{
+    const client=state.clients.find(item=>item.id===row.dataset.clientId);if(!client)return;
+    const request=++clientWorkspaceOpenSequence,account=state.user?.id,role=state.role;
+    state.client=client;state.clientTab='overview';state.data=emptyData();
+    const active=()=>request===clientWorkspaceOpenSequence&&state.user?.id===account&&state.role===role&&state.client?.id===client.id;
+    const host=$('#coachMain');delete host.dataset.workspaceOwner;delete host.dataset.workspaceClient;
+    host.innerHTML=pageHead('CLIENT WORKSPACE',client.display_name,'<button type="button" class="btn ghost small" id="openingClientBack">Back to clients</button>')+'<section class="panel workspace-opening" role="status"><h2>Opening your client’s workspace</h2><p>Reading their saved plans and history…</p></section>';
+    $('#openingClientBack').onclick=()=>{if(!active())return;state.client=null;state.coachView='clients';renderCoach();};
+    try{if(!state.preview){if(await loadClientData(client.id)===false||!active())return;}else state.data=state.sampleClientData?.get(client.id)||demoData();if(active())renderCoach();}
+    catch(error){if(active())renderError(host,error,()=>row.click());}
   });
 }
 
@@ -419,30 +418,23 @@ async function provisionClientAccount(payload) {
 const COACH_TABS = ['overview', 'planner', 'training', 'nutrition', 'check-ins', 'progress', 'onboarding', 'legal', 'diagnostics'];
 
 function renderClientWorkspace() {
-  const client = state.client;
-  $('#coachMain').innerHTML = pageHead('CLIENT WORKSPACE', client.display_name, '<button class="btn ghost small" id="viewAsClient">View as client</button>') + `
-    <div class="tabs" id="clientTabs">${COACH_TABS.map((tab) => `<button data-client-tab="${tab}" class="${state.clientTab === tab ? 'active' : ''}">${title(tab.replace('-', ' '))}</button>`).join('')}</div>
-    <div id="clientWorkspaceBody"></div>`;
-  $('#clientTabs').onclick = (event) => {
-    const button = event.target.closest('[data-client-tab]');
-    if (!button) return;
-    state.clientTab = button.dataset.clientTab;
-    renderClientWorkspace();
-  };
-  $('#viewAsClient').onclick = () => {
-    $('#clientHello').textContent = client.display_name;
-    $('#returnCoach').classList.remove('hidden');
-    show('#clientApp');
-    state.clientView = 'today';
-    renderClient();
-  };
-  const views = {
-    overview: coachOverview, planner: coachPlanner, training: coachTraining,
-    nutrition: coachNutrition, 'check-ins': coachCheckins, progress: coachProgress,
-    onboarding: coachOnboarding, legal: coachLegal, diagnostics: coachDiagnostics
-  };
-  try { views[state.clientTab](); }
-  catch (error) { renderError($('#clientWorkspaceBody'), error, renderClientWorkspace); }
+  const client=state.client,host=$('#coachMain'),owner=String(state.user?.id||'preview')+':'+state.role+':'+String(state.preview);
+  const retained=host.dataset.workspaceOwner===owner&&host.dataset.workspaceClient===client.id&&host.querySelector('#clientTabs')&&host.querySelector('#clientWorkspaceBody');
+  if(!retained){
+    host.innerHTML=pageHead('CLIENT WORKSPACE',client.display_name,'<button class="btn ghost small" id="viewAsClient">View as client</button>')+`<div class="tabs" id="clientTabs">${COACH_TABS.map(tab=>`<button data-client-tab="${tab}">${title(tab.replace('-',' '))}</button>`).join('')}</div><div id="clientWorkspaceBody"></div>`;
+    host.dataset.workspaceOwner=owner;host.dataset.workspaceClient=client.id;
+  }
+  const heading=host.querySelector('.page-head h1');if(heading&&heading.textContent!==client.display_name)heading.textContent=client.display_name;
+  host.querySelectorAll('[data-client-tab]').forEach(button=>{const active=button.dataset.clientTab===state.clientTab;button.classList.toggle('active',active);if(active)button.setAttribute('aria-current','page');else button.removeAttribute('aria-current');});
+  $('#clientTabs').onclick=event=>{const button=event.target.closest('[data-client-tab]');if(!button||button.dataset.clientTab===state.clientTab)return;state.clientTab=button.dataset.clientTab;renderClientWorkspace();};
+  $('#viewAsClient').onclick=()=>{$('#clientHello').textContent=client.display_name;$('#returnCoach').classList.remove('hidden');show('#clientApp');state.clientView='today';renderClient();};
+  const views={overview:coachOverview,planner:coachPlanner,training:coachTraining,nutrition:coachNutrition,'check-ins':coachCheckins,progress:coachProgress,onboarding:coachOnboarding,legal:coachLegal,diagnostics:coachDiagnostics};
+  try{
+    if(state.clientTab==='goals')return coachCoachingGoals();
+    if(state.clientTab==='support')return coachCoachingSupport();
+    if(state.clientTab==='connections')return renderConnectionsHub($('#clientWorkspaceBody')).catch(error=>{if(state.client?.id===client.id&&state.clientTab==='connections')renderError($('#clientWorkspaceBody'),error,renderClientWorkspace);});
+    return (views[state.clientTab]||views.overview)();
+  }catch(error){renderError($('#clientWorkspaceBody'),error,renderClientWorkspace);}
 }
 
 function coachOverview() {
@@ -468,8 +460,8 @@ function coachOverview() {
       <button class="btn primary wide">Save controls</button>
     </form></section><section class="panel"><div class="panel-head"><h3>Latest check-in</h3></div>${last ? `<div class="score">${last.week_score ?? '—'}/10</div><p><b>Win</b><br>${esc(last.wins || '—')}</p><p><b>Challenge</b><br>${esc(last.challenges || '—')}</p>` : '<div class="empty">No check-ins yet.</div>'}</section></div>`;
   const form = $('#clientSettings');
-  form.status.value = client.status || 'active';
-  form.checkin_day.value = String(client.checkin_day ?? 5);
+  form.elements.status.value = client.status || 'active';
+  form.elements.checkin_day.value = String(client.checkin_day ?? 5);
   form.onsubmit = saveClientControls;
   $('#linkSavedClient') && ($('#linkSavedClient').onsubmit = linkSavedClientAccount);
 }
@@ -634,7 +626,7 @@ function coachPlanner() {
   $('#weekEditor')?.addEventListener('submit', saveWeekDetails);
   $('#autofillNutrition')?.addEventListener('click', autofillNutritionWeek);
   $('#prepareWeek')?.addEventListener('click', prepareCurrentWeek);
-  $$('[data-session-editor]').forEach((form) => { form.training_type.value = state.data.sessions.find((session) => session.id === form.dataset.sessionEditor)?.training_type || 'weights'; form.onsubmit = savePlannerSession; });
+  $$('[data-session-editor]').forEach((form) => { form.elements.training_type.value = state.data.sessions.find((session) => session.id === form.dataset.sessionEditor)?.training_type || 'weights'; form.onsubmit = savePlannerSession; });
   $$('[data-delete-session]').forEach((button) => button.onclick = () => deletePlannerSession(button.dataset.deleteSession));
   $$('[data-nutrition-date]').forEach(select=>select.onchange=()=>savePlannerNutrition(select));
 }
@@ -847,7 +839,7 @@ function bindTrainingSetupTools(){
   $('#scheduleProgrammeForm')?.addEventListener('submit',scheduleProgrammeWeek);
   $('#addBankExercise')?.addEventListener('submit',addExerciseFromBank);
   $('#exerciseBankSearch')?.addEventListener('input',(event)=>$$('[data-bank-search]').forEach(card=>card.classList.toggle('hidden',!card.dataset.bankSearch.includes(event.target.value.toLowerCase()))));
-  $$('[data-session-editor]').forEach(form=>{form.training_type.value=state.data.sessions.find(s=>s.id===form.dataset.sessionEditor)?.training_type||'weights';form.onsubmit=saveActivitySession;});
+  $$('[data-session-editor]').forEach(form=>{form.elements.training_type.value=state.data.sessions.find(s=>s.id===form.dataset.sessionEditor)?.training_type||'weights';form.onsubmit=saveActivitySession;});
   $$('[data-delete-session]').forEach(button=>button.onclick=()=>deleteActivitySession(button.dataset.deleteSession));
 }
 
@@ -1875,7 +1867,7 @@ function bindShell() {
   });
   $('#coachNav').onclick = (event) => {
     const button = event.target.closest('[data-coach-view]');
-    if (!button) return;
+    if (!button||(!state.client&&state.coachView===button.dataset.coachView)) return;
     state.coachView = button.dataset.coachView;
     state.client = null;
     state.data = emptyData();
@@ -1883,7 +1875,7 @@ function bindShell() {
   };
   $('#clientNav').onclick = (event) => {
     const button = event.target.closest('[data-client-view]');
-    if (!button || button.classList.contains('hidden')) return;
+    if (!button || button.classList.contains('hidden') || state.clientView===button.dataset.clientView) return;
     state.clientView = button.dataset.clientView;
     renderClient();
   };

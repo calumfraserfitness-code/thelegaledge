@@ -87,9 +87,7 @@ loadClientData=async function(id){const request=++coachingLoadSequence,user=stat
 };
 COACH_TABS.push('goals','support');
 const originalCoachingWorkspace=renderClientWorkspace;
-renderClientWorkspace=function(){if(['goals','support'].includes(state.clientTab)){
- const tab=state.clientTab;state.clientTab='overview';originalCoachingWorkspace();state.clientTab=tab;$$('[data-client-tab]').forEach(b=>b.classList.toggle('active',b.dataset.clientTab===tab));(tab==='goals'?coachCoachingGoals:coachCoachingSupport)();
- }else originalCoachingWorkspace();};
+renderClientWorkspace=function(){return originalCoachingWorkspace();};
 const originalRenderCoachingClient=renderClient;
 renderClient=function(){
  if(state.clientView==='support'&&(state.preview||(state.client?.onboarding_status==='complete'&&state.client?.plan_status==='published'))){$('#clientNav').classList.remove('hidden');clientCoachingSupport();$$('#clientNav button').forEach(b=>b.classList.toggle('active',b.dataset.clientView==='support'));}else originalRenderCoachingClient();

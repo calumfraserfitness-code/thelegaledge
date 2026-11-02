@@ -2,8 +2,22 @@
 const journeyDemo=new URLSearchParams(location.search).get('onboarding')==='demo';
 const journeyLabels={payment:'Payment confirmation',welcome:'Your welcome',contract:'Your agreement',intake:'Your coaching profile',review:'Coach review',ready:'Coaching access'};
 let journeyCurrent=null,journeyConnecting=false;
+let journeySnapshot=null,journeyRenderGeneration=0;
+const journeySnapshotTTL=60000;
+function journeyOwner(){return [state.user?.id||'',state.role||'',state.client?.id||'',state.client?.onboarding_status||'',state.client?.plan_status||'',state.client?.portal_enabled===false?'disabled':'enabled'].join(':');}
+function invalidateJourneySnapshot(){journeySnapshot=null;journeyRenderGeneration++;}
+function journeyCache(){const key=journeyOwner();if(!journeySnapshot||journeySnapshot.key!==key)journeySnapshot={key,at:0,record:null,ready:false,pending:null};return journeySnapshot;}
+function rememberJourneySnapshot(record){const c=journeyCache();c.record=record||null;c.at=Date.now();c.ready=(!record||record.stage==='ready')&&state.client?.onboarding_status==='complete'&&state.client?.plan_status==='published'&&state.client?.portal_enabled!==false;return c;}
+function readJourneySnapshot(clientId){const c=journeyCache();if(c.pending)return c.pending;
+ c.pending=query('Onboarding journey',db.from('onboarding_journeys').select('*').eq('client_id',clientId)).then(rows=>{
+  if(!Array.isArray(rows)||rows.length>1||rows.some(r=>r.client_id&&r.client_id!==clientId))throw Error('Your onboarding status could not be verified.');
+  if(journeyOwner()===c.key){c.record=rows[0]||null;c.at=Date.now();c.ready=(!c.record||c.record.stage==='ready')&&state.client?.onboarding_status==='complete'&&state.client?.plan_status==='published'&&state.client?.portal_enabled!==false;}
+  return rows[0]||null;
+ }).finally(()=>{c.pending=null;});return c.pending;
+}
 async function journeyCall(action,data={}){
  if(journeyDemo){const j=journeyCurrent;if(action==='welcome'){j.stage='contract';j.welcomed_at=new Date().toISOString();}if(action==='sign'){j.signature_name=data.name;j.address=data.address;j.signed_at=new Date().toISOString();j.stage='contract';}return j;}
+ invalidateJourneySnapshot();
  return query('Onboarding journey',db.rpc('journey_action',{p_client:state.client.id,p_action:action,p_data:data}));
 }
 function journeyCopy(j){
@@ -63,17 +77,34 @@ async function checkForClientPlan(button,status){
    status.textContent='Checked just now: Calum is still preparing your plan. Your profile is saved and there is nothing else to fill in.';return;
   }
   if(!client.portal_enabled){status.textContent='Your plan is published. Calum still needs to enable your coaching access.';return;}
-  state.client={...state.client,...client};journeyCurrent=journey||null;
+  state.client={...state.client,...client};journeyCurrent=journey||null;rememberJourneySnapshot(journey);
   await loadClientData(clientId);if(!active())return;state.clientView='today';await renderClient();
  }catch(error){if(active())status.textContent='Couldn’t check your plan right now. Your profile is saved. Tap Check for my plan to retry.';}
  finally{if(button.isConnected)setBusy(button,false);}
 }
 const beforeJourneyClient=renderClient;
-renderClient=async function(){
+renderClient=function(){
  if(journeyDemo)return renderJourney(journeyCurrent);
  if(state.preview||state.role!=='client'||!state.client){$('#clientMain')?.classList.remove('journey-page');return beforeJourneyClient();}
- const clientId=state.client.id,userId=state.user?.id;
- try{const rows=await query('Onboarding journey',db.from('onboarding_journeys').select('*').eq('client_id',clientId));if(state.client?.id!==clientId||state.user?.id!==userId||state.role!=='client')return;const j=rows[0];journeyCurrent=j||null;if(j&&j.stage!=='ready')return renderJourney(j);if(j?.stage==='ready'&&state.client.plan_status!=='published'){const fresh=await query('Client status',db.from('clients').select('*').eq('id',clientId).single());if(state.client?.id!==clientId||state.user?.id!==userId||state.role!=='client')return;state.client={...state.client,...fresh};}$('.account-menu')?.classList.remove('hidden');$('#clientMain').classList.remove('journey-page');return beforeJourneyClient();}catch(e){if(state.client?.id!==clientId||state.user?.id!==userId||state.role!=='client')return;$('#clientMain').innerHTML='<section class="panel">Unable to check onboarding. Please refresh to retry.</section>';toast(e.message,'error');}
+ const clientId=state.client.id,userId=state.user?.id,view=state.clientView,request=++journeyRenderGeneration,key=journeyOwner(),snapshot=journeyCache();
+ const active=()=>request===journeyRenderGeneration&&journeyOwner()===key&&state.client?.id===clientId&&state.user?.id===userId&&state.role==='client'&&state.clientView===view;
+ const workspace=()=>{$('.account-menu')?.classList.remove('hidden');$('#clientMain').classList.remove('journey-page');return beforeJourneyClient();};
+ async function checked(background){
+  try{
+   const j=await readJourneySnapshot(clientId);if(!active())return;journeyCurrent=j;
+   if(j&&j.stage!=='ready')return renderJourney(j);
+   if(j?.stage==='ready'&&state.client.plan_status!=='published'){
+    const fresh=await query('Client status',db.from('clients').select('*').eq('id',clientId).single());if(!active())return;if(fresh?.id!==clientId)throw Error('Your plan status could not be confirmed.');state.client={...state.client,...fresh};rememberJourneySnapshot(j);
+   }
+   // A successful background check does not reconstruct a form or restart a video.
+   if(background&&snapshot.ready)return;
+   return workspace();
+  }catch(e){if(!active())return;if(background){toast('Could not refresh your account status. Your current view is kept.','error');return;}
+   const main=$('#clientMain');main.innerHTML='<section class="panel"><h2>Account status unavailable</h2><p>Your saved information is safe. Try checking again.</p><button type="button" class="btn primary" id="journeyStatusRetry">Retry</button></section>';$('#journeyStatusRetry').onclick=()=>renderClient();toast(e.message,'error');
+  }
+ }
+ if(snapshot.ready){const result=workspace();if(Date.now()-snapshot.at>=journeySnapshotTTL)checked(true).catch(()=>{});return result;}
+ return checked(false);
 };
 async function renderJourneyCoach(){
  show('#coachApp');const host=$('#coachMain'),coachId=state.user?.id;host.innerHTML='<section class="panel">Loading onboarding journeys…</section>';
@@ -99,7 +130,7 @@ document.addEventListener('DOMContentLoaded',()=>{
  if(journeyDemo){state.preview=true;state.role='client';state.client={id:'fictional-onboarding-client',display_name:'Preview Client'};journeyCurrent={client_id:state.client.id,stage:'welcome',funding_mode:new URLSearchParams(location.search).get('funding')==='corporate'?'corporate':'personal',payment_confirmed_at:new Date().toISOString(),welcome_url:'',contract_title:'Fictional preview agreement',contract_version:'DEMO',contract_body:'This is sample text to demonstrate the signing step. It is not a coaching contract. Your coach supplies the actual approved agreement, including service scope, fees, cancellation terms and privacy information.'};const previewStep=new URLSearchParams(location.search).get('step');if(previewStep==='review'){journeyCurrent.stage='review';journeyCurrent.intake_completed_at=new Date().toISOString();}renderJourney(journeyCurrent);}
 });
 // Refresh progress while the client is waiting; no notifications or emails are implied.
-setInterval(async()=>{if(document.hidden||journeyDemo||state.preview||state.role!=='client'||!journeyCurrent||journeyConnecting||!['payment','review'].includes(journeyCurrent.stage))return;const id=journeyCurrent.client_id;try{const rows=await query('Journey status',db.from('onboarding_journeys').select('stage').eq('client_id',id));if(journeyCurrent?.client_id===id&&rows[0]?.stage!==journeyCurrent.stage)renderClient();}catch{}},30000);
+setInterval(async()=>{if(document.hidden||journeyDemo||state.preview||state.role!=='client'||!journeyCurrent||journeyConnecting||!['payment','review'].includes(journeyCurrent.stage))return;const id=journeyCurrent.client_id;try{const rows=await query('Journey status',db.from('onboarding_journeys').select('stage').eq('client_id',id));if(journeyCurrent?.client_id===id&&rows[0]?.stage!==journeyCurrent.stage){invalidateJourneySnapshot();renderClient();}}catch{}},30000);
 
 function journeyIntakePages(){
  const f=$('#onboardingWizard'),headings=[...f.querySelectorAll('h2')],grids=[...f.querySelectorAll('.editor-grid')],submit=f.querySelector('button[type="submit"],button.btn.primary');let step=0;

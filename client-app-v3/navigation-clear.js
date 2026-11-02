@@ -74,8 +74,8 @@ function updateClientNav(){
 const clearClientRenderBefore=renderClient;
 renderClient=function(){
  const ready=state.preview||(state.client?.onboarding_status==='complete'&&state.client?.plan_status==='published');
- if(state.clientView==='more'&&ready){$('#clientNav').classList.remove('hidden');clearClientMore();}else clearClientRenderBefore();
- updateClientNav();
+ let result;if(state.clientView==='more'&&ready){$('#clientNav').classList.remove('hidden');result=clearClientMore();}else result=clearClientRenderBefore();
+ updateClientNav();return result;
 };
 function clearLogin(){
  const form=$('#loginForm');if(!form||form.dataset.clearLogin)return;form.dataset.clearLogin='true';

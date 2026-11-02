@@ -78,8 +78,7 @@ document.addEventListener('DOMContentLoaded',()=>{const b=document.createElement
 // A coach can inspect each client's status without authorizing an account for them.
 const hubWorkspaceBefore=renderClientWorkspace;
 renderClientWorkspace=function(){
- const connections=state.clientTab==='connections';if(connections)state.clientTab='overview';hubWorkspaceBefore();if(connections)state.clientTab='connections';
- const tabs=$('#clientTabs');if(!tabs)return;const button=document.createElement('button');button.dataset.clientTab='connections';button.textContent='Connections';button.classList.toggle('active',connections);button.onclick=e=>{e.stopPropagation();state.clientTab='connections';renderClientWorkspace();};tabs.append(button);
- if(connections){tabs.querySelectorAll('button').forEach(b=>b.classList.toggle('active',b===button));renderConnectionsHub($('#clientWorkspaceBody')).catch(e=>toast(e.message,'error'));}
+ const result=hubWorkspaceBefore(),tabs=$('#clientTabs');if(!tabs)return result;
+ let button=tabs.querySelector('[data-client-tab="connections"]');if(!button){button=document.createElement('button');button.dataset.clientTab='connections';button.textContent='Connections';tabs.append(button);}
+ button.classList.toggle('active',state.clientTab==='connections');button.onclick=e=>{e.stopPropagation();if(state.clientTab==='connections')return;state.clientTab='connections';renderClientWorkspace();};return result;
 };
-
