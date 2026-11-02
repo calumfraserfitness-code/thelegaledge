@@ -1545,35 +1545,39 @@ function bindCompletionActions() {
 
 
 function cardioLogForm(session) {
-  const actual = session?.source_metadata?.cardio_log || {};
-  const own = !session;
-  const kind = actual.activity || (session?.title?.toLowerCase().match(/run|walk|cycl|bike|spin|swim|row|elliptical|box/)?.[0] || 'other');
-  const opts = ['Run','Walk','Cycling','Spin','Swimming','Rowing','Elliptical','Boxing','Other'];
-  const optionValue = opts.find(x => x.toLowerCase().includes(kind.toLowerCase()) || kind.toLowerCase().includes(x.toLowerCase())) || 'Other';
-  return `<form class="cardio-entry-form" data-cardio-id="${session?.id || ''}" style="display:grid;gap:10px;margin:14px 0">
-    <label>Activity<select name="activity" required>${opts.map(x=>`<option value="${x}" ${optionValue===x?'selected':''}>${x}</option>`).join('')}</select></label>
-    ${own ? '<label>Date<input name="session_date" type="date" required value="'+iso(new Date())+'"></label>' : ''}
-    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
-      <label>Actual time (minutes)<input name="duration" type="number" min="1" max="1440" step="1" value="${esc(actual.duration_minutes ?? '')}" required></label>
-      <label>Distance (km, optional)<input name="distance" type="number" min="0" max="1000" step="0.01" value="${esc(actual.distance_km ?? '')}"></label>
-      <label>Average HR (optional)<input name="heart_rate" type="number" min="30" max="240" value="${esc(actual.heart_rate ?? '')}"></label>
-      <label>Effort / 10<input name="rpe" type="number" min="1" max="10" value="${esc(actual.rpe ?? '')}" placeholder="1–10"></label>
-    </div>
-    <label>Notes (optional)<textarea name="notes" rows="2" placeholder="How did it feel?">${esc(actual.notes || '')}</textarea></label>
-    <button type="submit" class="btn primary">${actual.duration_minutes?'Update actual session':own?'Add cardio session':'Save actual session'}</button>
+  const actual=session?.source_metadata?.cardio_log||{},own=!session;
+  const opts=['Run','Walk','Incline treadmill','Cycling','Spin','Swimming','Rowing','Elliptical','Boxing'];
+  const name=String(session?.title||'').toLowerCase();
+  const suggested=actual.activity||(name.includes('treadmill')?'Incline treadmill':opts.find(x=>name.includes(x.toLowerCase()))||(/cycl|bike/.test(name)?'Cycling':/swim/.test(name)?'Swimming':/row/.test(name)?'Rowing':''));
+  const list='cardio-activities-'+(session?.id||'extra');
+  let date;try{date=window.CheckinStatus.localDate(new Date(),state.client?.timezone||'Europe/Dublin');}catch{date=iso(new Date());}
+  return `<form class="cardio-entry-form" data-cardio-id="${session?.id||''}">
+    <label>What did you do?<input name="activity" list="${esc(list)}" maxlength="80" value="${esc(suggested)}" placeholder="Choose or type an activity" required><datalist id="${esc(list)}">${opts.map(x=>`<option value="${x}">`).join('')}</datalist></label>
+    <label>Time completed (minutes)<input name="duration" type="number" inputmode="numeric" min="1" max="1440" step="1" value="${esc(actual.duration_minutes??'')}" placeholder="e.g. 25" required></label>
+    ${own?'<label>Date completed<input name="session_date" type="date" required value="'+date+'"></label>':''}
+    <details class="cardio-more"><summary>Add more details (optional)</summary><div class="cardio-extra-fields">
+      <label>Distance (km)<input name="distance" type="number" inputmode="decimal" min="0" max="1000" step="0.01" value="${esc(actual.distance_km??'')}"></label>
+      <label>Average heart rate (bpm)<input name="heart_rate" type="number" inputmode="numeric" min="30" max="240" value="${esc(actual.heart_rate??'')}"></label>
+      <label>Effort (1–10)<input name="rpe" type="number" inputmode="numeric" min="1" max="10" value="${esc(actual.rpe??'')}"></label>
+      <label>Notes<textarea name="notes" rows="2" maxlength="2000" placeholder="Anything you want Calum to know">${esc(actual.notes||'')}</textarea></label>
+    </div></details>
+    <button type="submit" class="btn primary">${actual.duration_minutes?'Update saved cardio':'Save cardio'}</button>
+    <p class="muted">${own?'Saves this as an extra completed session.':'Saving marks this session complete. You do not need a separate tick.'}</p>
+    <p data-cardio-status role="status" aria-live="polite"></p>
   </form>`;
 }
-function cardioLogCard(session) {
- const a=session.source_metadata?.cardio_log;
- return `<div class="activity-session" style="margin-bottom:16px"><h3>${esc(session.title)}</h3>
- <p class="sub">${session.source_system === 'client_manual_cardio'?fmt(session.session_date)+' · Added by client':'Coach prescribed · complete when ready'} · ${esc(session.status)}</p>
- ${session.source_system !== 'client_manual_cardio' ? `<div class="activity-rx"><b>Coach target:</b> ${session.duration_minutes?'<span>'+session.duration_minutes+' min</span>':''} ${session.distance_km?'<span>'+session.distance_km+' km</span>':''} ${session.zone?'<span>'+esc(session.zone)+'</span>':''} ${session.heart_rate_target?'<span>'+esc(session.heart_rate_target)+'</span>':''}</div>`:''}
- ${a ? `<p><strong>Completed:</strong> ${esc(a.activity)} · ${esc(a.duration_minutes)} min${a.distance_km!=null?' · '+esc(a.distance_km)+' km':''}${a.heart_rate?' · '+esc(a.heart_rate)+' bpm':''}${a.rpe?' · RPE '+esc(a.rpe)+'/10':''}</p>` : ''}
- ${cardioLogForm(session)}</div>`;
+function cardioLogCard(session,open=false) {
+ const a=session.source_metadata?.cardio_log,manual=session.source_system==='client_manual_cardio',complete=session.status==='completed';
+ return `<article class="activity-session cardio-simple"><div class="panel-head"><h3>${esc(session.title)}</h3><span class="pill">${complete?'Completed':'To do'}</span></div>
+ ${!manual?`<p class="activity-rx"><strong>Coach’s plan:</strong> ${session.duration_minutes?esc(session.duration_minutes)+' min · ':''}${session.distance_km?esc(session.distance_km)+' km · ':''}${esc(session.zone||'')}${session.heart_rate_target?' · '+esc(session.heart_rate_target):''}</p><p class="muted">Complete when it suits you. Record what you actually did.</p>`:''}
+ ${a?`<p class="cardio-saved-result"><strong>Saved:</strong> ${esc(a.activity)} · ${esc(a.duration_minutes)} min${a.distance_km!=null?' · '+esc(a.distance_km)+' km':''}</p>`:complete?'<p>Marked complete. No cardio time has been recorded yet.</p>':''}
+ ${manual?'<p class="muted">'+esc(fmt(session.session_date))+' · Extra session</p>':''}
+ <details class="cardio-log-toggle" ${open?'open':''}><summary>${a?'Edit saved cardio':complete?'Add completed time':'Log this session'}</summary>${cardioLogForm(session)}</details></article>`;
 }
 function bindCardioLogForms() {
  $$('[data-cardio-id]').forEach(form => form.onsubmit = async (event) => {
    event.preventDefault();
+   if(form.dataset.saving==='true')return;
    const clientId=state.client?.id,account=state.user?.id;
    const active=()=>state.client?.id===clientId&&state.user?.id===account&&form.isConnected;
    const fd = new FormData(form);
@@ -1590,10 +1594,12 @@ function bindCardioLogForms() {
    const hr=hrText===''?null:Number(hrText);
    const effortText=String(fd.get('rpe')||'');
    const rpe=effortText===''?null:Number(effortText);
-   if ((distance!==null&&(!Number.isFinite(distance)||distance<0||distance>1000))||(hr!==null&&(hr<30||hr>240))||(rpe!==null&&(rpe<1||rpe>10))) return toast('Check distance, heart rate and effort.', 'error');
-   const actual={activity:String(fd.get('activity')||'Other'),duration_minutes:duration,distance_km:distance,heart_rate:hr,rpe,notes:String(fd.get('notes')||'').trim().slice(0,2000),logged_at:new Date().toISOString()};
-   const submit=form.querySelector('[type=submit]');
-   setBusy(submit,true);
+   if ((distance!==null&&(!Number.isFinite(distance)||distance<0||distance>1000))||(hr!==null&&(!Number.isFinite(hr)||hr<30||hr>240))||(rpe!==null&&(!Number.isFinite(rpe)||rpe<1||rpe>10))) return toast('Check distance, heart rate and effort.', 'error');
+   const activity=String(fd.get('activity')||'').trim().slice(0,80);
+   if(!activity)return toast('Choose or type the activity you did.','error');
+   const actual={activity,duration_minutes:duration,distance_km:distance,heart_rate:hr,rpe,notes:String(fd.get('notes')||'').trim().slice(0,2000),logged_at:new Date().toISOString()};
+   const submit=form.querySelector('[type=submit]'),status=form.querySelector('[data-cardio-status]');
+   form.dataset.saving='true';if(status)status.textContent='Saving cardio…';setBusy(submit,true);
    try {
      let saved;
      if(session) {
@@ -1613,9 +1619,10 @@ function bindCardioLogForms() {
        if(!active())return;
        state.data.sessions.push(saved);
      }
-     toast('Cardio results saved');
+     toast('Cardio saved');
      clientTraining();
-   } catch(error){if(active())toast(error.message,'error');} finally {if(submit.isConnected)setBusy(submit,false);}
+     const confirmation=document.getElementById('cardioSaveStatus');if(confirmation)confirmation.textContent='Saved: '+activity+' · '+duration+' min. '+(session?'Session complete.':'Extra session added.');
+   } catch(error){if(active()){if(status)status.textContent='Not saved. Your entries are still here—please retry.';toast(error.message,'error');}} finally {delete form.dataset.saving;if(submit.isConnected)setBusy(submit,false);}
  });
 }
 
@@ -1630,8 +1637,9 @@ function clientTraining() {
   const categoryTabs = `<div class="training-category-tabs">${categories.map(([key, label, count]) => `<button type="button" data-training-category="${key}" class="${state.trainingCategory === key ? 'active' : ''}"><b>${label}</b><span>${count}</span></button>`).join('')}</div>`;
   if (state.trainingCategory === 'steps') state.trainingCategory = 'weights';
   if (state.trainingCategory === 'cardio') {
-    const sessions = allSessions.filter((session) => session.training_type === 'cardio').sort((a,b)=>a.session_date.localeCompare(b.session_date));
-    $('#clientMain').innerHTML = clientHeader('', 'Training & activity', 'Log the cardio you actually completed, including extra sessions.') + categoryTabs + `<section class="panel"><div class="panel-head"><div><h2>Cardio</h2><span class="sub">Your coach's sessions and your own activity</span></div></div><div class="activity-list">${sessions.map(cardioLogCard).join('') || '<div class="empty">No cardio assigned yet. You can still log your own session below.</div>'}</div></section><section class="panel"><h3>Add your own cardio session</h3><p class="sub">Log an extra run, walk, cycle, swim or other workout.</p>${cardioLogForm(null)}</section>`;
+    const sessions=allSessions.filter(session=>session.training_type==='cardio').sort((a,b)=>a.session_date.localeCompare(b.session_date));
+    const pending=sessions.filter(s=>s.status!=='completed'),completed=sessions.filter(s=>s.status==='completed');
+    $('#clientMain').innerHTML=clientHeader('','Training & activity','Choose a session, enter your minutes and save.')+categoryTabs+`<p id="cardioSaveStatus" role="status" aria-live="polite"></p><section class="panel"><h2>Your cardio sessions</h2><p class="muted">Work through these whenever you can. Saving your time completes the session.</p><div class="activity-list">${pending.map((s,i)=>cardioLogCard(s,i===0||s.id===state.selectedSessionId)).join('')||'<p>No assigned cardio left to log.</p>'}</div></section><details class="panel cardio-own"><summary>+ Log extra cardio</summary><p>For an additional session you did yourself.</p>${cardioLogForm(null)}</details>${completed.length?`<details class="panel cardio-history"><summary>Saved cardio (${completed.length})</summary>${completed.map(s=>cardioLogCard(s)).join('')}</details>`:''}`;
     bindTrainingCategoryTabs();
     bindCardioLogForms();
     return;
