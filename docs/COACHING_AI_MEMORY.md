@@ -1,5 +1,7 @@
 # Legal Edge operating memory
 
+Optional recipes need explicit category handling: Main meal must never fall through to the first Breakfast slot. Main meals can serve lunch or dinner without duplicating a recipe. Per-movement recovery ticks use the assigned exercise ID plus local date; parent completion saves must merge, not overwrite, the saved exercise receipts. Latest published video cards must mount after the final client layout; keep a real loaded thumbnail or the inline Loom player, and never expose unreviewed video links.
+
 Progress layout preference: keep weight/watch/other progress above strength and cardio history. Cardio charts use actual saved results, grouped by activity, never coach targets or invented missing distances. The user is recording an app video; do not re-add the written app walkthrough.
 
 Session numbers describe programme order, not weekdays. Next-session selection must not skip unfinished sessions solely because their plan date passed. Recovery practices use per-local-date receipts, preserving previous days on undo; client/coach attribution requires an actual saved actor receipt. Existing completion timestamps do not establish who entered them. Use save_session_completion for guarded session/practice/cardio saves; normal client source-metadata edits are intentionally blocked by the prescription trigger. Keep written walkthroughs distinct from recorded video tutorials.

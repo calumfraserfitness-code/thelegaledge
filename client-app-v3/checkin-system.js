@@ -47,7 +47,7 @@
   try{await pushCall({action:'unsubscribe',endpoint:sub.endpoint},owner);}catch{ /* The confirmed unsubscribed endpoint cannot receive alerts. */ }
  }
  async function refreshCheckins(){if(refreshing||!state.user||state.preview||document.hidden)return;const user=state.user.id,id=state.client?.id;refreshing=true;try{
-  if(id){const rows=await query('Latest check-ins',db.from('checkins').select('*').eq('client_id',id).order('submitted_at',{ascending:false}).limit(250));if(state.user?.id!==user||state.client?.id!==id)return;state.data.checkins=rows;if(state.role==='client')reviewCard();}
+  if(id){const rows=await query('Latest check-ins',db.from('checkins').select('*').eq('client_id',id).order('submitted_at',{ascending:false}).limit(250));if(state.user?.id!==user||state.client?.id!==id)return;state.data.checkins=rows;if(state.role==='client'){reviewCard();window.PracticeFeedback?.refresh?.();}}
   if(state.role==='coach'&&!state.client&&state.coachView==='reviews'&&!document.activeElement?.matches('input,textarea,select'))await renderReviewQueue(0);
   if(state.role==='coach'&&!state.client&&state.coachView==='dashboard'&&!document.activeElement?.matches('input,textarea,select')){await window.LegalEdgePriorities?.refreshAttention?.();window.FlexibleCompletion?.refreshCoach?.();}
  }catch{ /* Retain last saved content when offline. */ }finally{refreshing=false;}}

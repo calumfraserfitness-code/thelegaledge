@@ -70,7 +70,8 @@
     "coach-home-focus.js",
     "coach-review-brief.js",
     "flexible-completion.js",
-    "cardio-progress.js"
+    "cardio-progress.js",
+    "practice-feedback.js"
   ],
   "styles": [
     "app.css",
@@ -115,6 +116,7 @@
     "clear-priorities.css",
     "call-followthrough.css",
     "coach-home-focus.css",
-    "flexible-completion.css"
+    "flexible-completion.css",
+    "practice-feedback.css"
   ]
 }

@@ -22,7 +22,7 @@ begin
  end if;
  if daily then
   if not(meta ? 'practice_baseline') then meta:=meta||jsonb_build_object('practice_baseline',jsonb_build_object('status',s.status,'completed_at',s.completed_at)); end if;
-  meta:=jsonb_set(meta,'{practice_days}',coalesce(meta->'practice_days','{}'::jsonb)||jsonb_build_object(d::text,receipt),true);
+  meta:=jsonb_set(meta,'{practice_days}',coalesce(meta->'practice_days','{}'::jsonb)||jsonb_build_object(d::text,coalesce(meta#>array['practice_days',d::text],'{}'::jsonb)||receipt),true);
   select max((value->>'saved_at')::timestamptz) into last_done from jsonb_each(meta->'practice_days') where value->>'completed'='true';
   if last_done is null and meta#>>'{practice_baseline,status}'='completed' then last_done:=(meta#>>'{practice_baseline,completed_at}')::timestamptz; end if;
  else last_done:=case when p_complete then stamp else null end;
