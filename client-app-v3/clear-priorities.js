@@ -39,14 +39,18 @@
   const user=state.user?.id,view=state.coachView,clients=state.clients.filter(c=>['active','ending'].includes(c.status)&&!c.deleted_at&&!/(demo|test)/i.test(c.display_name||''));
   async function load(){const token=++generation,active=()=>token===generation&&panel.isConnected&&eligible()&&state.user?.id===user&&state.coachView===view;const status=panel.querySelector('[role=status]'),button=panel.querySelector('button');button.disabled=true;status.textContent='Checking saved records…';
    try{const ids=clients.map(c=>c.id),dates=clients.map(c=>{try{return M.localDate(new Date(),c.timezone||'Europe/Dublin');}catch{return null;}}).filter(Boolean).sort(),start=dates[0]?new Date(+new Date(dates[0]+'T12:00:00Z')-6*864e5).toISOString().slice(0,10):null;
-    if(!ids.length){status.textContent='No active clients to review.';return;}
+    if(!ids.length){panel.dataset.homeCheckins=JSON.stringify({available:true,pending_available:true,rows:[],statuses:[],checked_at:new Date().toISOString()});status.textContent='No active clients to review.';return;}
     const results=await Promise.allSettled([
      query('Attention check-ins',db.from('checkins').select('id,client_id,period_start,submitted_at,reviewed_at,source_system').in('client_id',ids).gte('period_start',start).limit(1000)),
-     query('Attention current plans',db.from('program_weeks').select('id,client_id,week_start,published,nutrition_days(nutrition_date,nutrition_plan_id,nutrition_plans(client_id))').in('client_id',ids).eq('published',true).gte('week_start',start).lte('week_start',dates.at(-1)).limit(500))
+     query('Attention current plans',db.from('program_weeks').select('id,client_id,week_start,published,nutrition_days(nutrition_date,nutrition_plan_id,nutrition_plans(client_id))').in('client_id',ids).eq('published',true).gte('week_start',start).lte('week_start',dates.at(-1)).limit(500)),
+     query('Outstanding check-ins',db.from('checkins').select('id,client_id,period_start,submitted_at,reviewed_at,source_system').in('client_id',ids).is('reviewed_at',null).order('submitted_at',{ascending:false}).limit(250))
     ]);if(!active())return;
-    const capped=results.some((r,i)=>r.status==='fulfilled'&&r.value.length>=(i?500:1000));
+    const capped=results.some((r,i)=>r.status==='fulfilled'&&r.value.length>=([1000,500,250][i]));
     const checks=results[0].status==='fulfilled'&&results[0].value.length<1000?results[0].value:null,weeks=results[1].status==='fulfilled'&&results[1].value.length<500?results[1].value:null;
-    panel.dataset.homeCheckins=JSON.stringify({available:!!checks,checked_at:new Date().toISOString(),rows:checks?clients.map(c=>{const cs=currentCheckin(c,checks);return cs.saved?{client_id:c.id,submitted_at:cs.saved.submitted_at,reviewed_at:cs.saved.reviewed_at||null}:null;}).filter(Boolean):[]});
+    const pending=results[2].status==='fulfilled'&&results[2].value.length<250?results[2].value:null;
+    const statuses=clients.filter(c=>c.portal_enabled!==false).map(c=>{const cs=checks?currentCheckin(c,checks):{label:'Unavailable'};return {client_id:c.id,label:cs.label,due_at:cs.due?.toISOString()||null};});
+    const inbox=new Map();for(const row of [...(checks||[]).filter(r=>clients.some(c=>c.id===r.client_id&&currentCheckin(c,[r]).saved)),...(pending||[])]){if(clients.some(c=>c.id===row.client_id))inbox.set(row.id,row);}
+    panel.dataset.homeCheckins=JSON.stringify({available:!!checks,pending_available:!!pending,checked_at:new Date().toISOString(),statuses,rows:[...inbox.values()]});
     const issues=clients.map(c=>{const notes=[];let date;try{date=M.localDate(new Date(),c.timezone||'Europe/Dublin');}catch{notes.push('Timezone needs setup');}
      const cs=checks?currentCheckin(c,checks):null;
      if(!checks)notes.push('Check-in status unavailable');else if(cs.saved&&!cs.saved.reviewed_at)notes.push('Check-in ready to review');else if(['Overdue','Deadline not configured','Timezone needs setup'].includes(cs.label)&&c.weekly_checkin_enabled!==false)notes.push(cs.label);

@@ -1543,6 +1543,82 @@ function bindCompletionActions() {
   });
 }
 
+
+function cardioLogForm(session) {
+  const actual = session?.source_metadata?.cardio_log || {};
+  const own = !session;
+  const kind = actual.activity || (session?.title?.toLowerCase().match(/run|walk|cycl|bike|spin|swim|row|elliptical|box/)?.[0] || 'other');
+  const opts = ['Run','Walk','Cycling','Spin','Swimming','Rowing','Elliptical','Boxing','Other'];
+  const optionValue = opts.find(x => x.toLowerCase().includes(kind.toLowerCase()) || kind.toLowerCase().includes(x.toLowerCase())) || 'Other';
+  return `<form class="cardio-entry-form" data-cardio-id="${session?.id || ''}" style="display:grid;gap:10px;margin:14px 0">
+    <label>Activity<select name="activity" required>${opts.map(x=>`<option value="${x}" ${optionValue===x?'selected':''}>${x}</option>`).join('')}</select></label>
+    ${own ? '<label>Date<input name="session_date" type="date" required value="'+iso(new Date())+'"></label>' : ''}
+    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
+      <label>Actual time (minutes)<input name="duration" type="number" min="1" max="1440" step="1" value="${esc(actual.duration_minutes ?? '')}" required></label>
+      <label>Distance (km, optional)<input name="distance" type="number" min="0" max="1000" step="0.01" value="${esc(actual.distance_km ?? '')}"></label>
+      <label>Average HR (optional)<input name="heart_rate" type="number" min="30" max="240" value="${esc(actual.heart_rate ?? '')}"></label>
+      <label>Effort / 10<input name="rpe" type="number" min="1" max="10" value="${esc(actual.rpe ?? '')}" placeholder="1–10"></label>
+    </div>
+    <label>Notes (optional)<textarea name="notes" rows="2" placeholder="How did it feel?">${esc(actual.notes || '')}</textarea></label>
+    <button type="submit" class="btn primary">${actual.duration_minutes?'Update actual session':own?'Add cardio session':'Save actual session'}</button>
+  </form>`;
+}
+function cardioLogCard(session) {
+ const a=session.source_metadata?.cardio_log;
+ return `<div class="activity-session" style="margin-bottom:16px"><h3>${esc(session.title)}</h3>
+ <p class="sub">${fmt(session.session_date)} · ${session.source_system === 'client_manual_cardio'?'Added by client':'Coach prescribed'} · ${esc(session.status)}</p>
+ ${session.source_system !== 'client_manual_cardio' ? `<div class="activity-rx"><b>Coach target:</b> ${session.duration_minutes?'<span>'+session.duration_minutes+' min</span>':''} ${session.distance_km?'<span>'+session.distance_km+' km</span>':''} ${session.zone?'<span>'+esc(session.zone)+'</span>':''} ${session.heart_rate_target?'<span>'+esc(session.heart_rate_target)+'</span>':''}</div>`:''}
+ ${a ? `<p><strong>Completed:</strong> ${esc(a.activity)} · ${esc(a.duration_minutes)} min${a.distance_km!=null?' · '+esc(a.distance_km)+' km':''}${a.heart_rate?' · '+esc(a.heart_rate)+' bpm':''}${a.rpe?' · RPE '+esc(a.rpe)+'/10':''}</p>` : ''}
+ ${cardioLogForm(session)}</div>`;
+}
+function bindCardioLogForms() {
+ $$('[data-cardio-id]').forEach(form => form.onsubmit = async (event) => {
+   event.preventDefault();
+   const clientId=state.client?.id,account=state.user?.id;
+   const active=()=>state.client?.id===clientId&&state.user?.id===account&&form.isConnected;
+   const fd = new FormData(form);
+   const id=form.dataset.cardioId;
+   const session=state.data.sessions.find(x=>x.id===id);
+   if(id&&!session)return toast('Session unavailable. Reload Training.', 'error');
+   const week=currentWeek();
+   if (!week?.published) return toast('Your current week must be published first.', 'error');
+   const duration=Number(fd.get('duration'));
+   if (!Number.isFinite(duration)||duration<1||duration>1440) return toast('Enter a valid duration.', 'error');
+   const distanceText=String(fd.get('distance')||'');
+   const distance=distanceText===''?null:Number(distanceText);
+   const hrText=String(fd.get('heart_rate')||'');
+   const hr=hrText===''?null:Number(hrText);
+   const effortText=String(fd.get('rpe')||'');
+   const rpe=effortText===''?null:Number(effortText);
+   if ((distance!==null&&(!Number.isFinite(distance)||distance<0||distance>1000))||(hr!==null&&(hr<30||hr>240))||(rpe!==null&&(rpe<1||rpe>10))) return toast('Check distance, heart rate and effort.', 'error');
+   const actual={activity:String(fd.get('activity')||'Other'),duration_minutes:duration,distance_km:distance,heart_rate:hr,rpe,notes:String(fd.get('notes')||'').trim().slice(0,2000),logged_at:new Date().toISOString()};
+   const submit=form.querySelector('[type=submit]');
+   setBusy(submit,true);
+   try {
+     let saved;
+     if(session) {
+       const patch={source_metadata:{...(session.source_metadata||{}),cardio_log:actual},status:'completed',completed_at:new Date().toISOString()};
+       if(state.preview) saved={...session,...patch};
+       else { const rows=await query('Save cardio results',db.from('training_sessions').update(patch).eq('id',id).select());saved=rows[0];if(!saved)throw Error('No session updated'); }
+       if(!active())return;
+       Object.assign(session,saved);
+     } else {
+       const date=String(fd.get('session_date')||'');
+       const weekStart=week.week_start;
+       const offset=Math.round((new Date(date+'T12:00:00')-new Date(weekStart+'T12:00:00'))/864e5);
+       if(offset<0||offset>6||!Number.isFinite(offset))throw Error('Choose a date within the current training week');
+       const payload={week_id:week.id,session_date:date,training_type:'cardio',title:actual.activity+' · '+duration+' min',status:'completed',completed_at:new Date().toISOString(),source_system:'client_manual_cardio',source_metadata:{cardio_log:actual},sort_order:99};
+       if(state.preview)saved={...payload,id:'preview-cardio-'+Date.now()};
+       else {const rows=await query('Add cardio session',db.from('training_sessions').insert(payload).select());saved=rows[0];if(!saved)throw Error('Session could not be saved');}
+       if(!active())return;
+       state.data.sessions.push(saved);
+     }
+     toast('Cardio results saved');
+     clientTraining();
+   } catch(error){if(active())toast(error.message,'error');} finally {if(submit.isConnected)setBusy(submit,false);}
+ });
+}
+
 function clientTraining() {
   const week = currentWeek();
   const allSessions = state.data.sessions.filter((session) => week?.published && session.week_id === week.id);
@@ -1553,9 +1629,16 @@ function clientTraining() {
   ];
   const categoryTabs = `<div class="training-category-tabs">${categories.map(([key, label, count]) => `<button type="button" data-training-category="${key}" class="${state.trainingCategory === key ? 'active' : ''}"><b>${label}</b><span>${count}</span></button>`).join('')}</div>`;
   if (state.trainingCategory === 'steps') state.trainingCategory = 'weights';
-  if (state.trainingCategory === 'cardio' || state.trainingCategory === 'mobility') {
-    const sessions = allSessions.filter((session) => state.trainingCategory === 'cardio' ? session.training_type === 'cardio' : ['mobility', 'recovery'].includes(session.training_type));
-    $('#clientMain').innerHTML = clientHeader('', 'Training & activity', 'Your workouts, cardio and mobility. Daily step goals are in Schedule.') + categoryTabs + `<section class="panel"><div class="panel-head"><div><h2>${state.trainingCategory === 'cardio' ? 'Cardio' : 'Mobility & recovery'}</h2><span class="sub">${sessions.length} sessions this week</span></div></div><div class="activity-list">${sessions.map((session) => `<div class="activity-session">${taskMarkup(session)}${session.notes ? `<p>${esc(session.notes)}</p>` : ''}<div class="activity-rx">${session.duration_minutes ? `<span>${session.duration_minutes} min</span>` : ''}${session.distance_km ? `<span>${session.distance_km} km</span>` : ''}${session.zone ? `<span>${esc(session.zone)}</span>` : ''}${session.heart_rate_target ? `<span>${esc(session.heart_rate_target)}</span>` : ''}</div>${activityPrescription(session)}</div>`).join('') || '<div class="empty">Nothing assigned in this section.</div>'}</div></section>`;
+  if (state.trainingCategory === 'cardio') {
+    const sessions = allSessions.filter((session) => session.training_type === 'cardio').sort((a,b)=>a.session_date.localeCompare(b.session_date));
+    $('#clientMain').innerHTML = clientHeader('', 'Training & activity', 'Log the cardio you actually completed, including extra sessions.') + categoryTabs + `<section class="panel"><div class="panel-head"><div><h2>Cardio</h2><span class="sub">Your coach's sessions and your own activity</span></div></div><div class="activity-list">${sessions.map(cardioLogCard).join('') || '<div class="empty">No cardio assigned yet. You can still log your own session below.</div>'}</div></section><section class="panel"><h3>Add your own cardio session</h3><p class="sub">Log an extra run, walk, cycle, swim or other workout.</p>${cardioLogForm(null)}</section>`;
+    bindTrainingCategoryTabs();
+    bindCardioLogForms();
+    return;
+  }
+  if (state.trainingCategory === 'mobility') {
+    const sessions = allSessions.filter((session) => ['mobility', 'recovery'].includes(session.training_type));
+    $('#clientMain').innerHTML = clientHeader('', 'Training & activity', 'Your weights, cardio, mobility and steps in one clear place.') + categoryTabs + `<section class="panel"><div class="panel-head"><div><h2>Mobility & recovery</h2><span class="sub">${sessions.length} sessions this week</span></div></div><div class="activity-list">${sessions.map((session) => `<div class="activity-session">${taskMarkup(session)}${session.notes ? `<p>${esc(session.notes)}</p>` : ''}</div>`).join('') || '<div class="empty">Nothing assigned in this section.</div>'}</div></section>`;
     bindTrainingCategoryTabs(); bindCompletionActions(); return;
   }
   const sessions = allSessions.filter((session) => ['weights', 'resistance'].includes(session.training_type));

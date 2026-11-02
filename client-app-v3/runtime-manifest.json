@@ -67,7 +67,8 @@
     "progress-first.js",
     "clear-priorities.js",
     "call-followthrough.js",
-    "coach-home-focus.js"
+    "coach-home-focus.js",
+    "coach-review-brief.js"
   ],
   "styles": [
     "app.css",
