@@ -37,6 +37,7 @@
     "coach-mobile.js",
     "client-summary.js",
     "daily-nutrition-model.js",
+    "food-portion-model.js",
     "daily-nutrition.js",
     "premium-start.js",
     "coach-daily-nutrition.js",
