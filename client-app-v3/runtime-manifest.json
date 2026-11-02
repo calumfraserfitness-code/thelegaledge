@@ -71,7 +71,11 @@
     "coach-review-brief.js",
     "flexible-completion.js",
     "cardio-progress.js",
-    "practice-feedback.js"
+    "practice-feedback.js",
+    "personal-context-model.js",
+    "personal-context-ui.js",
+    "personal-coaching-home.js",
+    "coaching-finish.js"
   ],
   "styles": [
     "app.css",
@@ -117,6 +121,8 @@
     "call-followthrough.css",
     "coach-home-focus.css",
     "flexible-completion.css",
-    "practice-feedback.css"
+    "practice-feedback.css",
+    "personal-coaching-home.css",
+    "coaching-finish.css"
   ]
 }
