@@ -69,7 +69,8 @@
     "call-followthrough.js",
     "coach-home-focus.js",
     "coach-review-brief.js",
-    "flexible-completion.js"
+    "flexible-completion.js",
+    "cardio-progress.js"
   ],
   "styles": [
     "app.css",

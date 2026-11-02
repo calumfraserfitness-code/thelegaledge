@@ -31,12 +31,12 @@
   }
   return [...groups.values()].map(g=>{const days=new Map();for(const r of g.all){const prior=days.get(r.day);if(!prior||r.load>prior.load||r.load===prior.load&&r.reps>prior.reps)days.set(r.day,r);}return {...g,rows:[...days.values()].sort((a,b)=>a.day.localeCompare(b.day))};}).sort((a,b)=>b.rows.at(-1).day.localeCompare(a.rows.at(-1).day)||a.name.localeCompare(b.name));
  }
- function plot(rows,field,unit){
+ function plot(rows,field,unit,heading){
   const values=rows.map(r=>r[field]),low=Math.min(...values),high=Math.max(...values),span=high-low||Math.max(high*.1,1),min=Math.max(0,low-span*.2),max=high+span*.2;
   const start=+new Date(rows[0].day+'T12:00:00Z'),end=+new Date(rows.at(-1).day+'T12:00:00Z');
   const y=v=>207-(v-min)/(max-min)*174,num=v=>Number(v.toFixed(1)),date=d=>new Intl.DateTimeFormat('en-GB',{day:'numeric',month:'short',timeZone:'UTC'}).format(new Date(d+'T12:00:00Z'));
   const points=rows.map(r=>({x:end===start?300:66+(+new Date(r.day+'T12:00:00Z')-start)/(end-start)*480,y:y(r[field]),r}));
-  const label=(field==='load'?'Recorded weight':'Recorded reps')+' · '+unit;
+  const label=(heading||(field==='load'?'Recorded weight':'Recorded reps'))+' · '+unit;
   const grid=[min,(min+max)/2,max].map(v=>'<path d="M66 '+y(v)+'H552" stroke="#e3e9f1" stroke-dasharray="4 5"/><text x="48" y="'+(y(v)+4)+'" text-anchor="end">'+num(v)+'</text>').join('');
   const line=points.map(p=>p.x+','+p.y).join(' '),last=points.at(-1);
   return '<figure class="pf-plot"><figcaption>'+esc(label)+'<strong>'+esc(num(last.r[field])+' '+unit)+'</strong></figcaption><svg viewBox="0 0 600 260" role="img" aria-label="'+esc(label)+': '+rows.length+' recorded training dates">'+grid+'<path d="M66 207H552" stroke="#aab9cb"/>'+(points.length>1?'<polygon points="'+points[0].x+',207 '+line+' '+last.x+',207" fill="#b59a641a"/><polyline points="'+line+'" fill="none" stroke="#173c66" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>':'')+points.map((p,i)=>'<circle cx="'+p.x+'" cy="'+p.y+'" r="6" fill="#b59a64" stroke="#fff" stroke-width="2"><title>'+esc(p.r.day+' · '+p.r[field]+' '+unit)+'</title></circle>'+((points.length<=8||i===points.length-1)?'<text x="'+p.x+'" y="'+(p.y-13)+'" text-anchor="middle" class="pf-point-label">'+esc(num(p.r[field]))+'</text>':'')).join('')+'<text x="66" y="237">'+esc(date(rows[0].day))+'</text><text x="550" y="237" text-anchor="end">'+esc(date(rows.at(-1).day))+'</text></svg></figure>';
@@ -61,14 +61,14 @@
   const rows=g.rows.slice(-12).reverse();
   chart.querySelector('.pf-charts').insertAdjacentHTML('afterend','<div class="pf-dates"><table><caption>Weight and reps together · latest '+rows.length+' dates</caption><thead><tr><th>Date</th><th>Recorded load</th><th>Reps at that load</th></tr></thead><tbody>'+rows.map(r=>'<tr><th scope="row">'+esc(r.day)+'</th><td>'+esc(Number(r.load.toFixed(1))+' '+g.unit)+'</td><td>'+esc(r.reps)+'</td></tr>').join('')+'</tbody></table></div>');
  }
- window.LegalEdgeStrength={series,classification,watchMarkup};
+ window.LegalEdgeStrength={series,classification,watchMarkup,plot};
  function bind(host){if(!host)return;const client=state.client?.id,user=state.user?.id,active=()=>state.client?.id===client&&state.user?.id===user;
   datedTable(host);
   host.querySelectorAll('[data-strength-exercise]').forEach(select=>select.onchange=()=>{if(!active()||!select.isConnected)return;selected.set(client,select.value);select.closest('.pf-strength').outerHTML=strengthProgressMarkup();bind(host);});
   host.querySelectorAll('[data-strength-group]').forEach(button=>button.onclick=()=>{if(!active()||!button.isConnected)return;filters.set(client,button.dataset.strengthGroup);button.closest('.pf-strength').outerHTML=strengthProgressMarkup();bind(host);});
   host.querySelectorAll('[data-pf-route]').forEach(b=>b.onclick=()=>{if(!active()||!b.isConnected)return;if(state.role==='coach'&&!document.querySelector('#clientApp:not(.hidden)')){state.clientTab=({training:'training',health:'connections',checkin:'check-ins'})[b.dataset.pfRoute]||'progress';renderCoach();}else{state.clientView=b.dataset.pfRoute;renderClient();}});
  }
- function first(host){const chart=host?.querySelector('.pf-strength');if(chart){const heading=host.querySelector('.page-head');if(heading)heading.after(chart);else host.prepend(chart);const watch=watchMarkup();host.querySelectorAll('.pf-watch').forEach(n=>n.remove());if(watch){host.querySelector('.health-summary')?.remove();chart.insertAdjacentHTML('beforebegin',watch);}}bind(host);}
+ function first(host){const chart=host?.querySelector('.pf-strength');if(chart){host.append(chart);const watch=watchMarkup();host.querySelectorAll('.pf-watch').forEach(n=>n.remove());if(watch){host.querySelector('.health-summary')?.remove();const heading=host.querySelector('.page-head');if(heading)heading.insertAdjacentHTML('afterend',watch);else host.insertAdjacentHTML('afterbegin',watch);}}bind(host);}
  const client=clientProgress;clientProgress=function(){const r=client();first($('#clientMain'));return r;};
  const coach=coachProgress;coachProgress=function(){const r=coach();first($('#clientWorkspaceBody'));const panel=$('#coachProgressForm')?.closest('.panel');if(panel&&!panel.closest('details')){const detail=document.createElement('details');detail.className='pf-history-entry';detail.innerHTML='<summary>Add or backdate a progress entry</summary>';panel.before(detail);detail.append(panel);}return r;};
  const goals=coachingGoalsMarkup;coachingGoalsMarkup=function(){const box=document.createElement('div');box.innerHTML=goals();const heading=box.querySelector('h2');if(heading)heading.textContent='Your focus';box.querySelectorAll('.cw-lines').forEach(p=>{const full=p.textContent,at=full.search(/\b(?:Source:|Recorded:)/i);if(at<0)return;p.textContent=full.slice(0,at).trim();const detail=document.createElement('details');detail.innerHTML='<summary>Coach reference & recorded date</summary>';const text=document.createElement('p');text.textContent=full.slice(at);detail.append(text);p.after(detail);});return box.innerHTML;};
