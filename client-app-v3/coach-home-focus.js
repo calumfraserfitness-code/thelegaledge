@@ -59,7 +59,8 @@
    }
   }
   // Move, never reconstruct, original tools: their handlers, receipts and retry states survive.
-  Array.from(host.children).filter(node=>node!==shell&&node.id!=='priorityAttention').forEach(node=>{shell.querySelector('[data-home-content="'+groupFor(node)+'"]').append(node);});
+  Array.from(host.children).filter(node=>node!==shell&&node.id!=='priorityAttention'&&node.id!=='coachCompletionFeed').forEach(node=>{shell.querySelector('[data-home-content="'+groupFor(node)+'"]').append(node);});
+  const feed=host.querySelector('#coachCompletionFeed');if(feed&&feed.parentElement!==shell.querySelector('[data-home-primary]'))shell.querySelector('[data-home-primary]').append(feed);
   const watch=host.querySelector('#psWatchFeed');if(watch)compactWatch(watch);
   // Async modules replace these cards after initial rendering. Return them to the same group.
   ['coachActivity','psInbox','bwCoachQueue','psWatchFeed'].forEach(id=>{const node=host.querySelector('#'+id);if(!node)return;const target=shell.querySelector('[data-home-content="'+groupFor(node)+'"]');if(node.parentElement!==target)target.append(node);});

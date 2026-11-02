@@ -1207,7 +1207,7 @@ function flattenCheckinAnswers(value, prefix = '') {
 function checkinCard(checkin, coach = false) {
   const answers = answersFor(checkin);
   return `<details class="checkin-card rich-checkin" ${checkin === state.data.checkins[0] ? 'open' : ''}><summary><div><span class="eyebrow">WEEK ${checkin.week_number || '—'}</span><h3>${esc(checkin.original_date_text || fmt(checkin.submitted_at))}</h3></div><div class="score">${checkin.week_score ?? '—'}/10</div></summary>
-    <div class="detail-list"><div class="detail"><label>Weight</label>${displayWeight(checkin.weight_kg)}</div><div class="detail"><label>Energy</label>${checkin.energy ?? '—'}/10</div><div class="detail"><label>Sleep</label>${checkin.sleep ?? '—'}/10</div><div class="detail"><label>Stress</label>${checkin.stress ?? '—'}/10</div><div class="detail"><label>Training</label>${checkin.training_adherence == null ? '—' : checkin.training_adherence + '%'}</div><div class="detail"><label>Nutrition</label>${checkin.nutrition_adherence == null ? '—' : checkin.nutrition_adherence + '%'}</div><div class="detail"><label>Average steps</label>${checkin.average_steps != null ? Number(checkin.average_steps).toLocaleString() : '—'}</div></div>
+    <div class="detail-list"><div class="detail"><label>Weight</label>${displayWeight(checkin.weight_kg)}</div><div class="detail"><label>Energy</label>${checkin.energy ?? '—'}/10</div><div class="detail"><label>Sleep</label>${checkin.sleep ?? '—'}/10</div><div class="detail"><label>Stress</label>${checkin.stress ?? '—'}/10</div><div class="detail"><label>Training · self-reported</label>${checkin.training_adherence == null ? '—' : checkin.training_adherence + '%'}</div><div class="detail"><label>Nutrition · self-reported</label>${checkin.nutrition_adherence == null ? '—' : checkin.nutrition_adherence + '%'}</div><div class="detail"><label>Average steps</label>${checkin.average_steps != null ? Number(checkin.average_steps).toLocaleString() : '—'}</div></div>
     <div class="original-answers">${answers.length ? answers.map(([question, answer]) => `<div class="answer-block"><h4>${esc(question)}</h4><p>${esc(answer)}</p></div>`).join('') : '<p class="source-gap">No written response was submitted for this week.</p>'}</div>
     ${safeMediaUrl(checkin.voice_note_url) ? `<a class="loom-card" href="${esc(safeMediaUrl(checkin.voice_note_url))}" target="_blank" rel="noopener"><span>▶</span><div><b>Weekly check-in video</b><small>Open coach review</small></div></a>` : ''}
     ${!coach && checkin.focus_next_week ? `<div class="coach-note"><b>Agreed action points</b><p>${esc(checkin.focus_next_week)}</p></div>` : ''}
@@ -1566,7 +1566,7 @@ function cardioLogForm(session) {
 function cardioLogCard(session) {
  const a=session.source_metadata?.cardio_log;
  return `<div class="activity-session" style="margin-bottom:16px"><h3>${esc(session.title)}</h3>
- <p class="sub">${fmt(session.session_date)} · ${session.source_system === 'client_manual_cardio'?'Added by client':'Coach prescribed'} · ${esc(session.status)}</p>
+ <p class="sub">${session.source_system === 'client_manual_cardio'?fmt(session.session_date)+' · Added by client':'Coach prescribed · complete when ready'} · ${esc(session.status)}</p>
  ${session.source_system !== 'client_manual_cardio' ? `<div class="activity-rx"><b>Coach target:</b> ${session.duration_minutes?'<span>'+session.duration_minutes+' min</span>':''} ${session.distance_km?'<span>'+session.distance_km+' km</span>':''} ${session.zone?'<span>'+esc(session.zone)+'</span>':''} ${session.heart_rate_target?'<span>'+esc(session.heart_rate_target)+'</span>':''}</div>`:''}
  ${a ? `<p><strong>Completed:</strong> ${esc(a.activity)} · ${esc(a.duration_minutes)} min${a.distance_km!=null?' · '+esc(a.distance_km)+' km':''}${a.heart_rate?' · '+esc(a.heart_rate)+' bpm':''}${a.rpe?' · RPE '+esc(a.rpe)+'/10':''}</p>` : ''}
  ${cardioLogForm(session)}</div>`;
@@ -1599,7 +1599,7 @@ function bindCardioLogForms() {
      if(session) {
        const patch={source_metadata:{...(session.source_metadata||{}),cardio_log:actual},status:'completed',completed_at:new Date().toISOString()};
        if(state.preview) saved={...session,...patch};
-       else { const rows=await query('Save cardio results',db.from('training_sessions').update(patch).eq('id',id).select());saved=rows[0];if(!saved)throw Error('No session updated'); }
+       else { const result=await query('Save cardio results',db.rpc('save_session_completion',{p_session:id,p_complete:true,p_cardio:actual}));if(result?.session_id!==id||result.client_id!==clientId)throw Error('Cardio save was not confirmed');saved={...session,status:result.status,completed_at:result.completed_at,source_metadata:result.source_metadata}; }
        if(!active())return;
        Object.assign(session,saved);
      } else {
@@ -1638,7 +1638,7 @@ function clientTraining() {
   }
   if (state.trainingCategory === 'mobility') {
     const sessions = allSessions.filter((session) => ['mobility', 'recovery'].includes(session.training_type));
-    $('#clientMain').innerHTML = clientHeader('', 'Training & activity', 'Your weights, cardio, mobility and steps in one clear place.') + categoryTabs + `<section class="panel"><div class="panel-head"><div><h2>Mobility & recovery</h2><span class="sub">${sessions.length} sessions this week</span></div></div><div class="activity-list">${sessions.map((session) => `<div class="activity-session">${taskMarkup(session)}${session.notes ? `<p>${esc(session.notes)}</p>` : ''}</div>`).join('') || '<div class="empty">Nothing assigned in this section.</div>'}</div></section>`;
+    $('#clientMain').innerHTML = clientHeader('', 'Training & activity', 'Your weights, cardio, mobility and steps in one clear place.') + categoryTabs + `<section class="panel"><div class="panel-head"><div><h2>Mobility & recovery</h2><span class="sub">${sessions.length} sessions this week</span></div></div><div class="activity-list">${sessions.map((session) => `<div class="activity-session">${taskMarkup(session)}${session.notes ? `<p>${esc(session.notes)}</p>` : ''}${activityPrescription(session)}</div>`).join('') || '<div class="empty">Nothing assigned in this section.</div>'}</div></section>`;
     bindTrainingCategoryTabs(); bindCompletionActions(); return;
   }
   const sessions = allSessions.filter((session) => ['weights', 'resistance'].includes(session.training_type));
@@ -1647,7 +1647,7 @@ function clientTraining() {
     $('#clientMain').innerHTML = clientHeader('', 'Training & activity', 'Your workouts, cardio and mobility. Daily step goals are in Schedule.') + categoryTabs + `<div class="session-picker">${sessions.map((session) => `<button class="session-tile" data-open-session="${session.id}"><span>${fmt(session.session_date, { weekday: 'short', day: 'numeric', month: 'short' })}</span><strong>${esc(session.title)}</strong><small>${exercisesForSession(session).length} exercises · ${session.status === 'completed' ? 'Completed' : 'Planned'}</small></button>`).join('') || '<div class="empty">No weights or resistance session is scheduled this week.</div>'}</div>`;
     bindTrainingCategoryTabs(); return bindOpenSessions();
   }
-  $('#clientMain').innerHTML = `<button class="text-btn back-to-sessions" id="backToSessions">← All sessions</button>` + clientHeader('', selected.title, fmt(selected.session_date, { weekday: 'long', day: 'numeric', month: 'long' })) + categoryTabs + `<section class="panel workout"><div class="panel-head"><div><h2>Workout prescription</h2><span class="sub">${exercisesForSession(selected).length} exercises</span></div>${taskMarkup(selected)}</div>${exercisesForSession(selected).map((exercise) => exerciseCard(exercise, true)).join('') || '<div class="empty">No exercise prescription is attached to this workout.</div>'}</section>`;
+  $('#clientMain').innerHTML = `<button class="text-btn back-to-sessions" id="backToSessions">← All sessions</button>` + clientHeader('', selected.title, 'Complete when ready. Session numbers show programme order, not fixed weekdays.') + categoryTabs + `<section class="panel workout"><div class="panel-head"><div><h2>Workout prescription</h2><span class="sub">${exercisesForSession(selected).length} exercises</span></div>${taskMarkup(selected)}</div>${exercisesForSession(selected).map((exercise) => exerciseCard(exercise, true)).join('') || '<div class="empty">No exercise prescription is attached to this workout.</div>'}</section>`;
   $('#backToSessions').onclick = () => { state.selectedSessionId = null; clientTraining(); };
   bindTrainingCategoryTabs();
   bindCompletionActions();

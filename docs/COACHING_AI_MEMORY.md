@@ -1,5 +1,7 @@
 # Legal Edge operating memory
 
+Session numbers describe programme order, not weekdays. Next-session selection must not skip unfinished sessions solely because their plan date passed. Recovery practices use per-local-date receipts, preserving previous days on undo; client/coach attribution requires an actual saved actor receipt. Existing completion timestamps do not establish who entered them. Use save_session_completion for guarded session/practice/cardio saves; normal client source-metadata edits are intentionally blocked by the prescription trigger. Keep written walkthroughs distinct from recorded video tutorials.
+
 A current-week-only inbox hides Sunday submissions on Monday. Load a separate bounded outstanding-review backlog; label imported records and their unverified timestamps separately. A capped/failed backlog is unavailable, never zero. Review-context preparation is an explicit coach-only copy workflow, not model inference or client feedback publication.
 
 Test layout extensions together at phone widths. Independent mutation observers must respect one DOM owner per panel: the legacy mobile collapse wrapper skips Coach Home-owned panels. Isolated passing tests can miss a cross-module move/re-wrap loop; assert the combined DOM settles after asynchronous updates.

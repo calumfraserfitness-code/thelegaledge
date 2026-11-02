@@ -68,7 +68,8 @@
     "clear-priorities.js",
     "call-followthrough.js",
     "coach-home-focus.js",
-    "coach-review-brief.js"
+    "coach-review-brief.js",
+    "flexible-completion.js"
   ],
   "styles": [
     "app.css",
@@ -112,6 +113,7 @@
     "progress-first.css",
     "clear-priorities.css",
     "call-followthrough.css",
-    "coach-home-focus.css"
+    "coach-home-focus.css",
+    "flexible-completion.css"
   ]
 }
