@@ -8,3 +8,6 @@ assert.equal(ideas[0].meal.name,'Bowl');assert.equal(ideas[0].meal.calories,400)
 const unknown=M.mealIdeas(recipes,[{eaten:true,servings:1,meal:{calories:100,protein_g:null}}],{calories:null,protein_g:100},'Lunch');assert(unknown.every(x=>x.after.calories===null&&x.after.protein_g===null&&!x.comparable));
 assert.deepEqual(goals,{calories:1800,protein_g:130,carbs_g:200,fat_g:50});assert.equal(rows[1].eaten,false);
 console.log('PASS: meal ideas use actual remaining intake, assigned portions, group filters and family deduplication; unknown nutrients remain unknown and prescriptions stay unchanged.');
+assert.equal(M.recipeFamily({name:'Greek Yogurt Bowl · strawberries'}),M.recipeFamily({name:'Greek Yogurt Bowl · banana'}));
+assert.notEqual(M.recipeFamily({name:'Warm Protein Oats'}),M.recipeFamily({name:'Greek Yogurt Bowl'}));
+assert.notEqual(M.recipeFamily({name:'Chicken · Rice'}),M.recipeFamily({name:'Chicken · Pasta'}),'Different meal bases are separate choices');

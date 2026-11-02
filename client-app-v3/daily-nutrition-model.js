@@ -38,6 +38,11 @@
   return a!==null&&a>0&&b!==null&&p!==null&&q!==null&&Math.abs(a-b)<=Math.max(50,a*.2)&&Math.abs(p-q)<=Math.max(5,p*.25);
  }
  function matchesGroup(recipe,group){return recipe.group===group||recipe.groups?.includes(group)===true;}
+ function recipeFamily(meal){
+  const name=String(meal.name||'Meal').trim();
+  const explicit=(meal.tags||[]).find(t=>String(t).startsWith('recipe-family:'));
+  return (explicit?explicit.slice(14):name.replace(/^(Greek Yogurt (?:Protein Oat )?Bowl)\s*·.*$/i,'$1')).toLowerCase();
+ }
  function mealIdeas(recipes,rows,goals,group='All'){
   const eaten=totals(rows,true),remaining=Object.fromEntries(fields.map(k=>[k,number(goals[k])===null||eaten[k]===null?null:goals[k]-eaten[k]]));
   const portions=Math.max(1,rows.filter(r=>!r.eaten).length),families=new Map();
@@ -49,11 +54,11 @@
    const fits=remaining.calories!==null&&cal!==null&&cal<=Math.max(0,remaining.calories);
    const after=Object.fromEntries(fields.map(k=>[k,remaining[k]===null||number(meal[k])===null?null:remaining[k]-number(meal[k])]));
    const item={...recipe,group:group==='All'?recipe.group:group,score,fits,after,remaining,comparable:remaining.calories!==null&&cal!==null&&remaining.protein_g!==null&&protein!==null};
-   const key=recipe.group+':'+String(meal.name).trim().toLowerCase(),old=families.get(key);
+   const key=recipe.group+':'+recipeFamily(meal),old=families.get(key);
    if(!old||score<old.score)families.set(key,item);
   }
   return [...families.values()].sort((a,b)=>a.score-b.score||String(a.meal.name).localeCompare(String(b.meal.name)));
  }
- const model={fields,number,category,snapshot,slots,totals,targets,targetRange,comparable,matchesGroup,mealIdeas};
+ const model={fields,number,category,snapshot,slots,totals,targets,targetRange,comparable,matchesGroup,recipeFamily,mealIdeas};
  root.DailyNutrition=model;if(typeof module!=='undefined')module.exports=model;
 })(typeof window==='undefined'?globalThis:window);
