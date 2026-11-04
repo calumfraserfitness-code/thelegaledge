@@ -1197,13 +1197,14 @@ function flattenCheckinAnswers(value, prefix = '') {
 }
 
 function checkinCard(checkin, coach = false) {
-  const answers = answersFor(checkin);
+  const answers = answersFor(checkin), appFeedback = coach || checkin.review_channel !== 'whatsapp';
   return `<details class="checkin-card rich-checkin" ${checkin === state.data.checkins[0] ? 'open' : ''}><summary><div><span class="eyebrow">WEEK ${checkin.week_number || '—'}</span><h3>${esc(checkin.original_date_text || fmt(checkin.submitted_at))}</h3></div><div class="score">${checkin.week_score ?? '—'}/10</div></summary>
     <div class="detail-list"><div class="detail"><label>Weight</label>${displayWeight(checkin.weight_kg)}</div><div class="detail"><label>Energy</label>${checkin.energy ?? '—'}/10</div><div class="detail"><label>Sleep</label>${checkin.sleep ?? '—'}/10</div><div class="detail"><label>Stress</label>${checkin.stress ?? '—'}/10</div><div class="detail"><label>Training · self-reported</label>${checkin.training_adherence == null ? '—' : checkin.training_adherence + '%'}</div><div class="detail"><label>Nutrition · self-reported</label>${checkin.nutrition_adherence == null ? '—' : checkin.nutrition_adherence + '%'}</div><div class="detail"><label>Average steps</label>${checkin.average_steps != null ? Number(checkin.average_steps).toLocaleString() : '—'}</div></div>
     <div class="original-answers">${answers.length ? answers.map(([question, answer]) => `<div class="answer-block"><h4>${esc(question)}</h4><p>${esc(answer)}</p></div>`).join('') : '<p class="source-gap">No written response was submitted for this week.</p>'}</div>
-    ${safeMediaUrl(checkin.voice_note_url) ? `<a class="loom-card" href="${esc(safeMediaUrl(checkin.voice_note_url))}" target="_blank" rel="noopener"><span>▶</span><div><b>Weekly check-in video</b><small>Open coach review</small></div></a>` : ''}
-    ${!coach && checkin.focus_next_week ? `<div class="coach-note"><b>Agreed action points</b><p>${esc(checkin.focus_next_week)}</p></div>` : ''}
-    ${coach ? `<label class="field">Coach response<textarea data-checkin-response="${checkin.id}">${esc(checkin.coach_response || '')}</textarea></label><label class="field">Weekly video URL<input type="url" data-checkin-video="${checkin.id}" value="${esc(checkin.voice_note_url || '')}"></label>` : (checkin.coach_response ? `<div class="coach-note"><b>Coach response</b><p>${esc(checkin.coach_response)}</p></div>` : '')}
+    ${!coach && checkin.reviewed_at && checkin.review_channel === 'whatsapp' ? '<div class="coach-note"><b>Reviewed via WhatsApp</b><p>Your coach replied in WhatsApp. Open that conversation for the response.</p></div>' : ''}
+    ${appFeedback && safeMediaUrl(checkin.voice_note_url) ? `<a class="loom-card" href="${esc(safeMediaUrl(checkin.voice_note_url))}" target="_blank" rel="noopener"><span>▶</span><div><b>Weekly check-in video</b><small>Open coach review</small></div></a>` : ''}
+    ${!coach && appFeedback && checkin.focus_next_week ? `<div class="coach-note"><b>Agreed action points</b><p>${esc(checkin.focus_next_week)}</p></div>` : ''}
+    ${coach ? `<label class="field">Coach response<textarea data-checkin-response="${checkin.id}">${esc(checkin.coach_response || '')}</textarea></label><label class="field">Weekly video URL<input type="url" data-checkin-video="${checkin.id}" value="${esc(checkin.voice_note_url || '')}"></label>` : (appFeedback && checkin.coach_response ? `<div class="coach-note"><b>Coach response</b><p>${esc(checkin.coach_response)}</p></div>` : '')}
   </details>`;
 }
 

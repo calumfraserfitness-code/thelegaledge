@@ -29,7 +29,7 @@ clientToday = function() {
     <section class="panel"><div class="panel-head"><h2>Meals for today</h2>${m.mealPlan ? `<button class="btn primary small" data-open-meal-plan="${esc(m.mealPlan.id)}" data-meal-date="${m.date}">Ingredients & preparation</button>` : ''}</div>${m.mealPlan ? `<h3>${esc(nutritionDayLabel(m.mealPlan))}</h3>${meals.length ? `<div class="pw-meals">${meals.map(({meal}) => `<div><span class="eyebrow">${esc(title(meal.meal_type || 'Meal'))}</span><h3>${esc(meal.name)}</h3></div>`).join('')}</div>` : '<p>No measured meals are attached to this assigned menu yet. Ask your coach to complete it.</p>'}` : '<p>No meal plan is assigned to today. Your coach can assign a dated menu in your planner.</p>'}</section>
     <section class="panel"><div class="panel-head"><h2>This week</h2><button class="btn ghost small" data-today-view="progress">View progress</button></div><div class="pw-week-stats"><div><strong>${completed}/${m.weeklySessions.length}</strong><span>Assigned activities completed</span></div><div><strong>${m.checkin ? (m.checkin.reviewed_at ? 'Reviewed' : 'Submitted') : 'Not submitted'}</strong><span>Weekly check-in</span></div></div><button class="btn primary" data-today-view="checkin">${m.checkin ? 'View weekly check-in' : 'Complete weekly check-in'}</button></section>
     ${m.week?.coach_note ? `<section class="panel"><span class="eyebrow">WEEKLY FOCUS</span><p class="cw-lines">${esc(m.week.coach_note)}</p></section>` : ''}
-    ${m.checkin?.coach_response || m.checkin?.focus_next_week ? `<section class="panel"><h2>Your coach’s next steps</h2>${m.checkin.coach_response ? `<p class="cw-lines">${esc(m.checkin.coach_response)}</p>` : ''}${m.checkin.focus_next_week ? `<p class="cw-lines">${esc(m.checkin.focus_next_week)}</p>` : ''}${safeMediaUrl(m.checkin.voice_note_url) ? `<a class="btn ghost" href="${esc(safeMediaUrl(m.checkin.voice_note_url))}" target="_blank" rel="noopener">Watch coach review</a>` : ''}</section>` : ''}
+    ${m.checkin?.review_channel!=='whatsapp'&&(m.checkin?.coach_response || m.checkin?.focus_next_week) ? `<section class="panel"><h2>Your coach’s next steps</h2>${m.checkin.coach_response ? `<p class="cw-lines">${esc(m.checkin.coach_response)}</p>` : ''}${m.checkin.focus_next_week ? `<p class="cw-lines">${esc(m.checkin.focus_next_week)}</p>` : ''}${safeMediaUrl(m.checkin.voice_note_url) ? `<a class="btn ghost" href="${esc(safeMediaUrl(m.checkin.voice_note_url))}" target="_blank" rel="noopener">Watch coach review</a>` : ''}</section>` : ''}
     ${nextCall ? `<section class="panel"><h2>Upcoming coaching review</h2><p>${esc(nextCall.title)} · ${fmt(nextCall.scheduled_at)} · ${nextCall.duration_minutes} minutes</p><button class="btn ghost" data-today-view="support">View agreed time & details</button></section>` : ''}`;
   bindCompletionActions(); bindOpenSessions(); bindMealPlanLinks();
   $$('[data-today-view]').forEach(b => b.onclick = () => {state.clientView=b.dataset.todayView;renderClient();});
@@ -89,22 +89,33 @@ coachCheckins=function(){
   $$('[data-checkin-response]').forEach(field=>{
     const c=state.data.checkins.find(c=>c.id===field.dataset.checkinResponse);if(!c)return;
     const card=field.closest('details');field.closest('label').remove();card.querySelector('[data-checkin-video]')?.closest('label').remove();
-    card.insertAdjacentHTML('beforeend',`<form data-coach-review="${esc(c.id)}" class="editor-grid pw-review-form"><label class="wide">Coach response<textarea name="response_text" rows="4">${esc(c.coach_response || '')}</textarea></label><label class="wide">Agreed action points<textarea name="action_points" rows="3">${esc(c.focus_next_week || '')}</textarea></label><label class="wide">HTTPS Loom / review video<input name="video_url" type="url" pattern="https://.*" value="${esc(c.voice_note_url || '')}"></label><label class="toggle-field wide"><input name="mark_reviewed" type="checkbox" ${c.reviewed_at?'checked':''}> Mark review complete</label><p class="wide muted">${c.reviewed_at?'Reviewed '+fmt(c.reviewed_at):'Awaiting completed coach review'}</p><button class="btn primary wide">Save coach review</button></form>`);
-    card.querySelector('form[data-coach-review]').onsubmit=e=>saveExplicitCoachReview(e,c);
+    card.insertAdjacentHTML('beforeend',`<form data-coach-review="${esc(c.id)}" class="editor-grid pw-review-form"><label class="wide">Coach response<textarea name="response_text" rows="4">${esc(c.coach_response || '')}</textarea></label><label class="wide">Agreed action points<textarea name="action_points" rows="3">${esc(c.focus_next_week || '')}</textarea></label><label class="wide">HTTPS Loom / review video<input name="video_url" type="url" pattern="https://.*" value="${esc(c.voice_note_url || '')}"></label><label class="wide">Reply sent through<select name="review_method"><option value="app" ${c.review_channel!=='whatsapp'?'selected':''}>App response / video</option><option value="whatsapp" ${c.review_channel==='whatsapp'?'selected':''}>WhatsApp</option></select></label><label class="toggle-field wide"><input name="mark_reviewed" type="checkbox" ${c.reviewed_at?'checked':''}> Mark review complete</label><p class="wide muted" data-review-method-note hidden>Confirm you have already replied on WhatsApp. This saves review status only; your app draft stays separate.</p><p class="wide muted" data-review-save-status role="status">${coachReviewStatus(c)}</p><button class="btn primary wide">Save coach review</button></form>`);
+    const form=card.querySelector('form[data-coach-review]'),method=form.elements.review_method;
+    function syncMethod(){const whatsapp=method.value==='whatsapp';form.querySelector('[data-review-method-note]').hidden=!whatsapp;for(const name of ['response_text','action_points','video_url']){const field=form.elements[name];field.disabled=whatsapp;field.closest('label').hidden=whatsapp;}}
+    method.onchange=()=>{if(method.value==='whatsapp')form.elements.mark_reviewed.checked=true;syncMethod();};syncMethod();
+    form.onsubmit=e=>saveExplicitCoachReview(e,c);
   });
 };
+function coachReviewStatus(checkin){return checkin.reviewed_at?'Reviewed '+fmt(checkin.reviewed_at)+(checkin.review_channel==='whatsapp'?' · WhatsApp':''):'Awaiting completed coach review';}
 async function saveExplicitCoachReview(event,checkin) {
-  event.preventDefault();const fd=new FormData(event.target),clientId=state.client.id;
+  event.preventDefault();const form=event.target;if(form.dataset.saving==='true')return;
+  const fd=new FormData(form),clientId=state.client.id,userId=state.user?.id,role=state.role,whatsapp=fd.get('review_method')==='whatsapp';
+  if(role!=='coach'||checkin.client_id&&checkin.client_id!==clientId)return toast('Open this check-in in its coach workspace.','error');
+  const active=()=>state.client?.id===clientId&&state.user?.id===userId&&state.role===role;
   const args={target_checkin_id:checkin.id,response_text:String(fd.get('response_text')||''),video_url:String(fd.get('video_url')||''),action_points:String(fd.get('action_points')||''),mark_reviewed:fd.has('mark_reviewed')};
-  if(args.mark_reviewed&&!args.response_text.trim()&&!args.video_url.trim())return toast('Add your response or video before marking the review complete.','error');
-  if(args.video_url&&!safeMediaUrl(args.video_url))return toast('Use a valid HTTPS review link.','error');
-  setBusy(event.submitter,true);
+  if(!whatsapp&&args.mark_reviewed&&!args.response_text.trim()&&!args.video_url.trim())return toast('Add your response or video, or choose WhatsApp if you replied there.','error');
+  if(!whatsapp&&args.video_url&&!safeMediaUrl(args.video_url))return toast('Use a valid HTTPS review link.','error');
+  const status=form.querySelector('[data-review-save-status]');if(status)status.textContent='Saving review status…';form.dataset.saving='true';setBusy(event.submitter,true);
   try{
-    const saved=state.preview?{...checkin,coach_response:args.response_text,voice_note_url:args.video_url,focus_next_week:args.action_points,reviewed_at:args.mark_reviewed?new Date().toISOString():null}:await query('Coach review',db.rpc('save_checkin_review',args));
-    if(!saved?.id)throw new Error('The review was not saved.');if(state.client?.id!==clientId)return;
-    Object.assign(checkin,saved);coachCheckins();toast(state.preview?'Sample review saved locally':args.mark_reviewed?'Review completed':'Review draft saved');
-  }catch(error){toast(error.message,'error');setBusy(event.submitter,false);}
+    const saved=state.preview?(whatsapp?{...checkin,client_id:clientId,reviewed_at:args.mark_reviewed?(checkin.reviewed_at||new Date().toISOString()):null,review_channel:args.mark_reviewed?'whatsapp':null}:{...checkin,client_id:clientId,coach_response:args.response_text,voice_note_url:args.video_url,focus_next_week:args.action_points,reviewed_at:args.mark_reviewed?new Date().toISOString():null,review_channel:args.mark_reviewed?'app':null}):await query('Coach review',whatsapp?db.rpc('set_checkin_whatsapp_review',{p_checkin:checkin.id,p_reviewed:args.mark_reviewed}):db.rpc('save_checkin_review',args));
+    if(saved?.id!==checkin.id||saved.client_id!==clientId)throw new Error('The review save was not confirmed. Your draft is still here.');if(!active())return;
+    Object.assign(checkin,saved);const index=state.data.checkins.findIndex(row=>row.id===saved.id);if(index>=0)state.data.checkins[index]=saved;
+    if(whatsapp){if(form.isConnected){form.elements.mark_reviewed.checked=!!saved.reviewed_at;if(status)status.textContent=coachReviewStatus(saved)+(saved.reviewed_at?' · No message sent from the app.':'');}toast(state.preview?'Sample review status saved locally':saved.reviewed_at?'Reviewed via WhatsApp':'Check-in reopened');}
+    else{if(form.isConnected)coachCheckins();toast(state.preview?'Sample review saved locally':args.mark_reviewed?'Review completed':'Review draft saved');}
+  }catch(error){if(active()){if(status&&form.isConnected)status.textContent='Not saved. Your draft is still here; retry.';toast(error.message,'error');}}
+  finally{delete form.dataset.saving;setBusy(event.submitter,false);}
 }
+
 const beforeTodayCompletionBindings=bindCompletionActions;
 bindCompletionActions=function(){beforeTodayCompletionBindings();$$('[data-session-complete]').forEach(input=>{const save=input.onchange,clientId=state.client.id;input.onchange=async()=>{await save();if(state.clientView==='today'&&state.client?.id===clientId)clientToday();};});};
 importTrainingJson=async function(event){
