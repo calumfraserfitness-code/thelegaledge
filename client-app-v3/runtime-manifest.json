@@ -77,7 +77,9 @@
     "personal-context-ui.js",
     "personal-coaching-home.js",
     "coaching-finish.js",
-    "training-library-speed.js"
+    "training-library-speed.js",
+    "weigh-in-routine-model.js",
+    "weigh-in-routine.js"
   ],
   "styles": [
     "app.css",
@@ -126,6 +128,7 @@
     "practice-feedback.css",
     "personal-coaching-home.css",
     "coaching-finish.css",
-    "tab-performance.css"
+    "tab-performance.css",
+    "weigh-in-routine.css"
   ]
 }

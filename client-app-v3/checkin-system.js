@@ -107,6 +107,7 @@
      const base=failed?'Some saved entries could not refresh. Your last loaded records remain available.':raced?'A save completed while checking. Your saved entries were kept; refresh again for the latest records.':'Saved entries checked '+stamp(new Date().toISOString())+'.';
      statusEntries(base+(needsDisplay&&!canRepaint?' New weights or check-ins are loaded. Your current edits and video stay open; reopen Overview, Check-ins or Progress when ready.':needsDisplay?' Updated entries are shown.':''));
     }else if(role==='client'){reviewCard();window.PracticeFeedback?.refresh?.();}
+    window.WeighInRoutine?.mount?.();
    }
    if(!active())return;
    if(role==='coach'&&!id&&state.coachView==='reviews'&&!document.activeElement?.matches('input,textarea,select'))await renderReviewQueue(0);
@@ -114,7 +115,7 @@
   }catch{if(active()&&role==='coach'&&id)statusEntries('Saved entries could not refresh. Your last loaded records and edits remain available. Try Refresh saved entries again.');}
   finally{if(inFlight===running){inFlight=null;if(active())workspaceEntries();}}})();return running.promise;
  }
- function reviewCard(){if(state.role!=='client'||state.client?.onboarding_status!=='complete')return;if(state.clientView==='today'&&window.LegalEdgePriorities){window.LegalEdgePriorities.home();return;}const c=state.data.checkins.find(c=>c.reviewed_at&&(c.coach_response||c.voice_note_url));let card=document.querySelector('#csCoachReview');if(!c){card?.remove();return;}
+ function reviewCard(){if(state.role!=='client'||state.client?.onboarding_status!=='complete')return;if(state.clientView==='today'&&window.LegalEdgePriorities){if(document.querySelector('#personalCoachingHome'))window.PersonalCoachingHome?.arrange?.();else{window.LegalEdgePriorities.home();window.PersonalCoachingHome?.mount?.();}return;}const c=state.data.checkins.find(c=>c.reviewed_at&&(c.coach_response||c.voice_note_url));let card=document.querySelector('#csCoachReview');if(!c){card?.remove();return;}
   const url=safeMediaUrl(c.voice_note_url),loom=url?.match(/^https:\/\/(?:www\.)?loom\.com\/share\/([a-f0-9]{32})(?:[?/#]|$)/i);
   const stamp=[c.id,c.reviewed_at,c.coach_response,url].join('|');if(card?.dataset.stamp===stamp)return;if(!card){card=document.createElement('section');card.id='csCoachReview';card.className='panel cs-review';document.querySelector('#clientMain')?.prepend(card);}card.dataset.stamp=stamp;
   card.innerHTML='<span class="eyebrow">YOUR COACH REVIEW</span><h2>Your coach’s next steps</h2><p class="muted">'+esc(fmt(c.reviewed_at))+' · Your submitted check-in stays saved.</p>'+(loom?'<button type="button" class="cs-play" data-cs-play><span>▶</span><strong>Your weekly video review</strong><small>Watch your coach’s feedback</small></button>':'')+(url?'<a class="btn primary" href="'+esc(url)+'" target="_blank" rel="noopener">Watch your coach’s review ↗</a>':'')+(c.coach_response?'<p class="cw-lines">'+esc(c.coach_response)+'</p>':'')+(c.focus_next_week?'<h3>Agreed next steps</h3><p class="cw-lines">'+esc(c.focus_next_week)+'</p>':'');
