@@ -29,20 +29,33 @@ exerciseCard=function(ex,loggable=false){
  return html;
 };
 function checkinClientWeek(){return window.CheckinStatus?window.CheckinStatus.week(state.client):iso(monday());}
-function checkinWeekChoices(){const now=checkinClientWeek(),date=new Date(now+'T12:00:00');const past=Array.from({length:52},(_,i)=>iso(new Date(+date-i*7*86400000))).filter(d=>!state.client.start_date||d>=state.client.start_date);return [...new Set([now,...past,...state.data.weeks.filter(w=>w.week_start<=now).map(w=>w.week_start)])].sort().reverse();}
+function checkinWeekChoices(){const now=checkinClientWeek(),date=new Date(now+'T12:00:00Z');const past=Array.from({length:52},(_,i)=>iso(new Date(+date-i*7*86400000))).filter(d=>!state.client.start_date||iso(new Date(+new Date(d+'T12:00:00Z')+6*86400000))>=state.client.start_date);return [...new Set([now,...past,...state.data.weeks.filter(w=>w.week_start<=now).map(w=>w.week_start)])].sort().reverse();}
+function checkinWeekLabel(start){
+ const first=new Date(start+'T12:00:00Z'),last=new Date(+first+6*86400000),current=checkinClientWeek(),previous=iso(new Date(+new Date(current+'T12:00:00Z')-7*86400000)),format=new Intl.DateTimeFormat('en-IE',{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'});
+ const range=typeof format.formatRange==='function'?format.formatRange(first,last):format.format(first)+' – '+format.format(last);
+ return (start===current?'This week · ':start===previous?'Last week · ':'')+range;
+}
+let completionCheckinOwner='';
+function checkinSelectionOwner(){return [state.user?.id,state.client?.id,state.role].join('|');}
 const completionCheckin=clientCheckin;
 clientCheckin=function(){
- completionCheckin();const host=$('#clientMain'),weeks=checkinWeekChoices(),selected=state.checkinWeek||checkinClientWeek();
- host.insertAdjacentHTML('afterbegin','<section class="panel"><label>Week to review<select id="checkinWeekChoice">'+weeks.map(d=>'<option value="'+d+'" '+(d===selected?'selected':'')+'>Week beginning '+esc(fmt(d))+'</option>').join('')+'</select></label></section>');
- $('#checkinWeekChoice').onchange=e=>{state.checkinWeek=e.target.value;clientCheckin();};
- if(selected===checkinClientWeek())return;
- const record=state.data.checkins.find(c=>c.period_start===selected);
- if(record){host.innerHTML='<section class="panel"><button id="checkinChooseAnother" class="btn ghost">Choose another week</button><h2>Week beginning '+esc(fmt(selected))+'</h2>'+checkinCard(record)+'</section>';$('#checkinChooseAnother').onclick=()=>{state.checkinWeek=null;clientCheckin();};return;}
- // Reuse the established staged form for an unsubmitted past week, without current-week readings.
- const current=state.data.checkins,now=checkinClientWeek();state.data.checkins=current.filter(c=>c.period_start!==now);completionCheckin();state.data.checkins=current;
- host.insertAdjacentHTML('afterbegin','<section class="panel"><h2>Missed check-in · '+esc(fmt(selected))+'</h2><p>Your answers will be saved against this week.</p><button id="checkinChooseAnother" class="btn ghost">Choose another week</button></section>');$('#checkinChooseAnother').onclick=()=>{state.checkinWeek=null;clientCheckin();};
- const form=$('#checkinForm');form.elements.namedItem('period_start').value=selected;form.elements.namedItem('week_number').value=state.data.weeks.find(w=>w.week_start===selected)?.week_number||1;form.querySelector('[name="average_steps"]')?.remove();form.querySelector('.refresh-connected')?.remove();
+ const owner=checkinSelectionOwner();if(completionCheckinOwner!==owner){state.checkinWeek=null;completionCheckinOwner=owner;}
+ const host=$('#clientMain'),weeks=checkinWeekChoices(),now=checkinClientWeek(),selected=weeks.includes(state.checkinWeek)?state.checkinWeek:now;
+ const active=()=>checkinSelectionOwner()===owner,record=state.data.checkins.find(c=>c.period_start===selected&&(!c.client_id||c.client_id===state.client.id));
+ if(selected===now)completionCheckin();
+ else if(record)host.innerHTML='<section class="panel"><h2>'+esc(checkinWeekLabel(selected))+'</h2><p>This check-in is already submitted. Your saved answers are below.</p>'+checkinCard(record)+'</section>';
+ else{
+  // Reuse the staged form, then remove this week's automatic readings before drafts restore.
+  const current=state.data.checkins;try{state.data.checkins=current.filter(c=>c.period_start!==now);completionCheckin();}finally{state.data.checkins=current;}
+  host.insertAdjacentHTML('afterbegin','<section class="panel"><h2>Missed check-in · '+esc(checkinWeekLabel(selected))+'</h2><p>Answer for this past week. Your submission stays attached to these dates.</p></section>');
+  const form=$('#checkinForm');form.elements.namedItem('period_start').value=selected;form.elements.namedItem('week_number').value=state.data.weeks.find(w=>w.week_start===selected)?.week_number||1;
+  const steps=form.querySelector('[name="average_steps"]');if(steps?.type==='hidden'){steps.remove();const details=form.querySelector('details');details?.insertAdjacentHTML('beforeend','<label>Average daily steps for this week, if known<input name="average_steps" type="number" min="0" max="150000"></label>');}else if(steps)steps.value='';
+  form.querySelector('.refresh-connected')?.remove();
+ }
+ host.insertAdjacentHTML('afterbegin','<section class="panel"><label>Week to review<select id="checkinWeekChoice">'+weeks.map(d=>'<option value="'+d+'" '+(d===selected?'selected':'')+'>'+esc(checkinWeekLabel(d))+'</option>').join('')+'</select></label><p class="muted">Choose the week your answers describe. Missed weeks remain available.</p></section>');
+ const picker=$('#checkinWeekChoice');picker.onchange=async e=>{if(!active()||!picker.isConnected||picker.disabled)return;const next=e.target.value,form=$('#checkinForm');picker.disabled=true;try{if(form?.flushCheckinDraft&&!(await form.flushCheckinDraft())){if(active()&&picker.isConnected)picker.value=selected;return;}if(!active()||!picker.isConnected)return;state.checkinWeek=next;clientCheckin();}catch(error){if(active()&&picker.isConnected){picker.value=selected;toast('Your draft could not save. Your answers are still here; retry switching weeks.','error');}}finally{if(active()&&picker.isConnected)picker.disabled=false;}};
 };
+
 const completionCoachNutrition=coachNutrition;
 coachNutrition=function(){
  completionCoachNutrition();const form=$('#refreshTargetForm');if(!form)return;

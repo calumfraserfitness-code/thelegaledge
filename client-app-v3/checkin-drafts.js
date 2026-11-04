@@ -10,7 +10,12 @@
   const status=document.createElement('p');status.setAttribute('role','status');status.className='muted';status.textContent=state.preview?'Sample draft stays on this screen.':'Your draft saves privately as you type. Submit your check-in for Calum to review. Photos and audio attach on submission.';form.prepend(status);
   let dirty=false,timer=null,chain=Promise.resolve(),submitted=false,submitting=false;
   function answers(){const a={};for(const [k,v] of new FormData(form)){if(typeof v==='string'&&!['photo_front'].includes(k))a[k]=v.slice(0,8000);}return a;}
-  function persist(){if(state.preview||submitted||!active())return chain;const snapshot=answers();chain=chain.catch(()=>{}).then(async()=>{if(submitted||!active())return;let error;try{({error}=await db.from('client_checkin_drafts').upsert({client_id:client,period_start:period,answers:snapshot,updated_at:new Date().toISOString()},{onConflict:'client_id,period_start'}));}catch(e){error=e;}if(active())status.textContent=error?'Draft could not save. Keep this screen open and try again.':'Draft saved privately. Submit your check-in for Calum to review. Photos and audio attach on submission.';});return chain;}
+  function persist(){if(state.preview||submitted||!active())return chain;const snapshot=answers();chain=chain.catch(()=>{}).then(async()=>{if(submitted||!active())return;let error;try{({error}=await db.from('client_checkin_drafts').upsert({client_id:client,period_start:period,answers:snapshot,updated_at:new Date().toISOString()},{onConflict:'client_id,period_start'}));}catch(e){error=e;}if(active())status.textContent=error?'Draft could not save. Keep this screen open and try again.':'Draft saved privately. Submit your check-in for Calum to review. Photos and audio attach on submission.';return !error;});return chain;}
+  form.flushCheckinDraft=async()=>{
+   clearTimeout(timer);if(!active())return false;if(state.preview||!dirty)return true;
+   const snapshot=JSON.stringify(answers()),saved=await persist();if(saved!==true||!active())return false;
+   if(JSON.stringify(answers())!==snapshot){status.textContent='Your answers changed while saving. They are still here; retry switching weeks when they have saved.';return false;}return true;
+  };
   function changed(){dirty=true;if(!state.preview)status.textContent='Saving draft…';clearTimeout(timer);timer=setTimeout(persist,700);}
   form.addEventListener('input',changed);form.addEventListener('change',changed);
   const submit=form.onsubmit;
