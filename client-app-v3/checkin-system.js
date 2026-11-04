@@ -1,6 +1,9 @@
 /* Saved check-ins, private phone alerts and coach reviews share one account boundary. */
 (() => {
- let account='',channel=null,timer=null,refreshing=false,routed=false;
+ let account='',channel=null,timer=null,inFlight=null,refreshRequest=0,routed=false;
+ const editedForms=new WeakSet(),editedControls=new WeakSet(),formSnapshots=new WeakMap();let workspaceStatus=null,pendingDisplay=null,workspaceRender=0;
+ document.addEventListener('input',markEdited,true);document.addEventListener('change',markEdited,true);
+ function markEdited(e){if(e.target.closest?.('#clientWorkspaceBody'))editedControls.add(e.target);const form=e.target.closest?.('#clientWorkspaceBody form');if(form)editedForms.add(form);}
  const originalCoach=renderCoach,originalClient=renderClient;
  const reportError=e=>toast(e.message||'This action could not complete.','error');
  function bounded(promise,message,ms=12000){let timeout;return Promise.race([promise,new Promise((_,reject)=>{timeout=setTimeout(()=>reject(Error(message)),ms);})]).finally(()=>clearTimeout(timeout));}
@@ -46,21 +49,89 @@
   localStorage.removeItem('lec-push-account');
   try{await pushCall({action:'unsubscribe',endpoint:sub.endpoint},owner);}catch{ /* The confirmed unsubscribed endpoint cannot receive alerts. */ }
  }
- async function refreshCheckins(){if(refreshing||!state.user||state.preview||document.hidden)return;const user=state.user.id,id=state.client?.id;refreshing=true;try{
-  if(id){const rows=await query('Latest check-ins',db.from('checkins').select('*').eq('client_id',id).order('submitted_at',{ascending:false}).limit(250));if(state.user?.id!==user||state.client?.id!==id)return;state.data.checkins=rows;if(state.role==='client'){reviewCard();window.PracticeFeedback?.refresh?.();}}
-  if(state.role==='coach'&&!state.client&&state.coachView==='reviews'&&!document.activeElement?.matches('input,textarea,select'))await renderReviewQueue(0);
-  if(state.role==='coach'&&!state.client&&state.coachView==='dashboard'&&!document.activeElement?.matches('input,textarea,select')){await window.LegalEdgePriorities?.refreshAttention?.();window.FlexibleCompletion?.refreshCoach?.();}
- }catch{ /* Retain last saved content when offline. */ }finally{refreshing=false;}}
+ function entriesOwner(){return [state.user?.id,state.role,state.client?.id,String(state.preview)].join(':');}
+ function stamp(value){try{return window.CheckinStatus?.stamp(value,state.client?.timezone||'Europe/Dublin')||new Date(value).toLocaleString();}catch{return 'time unavailable';}}
+ function workspaceEntries(){
+  if(state.role!=='coach'||!state.client||state.preview)return;
+  const host=document.querySelector('#coachMain'),body=host?.querySelector('#clientWorkspaceBody');if(!body)return;
+  const owner=entriesOwner();let panel=host.querySelector('#csSavedEntries');
+  if(!panel||panel.dataset.owner!==owner){panel?.remove();panel=document.createElement('section');panel.id='csSavedEntries';panel.className='cs-saved-entries';panel.dataset.owner=owner;panel.setAttribute('aria-label','Saved client entries');
+   const text=document.createElement('p');text.dataset.entriesStatus='';text.setAttribute('role','status');
+   const button=document.createElement('button');button.type='button';button.className='btn ghost small';button.textContent='Refresh saved entries';button.onclick=()=>{if(entriesOwner()===owner&&panel.isConnected)refreshCheckins({manual:true});};panel.append(text,button);body.before(panel);
+  }
+  if(workspaceStatus?.owner!==owner)workspaceStatus={owner,text:'Saved client entries · refresh to check for new weights and check-ins.'};
+  for(const form of body.querySelectorAll('form'))if(!formSnapshots.has(form))formSnapshots.set(form,formSnapshot(form));
+  panel.querySelector('[data-entries-status]').textContent=workspaceStatus.text;
+  panel.querySelector('button').disabled=!!inFlight&&inFlight.owner===owner;
+ }
+ function statusEntries(text){workspaceStatus={owner:entriesOwner(),text};workspaceEntries();}
+ function formSnapshot(form){return JSON.stringify([...form.elements].filter(field=>field.type!=='hidden'&&!['submit','button','reset'].includes(field.type)).map(field=>[field.name,field.type,field.type==='file'?[...field.files].map(file=>[file.name,file.size,file.lastModified]):field.type==='checkbox'||field.type==='radio'?field.checked:field.value]));}
+ function hasWorkInProgress(body){
+  if(!body)return true;
+  if(body.contains(document.activeElement)&&document.activeElement?.matches('input,textarea,select,[contenteditable="true"]'))return true;
+  if(body.querySelector('iframe,[aria-busy="true"],[data-saving]:not([data-saving="false"]),button:disabled[data-label],[data-brief-generate]:disabled,[data-brief-save]:disabled,[data-brief-prepare]:disabled'))return true;
+  if([...body.querySelectorAll('input,textarea,select,[contenteditable="true"]')].some(control=>editedControls.has(control)))return true;
+  if([...body.querySelectorAll('audio,video')].some(media=>!media.paused&&!media.ended))return true;
+  return [...body.querySelectorAll('form')].some(form=>editedForms.has(form)||formSnapshots.has(form)&&formSnapshot(form)!==formSnapshots.get(form));
+ }
+ function refreshWeightFacts(body){
+  if(state.clientTab!=='overview'||typeof clientSummaryModel!=='function'||typeof displayWeight!=='function')return;
+  const weight=clientSummaryModel().weight,metrics=body?.querySelectorAll('.metric-strip .metric strong');
+  if(metrics?.length>=3){metrics[1].textContent=weight?displayWeight(weight.value):'—';metrics[2].textContent=weight&&finiteRecorded(state.client.start_weight_kg)?displayWeight(Number(weight.value)-Number(state.client.start_weight_kg),true):'—';}
+  const fact=body?.querySelector('.client-saved-summary .client-summary-facts > p');if(fact){const label=document.createElement('b');label.textContent='Latest recorded weight';fact.replaceChildren(label,document.createElement('br'),document.createTextNode(weight?displayWeight(weight.value)+' · '+fmt(weight.date)+' · '+weight.source:'No weigh-in recorded yet.'));}
+ }
+ async function refreshCheckins(options={}){
+  if(!state.user||state.preview||document.hidden)return;
+  const owner=entriesOwner();if(inFlight?.owner===owner)return inFlight.promise;
+  const user=state.user.id,id=state.client?.id,role=state.role,version=++refreshRequest;
+  const active=()=>version===refreshRequest&&entriesOwner()===owner;
+  const running={owner,promise:null};inFlight=running;workspaceEntries();
+  running.promise=(async()=>{try{
+   if(id){
+    const beforeChecks=JSON.stringify(state.data.checkins||[]),beforeProgress=JSON.stringify(state.data.progress||[]);
+    const reads=await Promise.allSettled([
+     query('Latest check-ins',db.from('checkins').select('*').eq('client_id',id).order('submitted_at',{ascending:false}).order('id',{ascending:false}).limit(250)),
+     query('Latest progress',db.from('progress_entries').select('*').eq('client_id',id).order('entry_date',{ascending:false}).limit(500))
+    ]);if(!active())return;
+    let changed=false,raced=false;
+    for(const [index,key,before]of [[0,'checkins',beforeChecks],[1,'progress',beforeProgress]]){
+     if(reads[index].status!=='fulfilled')continue;
+     // An in-flight read must not replace a save that completed after the read started.
+     if(JSON.stringify(state.data[key]||[])!==before){raced=true;continue;}
+     const rows=reads[index].value.filter(row=>row.client_id===id);if(JSON.stringify(rows)!==before){state.data[key]=rows;changed=true;}
+    }
+    const failed=reads.some(r=>r.status==='rejected');
+    if(role==='coach'){
+     const body=document.querySelector('#clientWorkspaceBody'),pending=pendingDisplay?.owner===owner&&pendingDisplay.body===body&&pendingDisplay.tab===state.clientTab&&pendingDisplay.render===workspaceRender,needsDisplay=changed||pending,canRepaint=needsDisplay&&['overview','check-ins','progress'].includes(state.clientTab)&&!hasWorkInProgress(body);
+     if(canRepaint){await Promise.resolve(renderClientWorkspace());if(!active())return;pendingDisplay=null;}else if(needsDisplay){pendingDisplay={owner,body,tab:state.clientTab,render:workspaceRender};refreshWeightFacts(body);}
+     const base=failed?'Some saved entries could not refresh. Your last loaded records remain available.':raced?'A save completed while checking. Your saved entries were kept; refresh again for the latest records.':'Saved entries checked '+stamp(new Date().toISOString())+'.';
+     statusEntries(base+(needsDisplay&&!canRepaint?' New weights or check-ins are loaded. Your current edits and video stay open; reopen Overview, Check-ins or Progress when ready.':needsDisplay?' Updated entries are shown.':''));
+    }else if(role==='client'){reviewCard();window.PracticeFeedback?.refresh?.();}
+   }
+   if(!active())return;
+   if(role==='coach'&&!id&&state.coachView==='reviews'&&!document.activeElement?.matches('input,textarea,select'))await renderReviewQueue(0);
+   if(role==='coach'&&!id&&state.coachView==='dashboard'&&!document.activeElement?.matches('input,textarea,select')){await window.LegalEdgePriorities?.refreshAttention?.();window.FlexibleCompletion?.refreshCoach?.();}
+  }catch{if(active()&&role==='coach'&&id)statusEntries('Saved entries could not refresh. Your last loaded records and edits remain available. Try Refresh saved entries again.');}
+  finally{if(inFlight===running){inFlight=null;if(active())workspaceEntries();}}})();return running.promise;
+ }
  function reviewCard(){if(state.role!=='client'||state.client?.onboarding_status!=='complete')return;if(state.clientView==='today'&&window.LegalEdgePriorities){window.LegalEdgePriorities.home();return;}const c=state.data.checkins.find(c=>c.reviewed_at&&(c.coach_response||c.voice_note_url));let card=document.querySelector('#csCoachReview');if(!c){card?.remove();return;}
   const url=safeMediaUrl(c.voice_note_url),loom=url?.match(/^https:\/\/(?:www\.)?loom\.com\/share\/([a-f0-9]{32})(?:[?/#]|$)/i);
   const stamp=[c.id,c.reviewed_at,c.coach_response,url].join('|');if(card?.dataset.stamp===stamp)return;if(!card){card=document.createElement('section');card.id='csCoachReview';card.className='panel cs-review';document.querySelector('#clientMain')?.prepend(card);}card.dataset.stamp=stamp;
   card.innerHTML='<span class="eyebrow">YOUR COACH REVIEW</span><h2>Your coach’s next steps</h2><p class="muted">'+esc(fmt(c.reviewed_at))+' · Your submitted check-in stays saved.</p>'+(loom?'<button type="button" class="cs-play" data-cs-play><span>▶</span><strong>Your weekly video review</strong><small>Watch your coach’s feedback</small></button>':'')+(url?'<a class="btn primary" href="'+esc(url)+'" target="_blank" rel="noopener">Watch your coach’s review ↗</a>':'')+(c.coach_response?'<p class="cw-lines">'+esc(c.coach_response)+'</p>':'')+(c.focus_next_week?'<h3>Agreed next steps</h3><p class="cw-lines">'+esc(c.focus_next_week)+'</p>':'');
   if(loom)card.querySelector('[data-cs-play]').onclick=e=>{e.currentTarget.outerHTML='<div class="cs-video"><iframe src="https://www.loom.com/embed/'+loom[1]+'" title="Your private coach review" allow="fullscreen; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>';};
  }
- function connect(){if(state.preview||!state.user||!['coach','client'].includes(state.role)||typeof db.channel!=='function')return;const key=state.user.id;if(account===key)return;if(channel)db.removeChannel(channel);clearInterval(timer);account=key;
-  channel=db.channel('checkin-account-'+key).on('postgres_changes',{event:'*',schema:'public',table:'checkins',...(state.role==='client'&&state.client?{filter:'client_id=eq.'+state.client.id}:{})},payload=>{if(state.user?.id!==key)return;if(state.role==='coach'&&payload.eventType==='INSERT')toast('New client check-in received. Open Check-ins to review.');refreshCheckins();}).subscribe();
-  timer=setInterval(refreshCheckins,30000);document.addEventListener('visibilitychange',refreshCheckins);
+ function connect(){
+  if(state.preview||!state.user||!['coach','client'].includes(state.role)||typeof db.channel!=='function')return;
+  const user=state.user.id,role=state.role,key=[user,role,role==='client'?state.client?.id:''].join(':');if(account===key)return;
+  if(channel)db.removeChannel(channel);clearInterval(timer);account=key;
+  const filter=role==='client'&&state.client?{filter:'client_id=eq.'+state.client.id}:{};
+  const changed=payload=>{if(account!==key||state.user?.id!==user||state.role!==role)return;if(role==='coach'&&payload.table==='checkins'&&payload.eventType==='INSERT')toast('New client check-in received. Open Check-ins to review.');refreshCheckins();};
+  channel=db.channel('checkin-account-'+key).on('postgres_changes',{event:'*',schema:'public',table:'checkins',...filter},changed).on('postgres_changes',{event:'*',schema:'public',table:'progress_entries',...filter},changed).subscribe();
+  timer=setInterval(refreshCheckins,30000);
  }
+ document.addEventListener('visibilitychange',refreshCheckins);window.addEventListener('focus',refreshCheckins);
+ if(typeof renderClientWorkspace==='function'){const originalWorkspace=renderClientWorkspace;renderClientWorkspace=function(){workspaceRender++;pendingDisplay=null;const result=originalWorkspace();Promise.resolve(result).then(workspaceEntries).catch(()=>{});return result;};}
+ window.CoachingEntrySync={refresh:refreshCheckins,mount:workspaceEntries};
  async function backups(){
   const owner=state.user?.id;
   panel('<span class="eyebrow">COACH OPERATIONS</span><h2 id="csTitle">Saved data & backups</h2><p>Download a private coaching-data snapshot. It includes check-ins, reviews, plans and saved client records. Keep it somewhere secure.</p><button class="btn primary" id="csExport">Download coaching backup</button><p id="csBackupStatus" role="status"></p><p class="muted">Check-in edits are also versioned in private recovery storage. This export excludes login passwords, provider credentials and uploaded file bytes. Those require a separate full-project backup.</p>');
@@ -73,7 +144,7 @@
    status.textContent='Backup exported. '+data.tables.checkins.length+' saved check-ins included.';
   }catch(e){if(current())status.textContent=e.message;}finally{if(current())e.target.disabled=false;}};
  }
- function controls(){connect();const history=document.querySelector('#coachCheckinForm')?.closest('.data-entry-panel');if(history&&!history.closest('.cs-history')){const d=document.createElement('details');d.className='cs-history';d.innerHTML='<summary>Add a past check-in</summary>';history.before(d);d.append(history);}if(state.role==='coach'&&!document.querySelector('#csCoachTools')){const nav=document.querySelector('#coachNav');if(nav){nav.insertAdjacentHTML('beforeend','<div id="csCoachTools" class="cs-tools"><button class="side-link" id="csPhoneAlerts">Phone alerts</button><button class="side-link" id="csBackups">Backups</button><a class="side-link" href="./firms-walkthrough.html" target="_blank" rel="noopener">Corporate walkthrough ↗</a></div>');document.querySelector('#csPhoneAlerts').onclick=()=>alerts().catch(reportError);document.querySelector('#csBackups').onclick=()=>backups();}}
+ function controls(){connect();workspaceEntries();const history=document.querySelector('#coachCheckinForm')?.closest('.data-entry-panel');if(history&&!history.closest('.cs-history')){const d=document.createElement('details');d.className='cs-history';d.innerHTML='<summary>Add a past check-in</summary>';history.before(d);d.append(history);}if(state.role==='coach'&&!document.querySelector('#csCoachTools')){const nav=document.querySelector('#coachNav');if(nav){nav.insertAdjacentHTML('beforeend','<div id="csCoachTools" class="cs-tools"><button class="side-link" id="csPhoneAlerts">Phone alerts</button><button class="side-link" id="csBackups">Backups</button><a class="side-link" href="./firms-walkthrough.html" target="_blank" rel="noopener">Corporate walkthrough ↗</a></div>');document.querySelector('#csPhoneAlerts').onclick=()=>alerts().catch(reportError);document.querySelector('#csBackups').onclick=()=>backups();}}
   if(state.role==='client'&&!document.querySelector('#csClientAlerts')){const menu=document.querySelector('#clientApp .account-menu > div');if(menu){const b=document.createElement('button');b.id='csClientAlerts';b.textContent='Notifications';b.onclick=()=>alerts().catch(reportError);menu.append(b);}}
   if(!routed&&state.user){routed=true;const q=new URLSearchParams(location.search);if(q.get('section')==='reviews'&&state.role==='coach'){state.client=null;state.coachView='reviews';const checkin=q.get('checkin');Promise.resolve(renderReviewQueue(0)).then(async()=>{if(!checkin||! /^[0-9a-f-]{36}$/i.test(checkin))return;const {data,error}=await db.from('checkins').select('id,client_id').eq('id',checkin).maybeSingle();if(error||!data){toast('This check-in is unavailable for this account.','error');return;}const button=document.createElement('button');button.dataset.reviewClient=data.client_id;button.dataset.reviewCheckin=data.id;await openQueuedReview(button);}).catch(reportError);}else if(q.get('section')==='checkin'&&state.role==='client'){state.clientView='checkin';renderClient();}}
  }

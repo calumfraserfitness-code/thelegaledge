@@ -1,5 +1,7 @@
 # Legal Edge operating memory
 
+Coach visibility has separate save, read, and paint boundaries. Refreshing state alone does not update an already open workspace. Synchronize check-ins plus standalone progress entries with owner/role/client and concurrent-save guards; realtime requires the table publication as well as a browser listener. Retain edited forms and active media, keep a pending-update notice across unchanged polls, and expose direct refresh. Distinguish private draft storage from submitted coach-visible records. Optional weights should be visible without copying a previous measurement into a new submission. Custom Home Review actions must not use generic roster data-client-id attributes that a later global binding overwrites.
+
 Optional recipes need explicit category handling: Main meal must never fall through to the first Breakfast slot. Main meals can serve lunch or dinner without duplicating a recipe. Per-movement recovery ticks use the assigned exercise ID plus local date; parent completion saves must merge, not overwrite, the saved exercise receipts. Latest published video cards must mount after the final client layout; keep a real loaded thumbnail or the inline Loom player, and never expose unreviewed video links.
 
 Progress layout preference: keep weight/watch/other progress above strength and cardio history. Cardio charts use actual saved results, grouped by activity, never coach targets or invented missing distances. The user is recording an app video; do not re-add the written app walkthrough.
