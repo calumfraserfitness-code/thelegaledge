@@ -42,7 +42,7 @@ function clearWorkspaceTabs(){
  let details=tabs.querySelector('.le-more-tabs');
  if(!details){details=document.createElement('details');details.className='le-more-tabs';details.innerHTML='<summary>Client details</summary><div></div>';tabs.append(details);}
  else details.querySelector('summary').textContent='Client details';
- const extras={onboarding:'Intake answers',legal:'Agreement & consent',diagnostics:'Bloods & genetics',goals:'Goals',support:'Calls & messages',connections:'Devices'};
+ const extras={onboarding:'Intake answers',legal:'Agreement & consent',diagnostics:'Bloods & genetics',goals:'Goals',support:'Calls & messages',connections:'Health reports & devices'};
  for(const b of [...tabs.querySelectorAll('[data-client-tab]')]){
   const key=b.dataset.clientTab;
   if(names[key])b.textContent=names[key];

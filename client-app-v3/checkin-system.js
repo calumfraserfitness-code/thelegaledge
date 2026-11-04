@@ -50,7 +50,7 @@
   try{await pushCall({action:'unsubscribe',endpoint:sub.endpoint},owner);}catch{ /* The confirmed unsubscribed endpoint cannot receive alerts. */ }
  }
  function entriesOwner(){return [state.user?.id,state.role,state.client?.id,String(state.preview)].join(':');}
- function stamp(value){try{return window.CheckinStatus?.stamp(value,state.client?.timezone||'Europe/Dublin')||new Date(value).toLocaleString();}catch{return 'time unavailable';}}
+ function stamp(value){try{return window.CheckinStatus?.stamp(value,Intl.DateTimeFormat().resolvedOptions().timeZone||'Europe/Dublin')||new Date(value).toLocaleString();}catch{return 'time unavailable';}}
  function workspaceEntries(){
   if(state.role!=='coach'||!state.client||state.preview)return;
   const host=document.querySelector('#coachMain'),body=host?.querySelector('#clientWorkspaceBody');if(!body)return;
@@ -59,7 +59,7 @@
    const text=document.createElement('p');text.dataset.entriesStatus='';text.setAttribute('role','status');
    const button=document.createElement('button');button.type='button';button.className='btn ghost small';button.textContent='Refresh saved entries';button.onclick=()=>{if(entriesOwner()===owner&&panel.isConnected)refreshCheckins({manual:true});};panel.append(text,button);body.before(panel);
   }
-  if(workspaceStatus?.owner!==owner)workspaceStatus={owner,text:'Saved client entries · refresh to check for new weights and check-ins.'};
+  if(workspaceStatus?.owner!==owner)workspaceStatus={owner,text:'Saved client entries · refresh to check weights, check-ins and health reports.'};
   for(const form of body.querySelectorAll('form'))if(!formSnapshots.has(form))formSnapshots.set(form,formSnapshot(form));
   panel.querySelector('[data-entries-status]').textContent=workspaceStatus.text;
   panel.querySelector('button').disabled=!!inFlight&&inFlight.owner===owner;
@@ -80,6 +80,13 @@
   if(metrics?.length>=3){metrics[1].textContent=weight?displayWeight(weight.value):'—';metrics[2].textContent=weight&&finiteRecorded(state.client.start_weight_kg)?displayWeight(Number(weight.value)-Number(state.client.start_weight_kg),true):'—';}
   const fact=body?.querySelector('.client-saved-summary .client-summary-facts > p');if(fact){const label=document.createElement('b');label.textContent='Latest recorded weight';fact.replaceChildren(label,document.createElement('br'),document.createTextNode(weight?displayWeight(weight.value)+' · '+fmt(weight.date)+' · '+weight.source:'No weigh-in recorded yet.'));}
  }
+ function refreshHealthFacts(){
+  if(state.role!=='coach'||state.clientTab!=='overview'||typeof clientSummaryModel!=='function')return;
+  const facts=document.querySelectorAll('#clientWorkspaceBody .client-summary-facts > p');if(facts.length<3)return;const m=clientSummaryModel();
+  const put=(node,label,value)=>{const b=document.createElement('b');b.textContent=label;node.replaceChildren(b,document.createElement('br'),document.createTextNode(value));};
+  put(facts[1],'Saved reports',(m.healthReports||[]).length+' weekly health reports · '+m.blood.length+' blood reports · '+m.genetics.length+' genetic reports');
+  put(facts[2],'Daily device readings',m.lastReading?'Latest received: '+hubStamp(m.lastReading.last_synced_at)+' · '+title(m.lastReading.source||'device'):'No daily device readings received. Weekly reports are shown separately.');
+ }
  async function refreshCheckins(options={}){
   if(!state.user||state.preview||document.hidden)return;
   const owner=entriesOwner();if(inFlight?.owner===owner)return inFlight.promise;
@@ -89,9 +96,14 @@
   running.promise=(async()=>{try{
    if(id){
     const beforeChecks=JSON.stringify(state.data.checkins||[]),beforeProgress=JSON.stringify(state.data.progress||[]);
+    const reportRows=()=> (state.data.files||[]).filter(row=>row.file_type==='health_weekly_report');
+    const healthBefore={files:JSON.stringify(reportRows()),daily:JSON.stringify(state.data.healthDaily||[]),imports:JSON.stringify(state.data.healthImports||[])};
     const reads=await Promise.allSettled([
      query('Latest check-ins',db.from('checkins').select('*').eq('client_id',id).order('submitted_at',{ascending:false}).order('id',{ascending:false}).limit(250)),
-     query('Latest progress',db.from('progress_entries').select('*').eq('client_id',id).order('entry_date',{ascending:false}).limit(500))
+     query('Latest progress',db.from('progress_entries').select('*').eq('client_id',id).order('entry_date',{ascending:false}).limit(500)),
+     query('Latest health reports',db.from('client_files').select('*').eq('client_id',id).eq('file_type','health_weekly_report').order('created_at',{ascending:false}).limit(100)),
+     query('Latest health readings',db.from('client_health_daily').select('*').eq('client_id',id).order('date',{ascending:false}).limit(90)),
+     query('Latest health imports',db.from('client_health_imports').select('*').eq('client_id',id).order('imported_at',{ascending:false}).limit(20))
     ]);if(!active())return;
     let changed=false,raced=false;
     for(const [index,key,before]of [[0,'checkins',beforeChecks],[1,'progress',beforeProgress]]){
@@ -100,6 +112,19 @@
      if(JSON.stringify(state.data[key]||[])!==before){raced=true;continue;}
      const rows=reads[index].value.filter(row=>row.client_id===id);if(JSON.stringify(rows)!==before){state.data[key]=rows;changed=true;}
     }
+    const healthStatus={...(state.healthReportsStatus||{}),clientId:id,accountId:user};
+    for(const [index,name,key,cap] of [[2,'files','files',100],[3,'daily','healthDaily',90],[4,'imports','healthImports',20]]){
+     const read=reads[index];if(read.status==='rejected'){healthStatus[name]='error';continue;}
+     healthStatus[name]='ready';healthStatus[name+'Capped']=read.value.length>=cap;
+     const current=name==='files'?reportRows():state.data[key]||[];
+     if(JSON.stringify(current)!==healthBefore[name]){raced=true;continue;}
+     const rows=read.value.filter(row=>row.client_id===id&&(name!=='files'||row.file_type==='health_weekly_report'));
+     if(name==='files'){
+      const oldest=rows.at(-1)?.created_at,older=rows.length>=cap?current.filter(row=>row.created_at&&row.created_at<oldest&&!rows.some(f=>f.id===row.id)):[];
+      state.data.files=[...(state.data.files||[]).filter(row=>row.file_type!=='health_weekly_report'),...rows,...older];
+     }else state.data[key]=rows;
+    }
+    state.healthReportsStatus=healthStatus;
     const failed=reads.some(r=>r.status==='rejected');
     if(role==='coach'){
      const body=document.querySelector('#clientWorkspaceBody'),pending=pendingDisplay?.owner===owner&&pendingDisplay.body===body&&pendingDisplay.tab===state.clientTab&&pendingDisplay.render===workspaceRender,needsDisplay=changed||pending,canRepaint=needsDisplay&&['overview','check-ins','progress'].includes(state.clientTab)&&!hasWorkInProgress(body);
@@ -107,11 +132,11 @@
      const base=failed?'Some saved entries could not refresh. Your last loaded records remain available.':raced?'A save completed while checking. Your saved entries were kept; refresh again for the latest records.':'Saved entries checked '+stamp(new Date().toISOString())+'.';
      statusEntries(base+(needsDisplay&&!canRepaint?' New weights or check-ins are loaded. Your current edits and video stay open; reopen Overview, Check-ins or Progress when ready.':needsDisplay?' Updated entries are shown.':''));
     }else if(role==='client'){reviewCard();window.PracticeFeedback?.refresh?.();}
-    window.WeighInRoutine?.mount?.();
+    refreshHealthFacts();window.CoachHealthReports?.mount?.();window.WeighInRoutine?.mount?.();
    }
    if(!active())return;
    if(role==='coach'&&!id&&state.coachView==='reviews'&&!document.activeElement?.matches('input,textarea,select'))await renderReviewQueue(0);
-   if(role==='coach'&&!id&&state.coachView==='dashboard'&&!document.activeElement?.matches('input,textarea,select')){await window.LegalEdgePriorities?.refreshAttention?.();window.FlexibleCompletion?.refreshCoach?.();}
+   if(role==='coach'&&!id&&state.coachView==='dashboard'&&!document.activeElement?.matches('input,textarea,select')){await window.LegalEdgePriorities?.refreshAttention?.();window.FlexibleCompletion?.refreshCoach?.();window.CoachHealthReports?.refreshHome?.();}
   }catch{if(active()&&role==='coach'&&id)statusEntries('Saved entries could not refresh. Your last loaded records and edits remain available. Try Refresh saved entries again.');}
   finally{if(inFlight===running){inFlight=null;if(active())workspaceEntries();}}})();return running.promise;
  }
@@ -127,7 +152,7 @@
   if(channel)db.removeChannel(channel);clearInterval(timer);account=key;
   const filter=role==='client'&&state.client?{filter:'client_id=eq.'+state.client.id}:{};
   const changed=payload=>{if(account!==key||state.user?.id!==user||state.role!==role)return;if(role==='coach'&&payload.table==='checkins'&&payload.eventType==='INSERT')toast('New client check-in received. Open Check-ins to review.');refreshCheckins();};
-  channel=db.channel('checkin-account-'+key).on('postgres_changes',{event:'*',schema:'public',table:'checkins',...filter},changed).on('postgres_changes',{event:'*',schema:'public',table:'progress_entries',...filter},changed).subscribe();
+  channel=db.channel('checkin-account-'+key).on('postgres_changes',{event:'*',schema:'public',table:'checkins',...filter},changed).on('postgres_changes',{event:'*',schema:'public',table:'progress_entries',...filter},changed).on('postgres_changes',{event:'*',schema:'public',table:'client_files',...filter},changed).on('postgres_changes',{event:'*',schema:'public',table:'client_health_daily',...filter},changed).on('postgres_changes',{event:'*',schema:'public',table:'client_health_imports',...filter},changed).subscribe();
   timer=setInterval(refreshCheckins,30000);
  }
  document.addEventListener('visibilitychange',refreshCheckins);window.addEventListener('focus',refreshCheckins);

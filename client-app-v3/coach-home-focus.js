@@ -60,7 +60,8 @@
    }
   }
   // Move, never reconstruct, original tools: their handlers, receipts and retry states survive.
-  Array.from(host.children).filter(node=>node!==shell&&node.id!=='priorityAttention'&&node.id!=='coachCompletionFeed').forEach(node=>{shell.querySelector('[data-home-content="'+groupFor(node)+'"]').append(node);});
+  Array.from(host.children).filter(node=>node!==shell&&node.id!=='priorityAttention'&&node.id!=='coachCompletionFeed'&&node.id!=='coachHealthReportInbox').forEach(node=>{shell.querySelector('[data-home-content="'+groupFor(node)+'"]').append(node);});
+  const reports=host.querySelector('#coachHealthReportInbox'),primary=shell.querySelector('[data-home-primary]');if(reports&&reports.parentElement!==primary)primary.prepend(reports);
   const feed=host.querySelector('#coachCompletionFeed');if(feed&&feed.parentElement!==shell.querySelector('[data-home-primary]'))shell.querySelector('[data-home-primary]').append(feed);
   const watch=host.querySelector('#psWatchFeed');if(watch)compactWatch(watch);
   // Async modules replace these cards after initial rendering. Return them to the same group.
