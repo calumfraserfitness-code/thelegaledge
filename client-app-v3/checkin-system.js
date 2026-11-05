@@ -140,6 +140,7 @@
     }else if(role==='client'){reviewCard();window.PracticeFeedback?.refresh?.();}
     if(role==='coach'&&typeof refreshCoachReplyAvailability==='function')refreshCoachReplyAvailability();
     refreshHealthFacts();window.CoachHealthReports?.mount?.();window.WeighInRoutine?.mount?.();
+    Promise.resolve(window.WeeklyRecap?.refresh?.()).catch(()=>{});
    }
    if(!active())return;
    if(role==='coach'&&!id&&state.coachView==='reviews'&&!document.activeElement?.matches('input,textarea,select'))await renderReviewQueue(0);

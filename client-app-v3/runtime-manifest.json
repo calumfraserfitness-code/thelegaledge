@@ -80,7 +80,10 @@
     "training-library-speed.js",
     "weigh-in-routine-model.js",
     "weigh-in-routine.js",
-    "coach-health-reports.js"
+    "coach-health-reports.js",
+    "client-home-quick-log.js",
+    "weekly-recap-model.js",
+    "weekly-recap.js"
   ],
   "styles": [
     "app.css",
@@ -131,6 +134,8 @@
     "coaching-finish.css",
     "tab-performance.css",
     "weigh-in-routine.css",
-    "coach-health-reports.css"
+    "coach-health-reports.css",
+    "client-home-quick-log.css",
+    "weekly-recap.css"
   ]
 }

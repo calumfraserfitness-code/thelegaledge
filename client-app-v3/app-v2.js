@@ -108,8 +108,11 @@ function displayWeight(kg, signed = false) {
 }
 
 function currentWeek() {
-  const start = iso(monday());
-  return state.data.weeks.find((week) => week.week_start === start) || null;
+  let start=iso(monday());
+  if(state.client?.id){
+    try{const parts=Object.fromEntries(new Intl.DateTimeFormat('en-GB',{timeZone:state.client.timezone||'Europe/Dublin',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date()).filter(p=>p.type!=='literal').map(p=>[p.type,p.value])),date=new Date(`${parts.year}-${parts.month}-${parts.day}T12:00:00Z`);date.setUTCDate(date.getUTCDate()-((date.getUTCDay()+6)%7));start=date.toISOString().slice(0,10);}catch{return null;}
+  }
+  return state.data.weeks.find((week) => week.week_start===start&&(!week.client_id||week.client_id===state.client?.id)) || null;
 }
 
 function safeStepGoal(client = state.client) {
