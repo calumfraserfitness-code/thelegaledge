@@ -95,7 +95,7 @@
   const running={owner,promise:null};inFlight=running;workspaceEntries();
   running.promise=(async()=>{try{
    if(id){
-    const beforeChecks=JSON.stringify(state.data.checkins||[]),beforeProgress=JSON.stringify(state.data.progress||[]);
+    const beforeChecks=JSON.stringify(state.data.checkins||[]),beforeProgress=JSON.stringify(state.data.progress||[]),beforeDrafts=JSON.stringify(state.data.reviewDrafts||[]),beforeDraftAvailability=state.data.reviewDraftsAvailable,beforeDraftRevision=state.data.reviewDraftsRevision||0;
     const reportRows=()=> (state.data.files||[]).filter(row=>row.file_type==='health_weekly_report');
     const healthBefore={files:JSON.stringify(reportRows()),daily:JSON.stringify(state.data.healthDaily||[]),imports:JSON.stringify(state.data.healthImports||[])};
     const reads=await Promise.allSettled([
@@ -103,7 +103,8 @@
      query('Latest progress',db.from('progress_entries').select('*').eq('client_id',id).order('entry_date',{ascending:false}).limit(500)),
      query('Latest health reports',db.from('client_files').select('*').eq('client_id',id).eq('file_type','health_weekly_report').order('created_at',{ascending:false}).limit(100)),
      query('Latest health readings',db.from('client_health_daily').select('*').eq('client_id',id).order('date',{ascending:false}).limit(90)),
-     query('Latest health imports',db.from('client_health_imports').select('*').eq('client_id',id).order('imported_at',{ascending:false}).limit(20))
+     query('Latest health imports',db.from('client_health_imports').select('*').eq('client_id',id).order('imported_at',{ascending:false}).limit(20)),
+     role==='coach'?query('Private check-in reply drafts',db.from('coach_checkin_reply_drafts').select('*').eq('client_id',id).eq('coach_id',user).order('updated_at',{ascending:false}).limit(250)):Promise.resolve([])
     ]);if(!active())return;
     let changed=false,raced=false;
     for(const [index,key,before]of [[0,'checkins',beforeChecks],[1,'progress',beforeProgress]]){
@@ -125,13 +126,19 @@
      }else state.data[key]=rows;
     }
     state.healthReportsStatus=healthStatus;
+    let privateChanged=false;
+    if(role==='coach'){
+     if(JSON.stringify(state.data.reviewDrafts||[])!==beforeDrafts||state.data.reviewDraftsAvailable!==beforeDraftAvailability||(state.data.reviewDraftsRevision||0)!==beforeDraftRevision)raced=true;
+     else{state.data.reviewDraftsRevision=beforeDraftRevision+1;if(reads[5].status==='rejected')state.data.reviewDraftsAvailable=false;else{state.data.reviewDraftsAvailable=true;const drafts=reads[5].value.filter(row=>row.client_id===id&&row.coach_id===user);privateChanged=JSON.stringify(drafts)!==beforeDrafts||beforeDraftAvailability!==true;state.data.reviewDrafts=drafts;}}
+    }
     const failed=reads.some(r=>r.status==='rejected');
     if(role==='coach'){
-     const body=document.querySelector('#clientWorkspaceBody'),pending=pendingDisplay?.owner===owner&&pendingDisplay.body===body&&pendingDisplay.tab===state.clientTab&&pendingDisplay.render===workspaceRender,needsDisplay=changed||pending,canRepaint=needsDisplay&&['overview','check-ins','progress'].includes(state.clientTab)&&!hasWorkInProgress(body);
+     const body=document.querySelector('#clientWorkspaceBody'),pending=pendingDisplay?.owner===owner&&pendingDisplay.body===body&&pendingDisplay.tab===state.clientTab&&pendingDisplay.render===workspaceRender,needsDisplay=changed||privateChanged&&state.clientTab==='check-ins'||pending,canRepaint=needsDisplay&&['overview','check-ins','progress'].includes(state.clientTab)&&!hasWorkInProgress(body);
      if(canRepaint){await Promise.resolve(renderClientWorkspace());if(!active())return;pendingDisplay=null;}else if(needsDisplay){pendingDisplay={owner,body,tab:state.clientTab,render:workspaceRender};refreshWeightFacts(body);}
      const base=failed?'Some saved entries could not refresh. Your last loaded records remain available.':raced?'A save completed while checking. Your saved entries were kept; refresh again for the latest records.':'Saved entries checked '+stamp(new Date().toISOString())+'.';
-     statusEntries(base+(needsDisplay&&!canRepaint?' New weights or check-ins are loaded. Your current edits and video stay open; reopen Overview, Check-ins or Progress when ready.':needsDisplay?' Updated entries are shown.':''));
+     statusEntries(base+(needsDisplay&&!canRepaint?' New saved records are loaded. Your current edits and video stay open; reopen Overview, Check-ins or Progress when ready.':needsDisplay?' Updated entries are shown.':''));
     }else if(role==='client'){reviewCard();window.PracticeFeedback?.refresh?.();}
+    if(role==='coach'&&typeof refreshCoachReplyAvailability==='function')refreshCoachReplyAvailability();
     refreshHealthFacts();window.CoachHealthReports?.mount?.();window.WeighInRoutine?.mount?.();
    }
    if(!active())return;
@@ -140,7 +147,7 @@
   }catch{if(active()&&role==='coach'&&id)statusEntries('Saved entries could not refresh. Your last loaded records and edits remain available. Try Refresh saved entries again.');}
   finally{if(inFlight===running){inFlight=null;if(active())workspaceEntries();}}})();return running.promise;
  }
- function reviewCard(){if(state.role!=='client'||state.client?.onboarding_status!=='complete')return;if(state.clientView==='today'&&window.LegalEdgePriorities){if(document.querySelector('#personalCoachingHome'))window.PersonalCoachingHome?.arrange?.();else{window.LegalEdgePriorities.home();window.PersonalCoachingHome?.mount?.();}return;}const c=state.data.checkins.find(c=>c.reviewed_at&&c.review_channel!=='whatsapp'&&(c.coach_response||c.voice_note_url));let card=document.querySelector('#csCoachReview');if(!c){card?.remove();return;}
+ function reviewCard(){if(state.role!=='client'||state.client?.onboarding_status!=='complete')return;if(state.clientView==='today'&&window.LegalEdgePriorities){if(document.querySelector('#personalCoachingHome'))window.PersonalCoachingHome?.arrange?.();else{window.LegalEdgePriorities.home();window.PersonalCoachingHome?.mount?.();}return;}const c=state.data.checkins.find(c=>(c.client_id===state.client?.id||state.preview&&!c.client_id)&&c.reviewed_at&&c.review_channel!=='whatsapp'&&(c.coach_response||c.voice_note_url));let card=document.querySelector('#csCoachReview');if(!c){card?.remove();return;}
   const url=safeMediaUrl(c.voice_note_url),loom=url?.match(/^https:\/\/(?:www\.)?loom\.com\/share\/([a-f0-9]{32})(?:[?/#]|$)/i);
   const stamp=[c.id,c.reviewed_at,c.coach_response,url].join('|');if(card?.dataset.stamp===stamp)return;if(!card){card=document.createElement('section');card.id='csCoachReview';card.className='panel cs-review';document.querySelector('#clientMain')?.prepend(card);}card.dataset.stamp=stamp;
   card.innerHTML='<span class="eyebrow">YOUR COACH REVIEW</span><h2>Your coach’s next steps</h2><p class="muted">'+esc(fmt(c.reviewed_at))+' · Your submitted check-in stays saved.</p>'+(loom?'<button type="button" class="cs-play" data-cs-play><span>▶</span><strong>Your weekly video review</strong><small>Watch your coach’s feedback</small></button>':'')+(url?'<a class="btn primary" href="'+esc(url)+'" target="_blank" rel="noopener">Watch your coach’s review ↗</a>':'')+(c.coach_response?'<p class="cw-lines">'+esc(c.coach_response)+'</p>':'')+(c.focus_next_week?'<h3>Agreed next steps</h3><p class="cw-lines">'+esc(c.focus_next_week)+'</p>':'');

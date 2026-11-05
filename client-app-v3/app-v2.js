@@ -60,7 +60,7 @@ function emptyData() {
   return {
     weeks: [], sessions: [], exercises: [], programs: [], nutritionPlans: [],
     nutritionDays: [], meals: [], habits: [], habitLogs: [], steps: [],
-    checkins: [], progress: [], onboarding: [], legal: [], diagnostics: [], files: [],
+    checkins: [], reviewDrafts: [], reviewDraftsAvailable: false, progress: [], onboarding: [], legal: [], diagnostics: [], files: [],
     mealAssignments: [], exerciseLogs: [], exerciseBank: [], mealBank: [], healthConnections: [], healthDaily: [], healthWorkouts: [], healthImports: []
   };
 }
@@ -178,10 +178,11 @@ async function loadClientData(clientId) {
     query('Health imports', db.from('client_health_imports').select('*').eq('client_id', clientId).order('imported_at', { ascending: false }).limit(20)),
     Promise.resolve([]), // Exercise/video library loads only when opened in Training.
     state.role==='coach'?query('Private client details',db.from('client_private_details').select('coach_notes').eq('client_id',clientId)):Promise.resolve([]),
-    Promise.resolve([]) // Meal bank is searched on demand by meal-library.js.
+    Promise.resolve([]), // Meal bank is searched on demand by meal-library.js.
+    state.role==='coach'?query('Private check-in reply drafts',db.from('coach_checkin_reply_drafts').select('*').eq('client_id',clientId).eq('coach_id',accountAtStart).order('updated_at',{ascending:false}).limit(250)).then(rows=>({rows,available:true})).catch(()=>({rows:[],available:false})):Promise.resolve({rows:[],available:false})
   ]);
   if (!currentLoad()) return false;
-  const [weeks, programs, nutritionPlans, habits, steps, checkins, progress, onboarding, legal, diagnostics, files, mealAssignments, exerciseLogs, healthConnections, healthDaily, healthWorkouts, healthImports, exerciseBank, privateDetails, mealBank] = requests;
+  const [weeks, programs, nutritionPlans, habits, steps, checkins, progress, onboarding, legal, diagnostics, files, mealAssignments, exerciseLogs, healthConnections, healthDaily, healthWorkouts, healthImports, exerciseBank, privateDetails, mealBank, replyDraftRead] = requests;
   if(state.role==='coach')state.client.coach_notes=privateDetails[0]?.coach_notes||'';
   let sessions = [];
   let exercises = [];
@@ -201,7 +202,7 @@ async function loadClientData(clientId) {
   if (!currentLoad()) return false;
   const recoveredExercises = programs.flatMap((program) => (program.days || []).flatMap((day) => day.exercises || []));
   const exerciseIndex = new Map([...recoveredExercises, ...exercises].map((exercise) => [exercise.id, exercise]));
-  state.data = { weeks, programs, nutritionPlans, habits, habitLogs: [], steps, checkins, progress, onboarding, legal, diagnostics, files, mealAssignments, exerciseLogs, exerciseBank, mealBank, healthConnections, healthDaily, healthWorkouts, healthImports, sessions, exercises: [...exerciseIndex.values()], nutritionDays, meals };
+  state.data = { weeks, programs, nutritionPlans, habits, habitLogs: [], steps, checkins, progress, onboarding, legal, diagnostics, files, mealAssignments, exerciseLogs, exerciseBank, mealBank, healthConnections, healthDaily, healthWorkouts, healthImports, reviewDrafts:roleAtStart==='coach'?(replyDraftRead.rows||[]).filter(row=>row.client_id===clientId&&row.coach_id===accountAtStart):[], reviewDraftsAvailable:roleAtStart==='coach'&&replyDraftRead.available===true, sessions, exercises: [...exerciseIndex.values()], nutritionDays, meals };
   state.healthReportsStatus={clientId,accountId:accountAtStart,files:'ready',imports:'ready',daily:'ready'};
   return true;
 }
@@ -1198,7 +1199,8 @@ function flattenCheckinAnswers(value, prefix = '') {
 }
 
 function checkinCard(checkin, coach = false) {
-  const answers = answersFor(checkin), appFeedback = coach || checkin.review_channel !== 'whatsapp';
+  if(!coach&&checkin.client_id&&checkin.client_id!==state.client?.id)return '';
+  const answers = answersFor(checkin), appFeedback = coach || Boolean(checkin.reviewed_at && checkin.review_channel !== 'whatsapp');
   return `<details class="checkin-card rich-checkin" ${checkin === state.data.checkins[0] ? 'open' : ''}><summary><div><span class="eyebrow">WEEK ${checkin.week_number || '—'}</span><h3>${esc(checkin.original_date_text || fmt(checkin.submitted_at))}</h3></div><div class="score">${checkin.week_score ?? '—'}/10</div></summary>
     <div class="detail-list"><div class="detail"><label>Weight</label>${displayWeight(checkin.weight_kg)}</div><div class="detail"><label>Energy</label>${checkin.energy ?? '—'}/10</div><div class="detail"><label>Sleep</label>${checkin.sleep ?? '—'}/10</div><div class="detail"><label>Stress</label>${checkin.stress ?? '—'}/10</div><div class="detail"><label>Training · self-reported</label>${checkin.training_adherence == null ? '—' : checkin.training_adherence + '%'}</div><div class="detail"><label>Nutrition · self-reported</label>${checkin.nutrition_adherence == null ? '—' : checkin.nutrition_adherence + '%'}</div><div class="detail"><label>Average steps</label>${checkin.average_steps != null ? Number(checkin.average_steps).toLocaleString() : '—'}</div></div>
     <div class="original-answers">${answers.length ? answers.map(([question, answer]) => `<div class="answer-block"><h4>${esc(question)}</h4><p>${esc(answer)}</p></div>`).join('') : '<p class="source-gap">No written response was submitted for this week.</p>'}</div>
@@ -1229,14 +1231,17 @@ function parsedQaLines(text) {
 }
 
 async function addCoachCheckin(event) {
-  event.preventDefault(); const fd = new FormData(event.target), display = Number(fd.get('weight_display') || 0);
-  const row = { client_id: state.client.id, submitted_at: `${fd.get('submitted_date')}T12:00:00.000Z`, original_date_text: fd.get('submitted_date'), original_answers: parsedQaLines(fd.get('original_answers')) };
+  event.preventDefault(); const fd = new FormData(event.target), display = Number(fd.get('weight_display') || 0), clientId=state.client.id, userId=state.user?.id, role=state.role;
+  const active=()=>state.client?.id===clientId&&state.user?.id===userId&&state.role===role;
+  const row = { client_id: clientId, submitted_at: `${fd.get('submitted_date')}T12:00:00.000Z`, original_date_text: fd.get('submitted_date'), original_answers: parsedQaLines(fd.get('original_answers')) };
   for (const key of ['week_number','week_score','energy','sleep','stress','average_steps','training_adherence','nutrition_adherence']) row[key] = fd.get(key) === '' ? null : Number(fd.get(key));
   for (const key of ['wins','challenges','support_needed','coach_response','voice_note_url']) row[key] = String(fd.get(key) || '').trim() || null;
   row.weight_kg = display ? display / (state.client.weight_unit === 'lbs' ? 2.20462 : 1) : null;
   setBusy(event.submitter, true, 'Saving…');
   try {
-    const saved = state.preview ? { ...row, id: `preview-checkin-${Date.now()}` } : (await query('Historical check-in', db.from('checkins').insert(row).select()))[0];
+    const saved = state.preview ? { ...row, coach_response:null, voice_note_url:null, focus_next_week:null, id: `preview-checkin-${Date.now()}` } : (await query('Historical check-in', db.from('checkins').insert(row).select()))[0];
+    if(saved?.id==null||saved.client_id!==clientId)throw Error('The historical check-in was not confirmed.');if(!active())return;
+    if(typeof rememberCoachReplyDraft==='function'&&(row.coach_response||row.voice_note_url||row.focus_next_week))rememberCoachReplyDraft(saved,{response_text:row.coach_response||'',video_url:row.voice_note_url||'',action_points:row.focus_next_week||''});
     state.data.checkins.push(saved); state.data.checkins.sort((a,b)=>String(b.submitted_at).localeCompare(String(a.submitted_at)));
     toast('Historical check-in saved to the correct week'); coachCheckins();
   } catch (error) { toast(error.message, 'error'); setBusy(event.submitter, false); }
@@ -1823,38 +1828,43 @@ function bindShell() {
       if(error)throw error;
       $('#authMsg').textContent='Opening your coaching workspace…';
       await boot();
-    }catch(error){$('#authMsg').textContent=/abort|timeout|fetch|network/i.test(error.message||'')?'The connection timed out. Your records are safe. Tap Sign in to retry.':error.message||'Sign-in could not complete. Try again.';}
+    }catch(error){$('#authMsg').textContent=/abort|timeout|too long|fetch|network/i.test(error.message||'')?'The connection timed out. Your records are safe. Tap Sign in to retry.':error.message||'Sign-in could not complete. Try again.';}
     finally{setBusy(button,false);}
 
   };
   $('#resetBtn').onclick = async () => {
-    const email = $('#email').value.trim();
-    if (!email) return $('#authMsg').textContent = 'Enter your email first.';
-    const { error } = await db.auth.resetPasswordForEmail(email, { redirectTo: location.origin });
-    $('#authMsg').textContent = error ? error.message : 'Password reset email sent.';
+    const button=$('#resetBtn'),message=$('#authMsg');if(button.disabled)return;
+    const email=$('#email').value.trim().toLowerCase();
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return message.textContent='Enter your account email first.';
+    if(!db)return message.textContent='Secure connection failed to load. Refresh the page.';
+    setBusy(button,true,'Requesting reset…');message.textContent='Requesting your reset link…';
+    try{const {error}=await withinDeadline(db.auth.resetPasswordForEmail(email,{redirectTo:location.origin}),'Password reset request');if(error)throw error;message.textContent='Reset link requested. Check your inbox and spam folder.';}
+    catch(error){message.textContent=/abort|timeout|too long|fetch|network/i.test(error.message||'')?'Reset request was not confirmed. Check your email before retrying.':error.message||'The reset link could not be requested. Try again.';}
+    finally{setBusy(button,false);}
   };
   $('#recoveryForm').onsubmit = async (event) => {
     event.preventDefault();
-    const form = event.target;
+    const form = event.target;if(form.dataset.saving==='true')return;
     const password = form.elements.new_password.value;
     const message = $('#recoveryMsg');
     if (password !== form.elements.confirm_password.value) return message.textContent = 'Passwords do not match.';
+    if(password.length<(form.elements.new_password.minLength||12))return message.textContent='Use at least '+(form.elements.new_password.minLength||12)+' characters for your new password.';
     if (!db) return message.textContent = 'Secure connection failed to load. Refresh the page.';
-    const button = event.submitter;
-    setBusy(button, true);
+    const button = event.submitter||form.querySelector('button[type="submit"]');
+    form.dataset.saving='true';setBusy(button, true);message.textContent='Updating your password…';let updated=false,updateStarted=false;
     try {
-      const { data: { session }, error: sessionError } = await db.auth.getSession();
+      const { data: { session }, error: sessionError } = await withinDeadline(db.auth.getSession(),'Reset session check');
       if (sessionError || !session) throw new Error('This reset link has expired. Request a new one from the sign-in screen.');
-      const { error } = await db.auth.updateUser({ password });
-      if (error) throw error;
-      await db.auth.signOut();
+      updateStarted=true;const { error } = await withinDeadline(db.auth.updateUser({ password }),'Password update');
+      if (error) throw error;updated=true;
+      const {error:signOutError}=await withinDeadline(db.auth.signOut(),'Reset sign-out');if(signOutError)throw signOutError;
       recoveryMode = false;
       history.replaceState({}, '', location.pathname);
       form.reset();
       show('#auth');
       $('#authMsg').textContent = 'Password updated. Sign in with your new password.';
-    } catch (error) { message.textContent = error.message || 'Password could not be updated.'; }
-    finally { setBusy(button, false); }
+    } catch (error) { message.textContent = updated?'Your password was updated, but sign-out was not confirmed. Return to sign-in and use your new password.':/abort|timeout|too long|fetch|network/i.test(error.message||'')?(updateStarted?'The password update was not confirmed. Your entries are still here. Try signing in with the new password before retrying.':'The reset session could not be checked. Your entries are still here; retry.'):error.message||'Password could not be updated.'; }
+    finally { delete form.dataset.saving;setBusy(button, false); }
   };
   $('#recoveryBack').onclick = () => {
     recoveryMode = false;
