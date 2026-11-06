@@ -3,5 +3,8 @@
   "framework": null,
   "installCommand": "npm ci --ignore-scripts --no-audit --no-fund",
   "buildCommand": "npm test",
-  "outputDirectory": "."
+  "outputDirectory": ".",
+  "headers": [
+    {"source":"/release-evidence.json","headers":[{"key":"Cache-Control","value":"no-store"}]}
+  ]
 }

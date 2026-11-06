@@ -83,7 +83,8 @@
     "coach-health-reports.js",
     "client-home-quick-log.js",
     "weekly-recap-model.js",
-    "weekly-recap.js"
+    "weekly-recap.js",
+    "coach-reliability.js"
   ],
   "styles": [
     "app.css",
@@ -136,6 +137,7 @@
     "weigh-in-routine.css",
     "coach-health-reports.css",
     "client-home-quick-log.css",
-    "weekly-recap.css"
+    "weekly-recap.css",
+    "coach-reliability.css"
   ]
 }
