@@ -1,0 +1,8 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert'),{JSDOM}=require('jsdom');
+const dom=new JSDOM('<nav id="clientTabs"><button data-client-tab="overview">Summary</button><button data-client-tab="training">Training</button><button data-client-tab="goals">Goals</button><button data-client-tab="support" class="active">Calls</button></nav>',{runScripts:'outside-only'}),w=dom.window;
+w.$=s=>w.document.querySelector(s);const source=fs.readFileSync(__dirname+'/../clarity.js','utf8');vm.runInContext(source.slice(source.indexOf('function simplifyCoachTabs(){'),source.indexOf('const workspaceBeforeClarity=')),dom.getInternalVMContext());
+let clicked=0;w.$('[data-client-tab="goals"]').onclick=()=>clicked++;
+w.simplifyCoachTabs();const details=w.$('.le-more-tabs'),goals=w.$('[data-client-tab="goals"]');assert(details.open);assert.equal(w.document.querySelectorAll('.le-more-tabs').length,1);assert.equal(goals.parentElement,details.lastElementChild);
+details.open=false;w.$('[data-client-tab="support"]').classList.remove('active');w.$('[data-client-tab="overview"]').classList.add('active');w.simplifyCoachTabs();w.simplifyCoachTabs();
+assert.equal(w.$('.le-more-tabs'),details,'Stable workspace tabs reuse their existing disclosure');assert.equal(w.document.querySelectorAll('.le-more-tabs').length,1);assert(!details.open,'Switching a primary tab preserves disclosure choice');goals.click();assert.equal(clicked,1,'Moving a tab retains its handler');assert.equal(w.$('[data-client-tab="training"]').parentElement,w.$('#clientTabs'));
+dom.window.close();console.log('PASS reused coach tab chrome: one stable disclosure, retained open choice, primary tabs and original handlers');

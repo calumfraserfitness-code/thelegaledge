@@ -29,8 +29,8 @@ function swapChoiceMarkup(ex){
  const logged=(state.data.exerciseLogs||[]).some(l=>l.training_session_id===state.selectedSessionId&&l.program_exercise_id===ex.id);
  return `<details class="gym-swap"><summary>Equipment busy? Swap exercise</summary><label>Exercise for this session<select data-exercise-choice="${esc(ex.id)}" ${logged?'disabled':''}>${options.map(n=>`<option value="${esc(n)}" ${name===n?'selected':''}>${esc(n)}</option>`).join('')}</select></label><p class="muted">${logged?'This session already has logged sets. Your recorded exercise stays attached to them.':'Keep the prescribed sets, reps and effort. Choose a comfortable starting weight for the different equipment. This changes only this session.'}</p></details>`;
 }
-const gymLoadBefore=loadClientData;
-loadClientData=async function(id){await gymLoadBefore(id);if(state.client?.id!==id)return;const choices=state.preview?[]:await query('Saved exercise choices',db.from('session_exercise_choices').select('*').eq('client_id',id));if(state.client?.id===id)state.data.exerciseChoices=choices;};
+const gymLoadBefore=loadClientData;let gymLoadSequence=0;
+loadClientData=async function(id){const request=++gymLoadSequence,user=state.user?.id,role=state.role,active=()=>request===gymLoadSequence&&state.client?.id===id&&state.user?.id===user&&state.role===role;if(await gymLoadBefore(id)===false||!active())return false;const choices=state.preview?[]:await query('Saved exercise choices',db.from('session_exercise_choices').select('*').eq('client_id',id));if(!active())return false;state.data.exerciseChoices=choices;return true;};
 const gymRowsBefore=workoutSetRows;
 workoutSetRows=function(ex,session,fd,client){return gymRowsBefore(ex,session,fd,client).map(row=>({...row,exercise_name:currentExerciseChoice(ex,session.id)}));};
 const gymCardBefore=exerciseCard;
@@ -51,12 +51,13 @@ const techniqueVideoLinks={
 function techniqueVideoMarkup(kind){const v=techniqueVideoLinks[kind];return v?`<a class="btn ghost small technique-video-link" href="${v.url}" target="_blank" rel="noopener noreferrer">▶ Watch: ${v.label}</a><small class="technique-source">Muscle & Strength · video explanation</small>`:'';}
 const gymTrainingBefore=clientTraining;
 clientTraining=function(){
- gymTrainingBefore();const client=state.client,session=state.data.sessions.find(s=>s.id===state.selectedSessionId);if(!session)return;
+ gymTrainingBefore();const client=state.client,account=state.user?.id,role=state.role,session=state.data.sessions.find(s=>s.id===state.selectedSessionId);if(!session)return;
  const exercises=exercisesForSession(session),groupCards=$$('#clientMain .training-rounds article');
  const groups=[...new Set(exercises.filter(e=>e.superset_group).map(e=>e.superset_group))];
  groupCards.forEach((node,i)=>{const group=exercises.filter(e=>e.superset_group===groups[i]);node.insertAdjacentHTML('beforeend',techniqueVideoMarkup(group[0]?.combination_type==='triset'?'triset':'superset'));const names=node.querySelector('p');if(names)names.textContent=group.map((e,j)=>groups[i]+(j+1)+': '+currentExerciseChoice(e)).join(' → ');});
  $$('#clientMain .technique-note').forEach(node=>node.insertAdjacentHTML('beforeend',techniqueVideoMarkup('drop')));
  $$('[data-exercise-choice]').forEach(select=>select.onchange=async()=>{
+  if(state.client?.id!==client.id||state.user?.id!==account||state.role!==role||!select.isConnected)return;
   const ex=exercises.find(e=>e.id===select.dataset.exerciseChoice),old=currentExerciseChoice(ex),name=select.value,form=select.closest('.exercise-card')?.querySelector('[data-exercise-log]');
   if(form&&[...form.querySelectorAll('input')].some(input=>input.value!=='')){select.value=old;return toast('Save your entered sets first. Swap an exercise before logging it.','error');}
   if(!approvedExerciseOptions(ex).includes(name)){select.value=old;return;}
@@ -64,7 +65,7 @@ clientTraining=function(){
   try{
    const row={client_id:client.id,training_session_id:session.id,program_exercise_id:ex.id,exercise_name:name};
    const saved=state.preview?row:(await query('Save exercise choice',db.from('session_exercise_choices').upsert(row,{onConflict:'client_id,training_session_id,program_exercise_id'}).select()))[0];
-   if(!saved)throw Error('The exercise choice was not saved.');if(state.client?.id!==client.id)return;
+   if(!saved)throw Error('The exercise choice was not saved.');if(state.client?.id!==client.id||state.user?.id!==account||state.role!==role)return;
    state.data.exerciseChoices=[saved,...(state.data.exerciseChoices||[]).filter(r=>!(r.training_session_id===session.id&&r.program_exercise_id===ex.id))];
    if(state.selectedSessionId===session.id&&select.isConnected){clientTraining();toast(state.preview?'Sample exercise switched':'Exercise choice saved');}
   }catch(e){select.value=old;select.disabled=false;toast(e.message,'error');}

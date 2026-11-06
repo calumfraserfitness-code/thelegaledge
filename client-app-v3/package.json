@@ -1,0 +1,1 @@
+{"name":"legal-edge-client-app","private":true,"version":"1.0.0","scripts":{"test":"node scripts/build-runtime.cjs && node tests/run.cjs"},"devDependencies":{"jsdom":"26.1.0"}}

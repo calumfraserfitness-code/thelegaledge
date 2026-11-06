@@ -1,0 +1,13 @@
+create or replace function public.save_progress_entry(p_client uuid,p_date date,p_values jsonb)
+returns setof public.progress_entries language plpgsql security invoker set search_path='' as $$
+begin
+ if auth.uid() is null then raise exception 'Sign in before saving progress'; end if;
+ if p_date is null or p_values is null or jsonb_typeof(p_values)<>'object' or p_values='{}'::jsonb then raise exception 'Add at least one recorded value'; end if;
+ if exists(select 1 from jsonb_object_keys(p_values) k where k<>all(array['weight_kg','waist_cm','chest_cm','hips_cm','arm_cm','thigh_cm','body_fat_percent','steps','training_adherence','nutrition_adherence','notes'])) then raise exception 'Unsupported progress field'; end if;
+ return query insert into public.progress_entries as existing(client_id,entry_date,weight_kg,waist_cm,chest_cm,hips_cm,arm_cm,thigh_cm,body_fat_percent,steps,training_adherence,nutrition_adherence,notes)
+ values(p_client,p_date,(p_values->>'weight_kg')::numeric,(p_values->>'waist_cm')::numeric,(p_values->>'chest_cm')::numeric,(p_values->>'hips_cm')::numeric,(p_values->>'arm_cm')::numeric,(p_values->>'thigh_cm')::numeric,(p_values->>'body_fat_percent')::numeric,(p_values->>'steps')::integer,(p_values->>'training_adherence')::integer,(p_values->>'nutrition_adherence')::integer,p_values->>'notes')
+ on conflict(client_id,entry_date) do update set weight_kg=case when p_values?'weight_kg' then excluded.weight_kg else existing.weight_kg end,waist_cm=case when p_values?'waist_cm' then excluded.waist_cm else existing.waist_cm end,chest_cm=case when p_values?'chest_cm' then excluded.chest_cm else existing.chest_cm end,hips_cm=case when p_values?'hips_cm' then excluded.hips_cm else existing.hips_cm end,arm_cm=case when p_values?'arm_cm' then excluded.arm_cm else existing.arm_cm end,thigh_cm=case when p_values?'thigh_cm' then excluded.thigh_cm else existing.thigh_cm end,body_fat_percent=case when p_values?'body_fat_percent' then excluded.body_fat_percent else existing.body_fat_percent end,steps=case when p_values?'steps' then excluded.steps else existing.steps end,training_adherence=case when p_values?'training_adherence' then excluded.training_adherence else existing.training_adherence end,nutrition_adherence=case when p_values?'nutrition_adherence' then excluded.nutrition_adherence else existing.nutrition_adherence end,notes=case when p_values?'notes' then excluded.notes else existing.notes end
+ returning existing.*;
+end; $$;
+revoke all on function public.save_progress_entry(uuid,date,jsonb) from public,anon;
+grant execute on function public.save_progress_entry(uuid,date,jsonb) to authenticated;

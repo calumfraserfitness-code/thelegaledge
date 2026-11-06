@@ -42,7 +42,7 @@ function clearWorkspaceTabs(){
  let details=tabs.querySelector('.le-more-tabs');
  if(!details){details=document.createElement('details');details.className='le-more-tabs';details.innerHTML='<summary>Client details</summary><div></div>';tabs.append(details);}
  else details.querySelector('summary').textContent='Client details';
- const extras={onboarding:'Intake answers',legal:'Agreement & consent',diagnostics:'Bloods & genetics',goals:'Goals',support:'Calls & messages',connections:'Devices'};
+ const extras={onboarding:'Intake answers',legal:'Agreement & consent',diagnostics:'Bloods & genetics',goals:'Goals',support:'Calls & messages',connections:'Health reports & devices'};
  for(const b of [...tabs.querySelectorAll('[data-client-tab]')]){
   const key=b.dataset.clientTab;
   if(names[key])b.textContent=names[key];
@@ -67,16 +67,15 @@ function clearClientMore(){
 function updateClientNav(){
  const nav=$('#clientNav');if(!nav)return;
  if(!nav.dataset.clearNavigation){
-  nav.dataset.clearNavigation='true';nav.innerHTML=[['today','⌂','Today'],['planner','▦','Schedule'],['training','◇','Training'],['nutrition','○','Nutrition'],['checkin','✓','Check-in']].map(([key,icon,label])=>`<button data-client-view="${key}"><span>${icon}</span>${label}</button>`).join('')+'<button type="button" id="clearClientMore"><span>☰</span>More</button>';
-  nav.querySelector('#clearClientMore').onclick=e=>{e.stopPropagation();state.clientView='more';renderClient();};
+  nav.dataset.clearNavigation='true';nav.innerHTML=[['today','⌂','Today'],['training','◇','Training'],['nutrition','○','Nutrition'],['checkin','✓','Check-in'],['progress','↗','Progress'],['support','◌','Coach']].map(([key,icon,label])=>`<button type="button" data-client-view="${key}"><span aria-hidden="true">${icon}</span>${label}</button>`).join('');
  }
- nav.querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.clientView===state.clientView||(b.id==='clearClientMore'&&!['today','planner','training','nutrition','checkin'].includes(state.clientView))));
+ nav.querySelectorAll('button').forEach(b=>{const active=b.dataset.clientView===state.clientView||(b.dataset.clientView==='progress'&&['diagnostics','health'].includes(state.clientView))||(b.dataset.clientView==='training'&&state.clientView==='planner');b.classList.toggle('active',active);if(active)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});
 }
 const clearClientRenderBefore=renderClient;
 renderClient=function(){
  const ready=state.preview||(state.client?.onboarding_status==='complete'&&state.client?.plan_status==='published');
- if(state.clientView==='more'&&ready){$('#clientNav').classList.remove('hidden');clearClientMore();}else clearClientRenderBefore();
- updateClientNav();
+ let result;if(state.clientView==='more'&&ready){$('#clientNav').classList.remove('hidden');result=clearClientMore();}else result=clearClientRenderBefore();
+ updateClientNav();return result;
 };
 function clearLogin(){
  const form=$('#loginForm');if(!form||form.dataset.clearLogin)return;form.dataset.clearLogin='true';
@@ -86,7 +85,7 @@ function clearLogin(){
  const preview=form.querySelector('a[href*="workspace=demo"]');if(preview){const detail=document.createElement('details');detail.className='clear-preview-link';detail.innerHTML='<summary>See a sample before signing in</summary>';preview.before(detail);detail.append(preview);preview.textContent='Open fictional preview';}
  const password=$('#password'),toggle=document.createElement('button');toggle.type='button';toggle.className='text-btn clear-password-toggle';toggle.textContent='Show password';toggle.setAttribute('aria-pressed','false');toggle.onclick=()=>{const visible=password.type==='password';password.type=visible?'text':'password';toggle.textContent=visible?'Hide password':'Show password';toggle.setAttribute('aria-pressed',String(visible));};password.closest('label').append(toggle);
  const original=form.onsubmit;let pending=false;
- form.onsubmit=async event=>{event.preventDefault();if(pending)return;pending=true;const button=form.querySelector('button[type="submit"]');setBusy(button,true,'Signing in…');try{await original(event);}catch{$('#authMsg').textContent='Could not sign in. Check your connection and try again.';}finally{pending=false;setBusy(button,false);}};
+ form.onsubmit=async event=>{event.preventDefault();if(pending)return;pending=true;try{await original(event);}catch{$('#authMsg').textContent='Could not sign in. Check your connection and try again.';}finally{pending=false;}};
  $('#authMsg').setAttribute('role','status');$('#authMsg').setAttribute('aria-live','polite');
 }
 document.addEventListener('DOMContentLoaded',()=>{clearCoachNav();updateClientNav();clearWorkspaceTabs();clearLogin();});

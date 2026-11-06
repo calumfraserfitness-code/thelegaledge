@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import {normalizeDevicePayload as parse} from '../../supabase/functions/health-device-ingest/normalize.mjs';
+const now=new Date('2026-10-09T12:00:00Z');
+const sample=(start,end,v,source='Connect')=>`${start}\t${end}\t${v}\t${source}`;
+const lines=[sample('2026-10-08T09:00:00+01:00','2026-10-08T09:10:00+01:00',100),sample('2026-10-08T09:10:00+01:00','2026-10-08T09:20:00+01:00',150),sample('2026-10-08T09:00:00+01:00','2026-10-08T09:10:00+01:00',100),sample('2026-10-08T09:00:00+01:00','2026-10-08T09:10:00+01:00',500,'iPhone'),sample('2026-10-09T09:00:00+01:00','2026-10-09T09:10:00+01:00',400)];
+const payload={shortcut_version:'steps-v1',source_name:'Connect',local_today:'2026-10-09',samples_tsv:lines.join('\n')};
+assert.deepEqual(parse(payload,['steps'],now),[{date:'2026-10-08',steps:250}]);
+assert.deepEqual(parse(payload,['steps'],now),[{date:'2026-10-08',steps:250}],'Repeat import is a snapshot, not incremental inflation');
+assert.throws(()=>parse({...payload,samples_tsv:lines[0]+'\n'+sample('2026-10-08T09:05:00+01:00','2026-10-08T09:15:00+01:00',90)},['steps'],now),/Overlapping/);
+assert.throws(()=>parse({...payload,source_name:'Absent'},['steps'],now),/Available sources/);
+assert.throws(()=>parse(payload,['sleep_minutes'],now),/not permitted/);
+assert.throws(()=>parse({...payload,samples_tsv:''},['steps'],now),/No completed-day/);
+assert.throws(()=>parse({...payload,samples_tsv:sample('2026-10-08T23:59:00+01:00','2026-10-09T00:02:00+01:00',5)},['steps'],now),/crosses local/);
+assert.throws(()=>parse({...payload,samples_tsv:sample('2026-10-08T09:00:00','2026-10-08T09:10:00',100)},['steps'],now),/timezone/);
+assert.throws(()=>parse({...payload,samples_tsv:sample('2026-10-08T09:00:00Z','2026-10-08T09:10:00Z','NaN')},['steps'],now),/Invalid/);
+assert.throws(()=>parse({...payload,samples_tsv:Array(4001).fill(lines[0]).join('\n')},['steps'],now),/Too many/);
+assert.deepEqual(parse({daily:[{date:'2026-10-08',steps:200,sleep_minutes:450}]},['steps','sleep_minutes'],now),[{date:'2026-10-08',steps:200,sleep_minutes:450}]);
+console.log('PASS steps normalization: one source, duplicate suppression, completed days, repeat snapshots, overlap/cross-day/invalid/oversized/unauthorized rejection, existing daily API preserved.');

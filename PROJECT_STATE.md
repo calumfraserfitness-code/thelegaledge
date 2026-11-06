@@ -1,5 +1,10 @@
 # The Legal Edge Client App — Persistent Project State
 
+## 9 October 2026 — daily nutrition release
+
+See client-app-v3/RELEASE_20261009.md. Changes build on the verified live source branch feat/client-summary-audit-20261008 at d0e8ded69118a7a3864a29bc08f8887287513090, preserving all 7–8 October fixes that are absent from main. Daily food and favourites use additive RLS tables; original prescriptions/history remain intact. Five client destinations group check-ins/diagnostics/devices under Progress. Optional coach QA now has an eight-second deadline and avoids interrupting active editing. Local and role-based SQL rollback tests passed. Real browser logins/persistence and physical iPhone still need verification; this is not certification of the entire Monday launch.
+
+
 Last updated: 30 September 2026
 
 ## 30 September weekly meals and activity presentation

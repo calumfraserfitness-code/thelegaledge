@@ -1,0 +1,855 @@
+{
+  "source": "USDA FoodData Central SR Legacy, April 2018",
+  "source_url": "https://fdc.nal.usda.gov/download-datasets/",
+  "foods": {
+    "167747": {
+      "description": "Lemon juice, raw",
+      "portions": [
+        {
+          "unit": "cup",
+          "form": "",
+          "grams": 244.0,
+          "usda_modifier": "cup",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 244.0
+        }
+      ]
+    },
+    "167755": {
+      "description": "Raspberries, raw",
+      "portions": [
+        {
+          "unit": "cup",
+          "form": "",
+          "grams": 123.0,
+          "usda_modifier": "cup",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 123.0
+        }
+      ]
+    },
+    "167762": {
+      "description": "Strawberries, raw",
+      "portions": [
+        {
+          "unit": "cup",
+          "form": "halved",
+          "grams": 152.0,
+          "usda_modifier": "cup, halves",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 152.0
+        }
+      ]
+    },
+    "168462": {
+      "description": "Spinach, raw",
+      "portions": [
+        {
+          "unit": "cup",
+          "form": "loosely filled",
+          "grams": 30.0,
+          "usda_modifier": "cup",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 30.0
+        }
+      ]
+    },
+    "168482": {
+      "description": "Sweet potato, raw, unprepared (Includes foods for USDA's Food Distribution Program)",
+      "portions": [
+        {
+          "unit": "cup",
+          "form": "cubed",
+          "grams": 133.0,
+          "usda_modifier": "cup, cubes",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 133.0
+        }
+      ]
+    },
+    "168874": {
+      "description": "Quinoa, uncooked",
+      "portions": [
+        {
+          "unit": "cup",
+          "form": "dry",
+          "grams": 170.0,
+          "usda_modifier": "cup",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 170.0
+        }
+      ]
+    },
+    "168877": {
+      "description": "Rice, white, long-grain, regular, raw, enriched",
+      "portions": [
+        {
+          "unit": "cup",
+          "form": "dry",
+          "grams": 185.0,
+          "usda_modifier": "cup",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 185.0
+        }
+      ]
+    },
+    "168878": {
+      "description": "Rice, white, long-grain, regular, enriched, cooked",
+      "portions": [
+        {
+          "unit": "cup",
+          "form": "cooked",
+          "grams": 158.0,
+          "usda_modifier": "cup",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 158.0
+        }
+      ]
+    },
+    "169074": {
+      "description": "Tomato sauce, canned, no salt added",
+      "portions": [
+        {
+          "unit": "cup",
+          "form": "",
+          "grams": 245.0,
+          "usda_modifier": "cup",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 245.0
+        }
+      ]
+    },
+    "169097": {
+      "description": "Oranges, raw, all commercial varieties",
+      "portions": [
+        {
+          "unit": "medium orange",
+          "form": "",
+          "grams": 131.0,
+          "usda_modifier": "fruit (2-5/8\" dia)",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 131.0
+        }
+      ]
+    },
+    "169230": {
+      "description": "Garlic, raw",
+      "portions": [
+        {
+          "unit": "clove",
+          "form": "",
+          "grams": 3.0,
+          "usda_modifier": "clove",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 3.0
+        }
+      ]
+    },
+    "169231": {
+      "description": "Ginger root, raw",
+      "portions": [
+        {
+          "unit": "teaspoon",
+          "form": "grated",
+          "grams": 2.0,
+          "usda_modifier": "tsp",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 2.0
+        }
+      ]
+    },
+    "169251": {
+      "description": "Mushrooms, white, raw",
+      "portions": [
+        {
+          "unit": "cup",
+          "form": "sliced",
+          "grams": 70.0,
+          "usda_modifier": "cup, pieces or slices",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 70.0
+        }
+      ]
+    },
+    "169291": {
+      "description": "Squash, summer, zucchini, includes skin, raw",
+      "portions": [
+        {
+          "unit": "cup",
+          "form": "chopped",
+          "grams": 124.0,
+          "usda_modifier": "cup, chopped",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 124.0
+        }
+      ]
+    },
+    "169699": {
+      "description": "Couscous, dry",
+      "portions": [
+        {
+          "unit": "cup",
+          "form": "dry",
+          "grams": 173.0,
+          "usda_modifier": "cup",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 173.0
+        }
+      ]
+    },
+    "169703": {
+      "description": "Rice, brown, long-grain, raw (Includes foods for USDA's Food Distribution Program)",
+      "portions": [
+        {
+          "unit": "cup",
+          "form": "dry",
+          "grams": 185.0,
+          "usda_modifier": "cup",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 185.0
+        }
+      ]
+    },
+    "169705": {
+      "description": "Oats (Includes foods for USDA's Food Distribution Program)",
+      "portions": [
+        {
+          "unit": "cup",
+          "form": "whole oat groats",
+          "grams": 156.0,
+          "usda_modifier": "cup",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 156.0
+        }
+      ]
+    },
+    "169736": {
+      "description": "Pasta, dry, enriched",
+      "portions": [
+        {
+          "unit": "cup",
+          "form": "dry penne",
+          "grams": 95.0,
+          "usda_modifier": "cup penne",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 95.0
+        }
+      ]
+    },
+    "169868": {
+      "description": "Milk, fluid, nonfat, calcium fortified (fat free or skim)",
+      "portions": [
+        {
+          "unit": "cup",
+          "form": "",
+          "grams": 247.0,
+          "usda_modifier": "cup",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 247.0
+        }
+      ]
+    },
+    "169961": {
+      "description": "Beans, snap, green, raw",
+      "portions": [
+        {
+          "unit": "cup",
+          "form": "chopped",
+          "grams": 100.0,
+          "usda_modifier": "cup 1/2\" pieces",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 100.0
+        }
+      ]
+    },
+    "169986": {
+      "description": "Cauliflower, raw",
+      "portions": [
+        {
+          "unit": "cup",
+          "form": "chopped",
+          "grams": 107.0,
+          "usda_modifier": "cup chopped (1/2\" pieces)",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 107.0
+        }
+      ]
+    },
+    "170026": {
+      "description": "Potatoes, flesh and skin, raw",
+      "portions": [
+        {
+          "unit": "cup",
+          "form": "diced",
+          "grams": 150.0,
+          "usda_modifier": "cup, diced",
+          "usda_amount": 0.5,
+          "usda_gram_weight": 75.0
+        },
+        {
+          "unit": "medium potato",
+          "form": "",
+          "grams": 213.0,
+          "usda_modifier": "Potato medium (2-1/4\" to 3-1/4\" dia)",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 213.0
+        }
+      ]
+    },
+    "170108": {
+      "description": "Peppers, sweet, red, raw",
+      "portions": [
+        {
+          "unit": "cup",
+          "form": "chopped",
+          "grams": 149.0,
+          "usda_modifier": "cup, chopped",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 149.0
+        }
+      ]
+    },
+    "170184": {
+      "description": "Nuts, pistachio nuts, raw",
+      "portions": [
+        {
+          "unit": "cup",
+          "form": "shelled",
+          "grams": 123.0,
+          "usda_modifier": "cup",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 123.0
+        }
+      ]
+    },
+    "170187": {
+      "description": "Nuts, walnuts, english",
+      "portions": [
+        {
+          "unit": "cup",
+          "form": "chopped",
+          "grams": 117.0,
+          "usda_modifier": "cup, chopped",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 117.0
+        }
+      ]
+    },
+    "170379": {
+      "description": "Broccoli, raw",
+      "portions": [
+        {
+          "unit": "cup",
+          "form": "chopped",
+          "grams": 91.0,
+          "usda_modifier": "cup chopped",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 91.0
+        }
+      ]
+    },
+    "170393": {
+      "description": "Carrots, raw",
+      "portions": [
+        {
+          "unit": "cup",
+          "form": "chopped",
+          "grams": 128.0,
+          "usda_modifier": "cup chopped",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 128.0
+        }
+      ]
+    },
+    "170457": {
+      "description": "Tomatoes, red, ripe, raw, year round average",
+      "portions": [
+        {
+          "unit": "cup",
+          "form": "chopped",
+          "grams": 180.0,
+          "usda_modifier": "cup, chopped or sliced",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 180.0
+        }
+      ]
+    },
+    "170567": {
+      "description": "Nuts, almonds",
+      "portions": [
+        {
+          "unit": "cup",
+          "form": "whole",
+          "grams": 143.0,
+          "usda_modifier": "cup, whole",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 143.0
+        }
+      ]
+    },
+    "170688": {
+      "description": "Bulgur, dry",
+      "portions": [
+        {
+          "unit": "cup",
+          "form": "dry",
+          "grams": 140.0,
+          "usda_modifier": "cup",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 140.0
+        }
+      ]
+    },
+    "170894": {
+      "description": "Yogurt, Greek, plain, nonfat (Includes foods for USDA's Food Distribution Program)",
+      "portions": [
+        {
+          "unit": "pot",
+          "form": "170g reference pot",
+          "grams": 170.0,
+          "usda_modifier": "container",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 170.0
+        }
+      ]
+    },
+    "170923": {
+      "description": "Spices, cumin seed",
+      "portions": [
+        {
+          "unit": "teaspoon",
+          "form": "whole",
+          "grams": 2.1,
+          "usda_modifier": "tsp, whole",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 2.1
+        }
+      ]
+    },
+    "170931": {
+      "description": "Spices, pepper, black",
+      "portions": [
+        {
+          "unit": "teaspoon",
+          "form": "ground",
+          "grams": 2.3,
+          "usda_modifier": "tsp, ground",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 2.3
+        }
+      ]
+    },
+    "171077": {
+      "description": "Chicken, broiler or fryers, breast, skinless, boneless, meat only, raw",
+      "portions": [
+        {
+          "unit": "raw chicken breast",
+          "form": "reference size; pieces vary",
+          "grams": 272.0,
+          "usda_modifier": "piece",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 272.0
+        }
+      ]
+    },
+    "171287": {
+      "description": "Egg, whole, raw, fresh",
+      "portions": [
+        {
+          "unit": "large egg",
+          "form": "without shell",
+          "grams": 50.0,
+          "usda_modifier": "large",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 50.0
+        }
+      ]
+    },
+    "171300": {
+      "description": "Yogurt, Greek, strawberry, lowfat",
+      "portions": [
+        {
+          "unit": "cup",
+          "form": "Greek yogurt density reference",
+          "grams": 245.0,
+          "usda_modifier": "cup (8 fl oz)",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 245.0
+        }
+      ]
+    },
+    "171328": {
+      "description": "Spices, oregano, dried",
+      "portions": [
+        {
+          "unit": "teaspoon",
+          "form": "dried leaves",
+          "grams": 1.0,
+          "usda_modifier": "tsp, leaves",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 1.0
+        }
+      ]
+    },
+    "171329": {
+      "description": "Spices, paprika",
+      "portions": [
+        {
+          "unit": "teaspoon",
+          "form": "",
+          "grams": 2.3,
+          "usda_modifier": "tsp",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 2.3
+        }
+      ]
+    },
+    "171413": {
+      "description": "Oil, olive, salad or cooking",
+      "portions": [
+        {
+          "unit": "teaspoon",
+          "form": "",
+          "grams": 4.5,
+          "usda_modifier": "tsp",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 4.5
+        }
+      ]
+    },
+    "171477": {
+      "description": "Chicken, broilers or fryers, breast, meat only, cooked, roasted",
+      "portions": [
+        {
+          "unit": "cup",
+          "form": "chopped, cooked",
+          "grams": 140.0,
+          "usda_modifier": "cup, chopped or diced",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 140.0
+        }
+      ]
+    },
+    "171650": {
+      "description": "Cereals ready-to-eat, POST Raisin Bran Cereal",
+      "portions": [
+        {
+          "unit": "cup",
+          "form": "raisin bran reference",
+          "grams": 59.0,
+          "usda_modifier": "cup (1 NLEA serving)",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 59.0
+        }
+      ]
+    },
+    "171688": {
+      "description": "Apples, raw, with skin (Includes foods for USDA's Food Distribution Program)",
+      "portions": [
+        {
+          "unit": "cup",
+          "form": "chopped",
+          "grams": 125.0,
+          "usda_modifier": "cup, quartered or chopped",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 125.0
+        },
+        {
+          "unit": "medium apple",
+          "form": "edible portion",
+          "grams": 182.0,
+          "usda_modifier": "medium (3\" dia)",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 182.0
+        }
+      ]
+    },
+    "171705": {
+      "description": "Avocados, raw, all commercial varieties",
+      "portions": [
+        {
+          "unit": "cup",
+          "form": "cubed",
+          "grams": 150.0,
+          "usda_modifier": "cup, cubes",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 150.0
+        },
+        {
+          "unit": "avocado",
+          "form": "flesh only",
+          "grams": 201.0,
+          "usda_modifier": "avocado, NS as to Florida or California",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 201.0
+        }
+      ]
+    },
+    "171711": {
+      "description": "Blueberries, raw",
+      "portions": [
+        {
+          "unit": "cup",
+          "form": "",
+          "grams": 148.0,
+          "usda_modifier": "cup",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 148.0
+        }
+      ]
+    },
+    "171955": {
+      "description": "Fish, cod, Atlantic, raw",
+      "portions": [
+        {
+          "unit": "raw cod fillet",
+          "form": "reference size; fillets vary",
+          "grams": 231.0,
+          "usda_modifier": "fillet",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 231.0
+        }
+      ]
+    },
+    "172182": {
+      "description": "Cheese, cottage, lowfat, 2% milkfat",
+      "portions": [
+        {
+          "unit": "cup",
+          "form": "not packed",
+          "grams": 226.0,
+          "usda_modifier": "cup (not packed)",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 226.0
+        }
+      ]
+    },
+    "172183": {
+      "description": "Egg, white, raw, fresh",
+      "portions": [
+        {
+          "unit": "large egg white",
+          "form": "",
+          "grams": 33.0,
+          "usda_modifier": "large",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 33.0
+        },
+        {
+          "unit": "cup",
+          "form": "",
+          "grams": 243.0,
+          "usda_modifier": "cup",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 243.0
+        }
+      ]
+    },
+    "172421": {
+      "description": "Lentils, mature seeds, cooked, boiled, without salt",
+      "portions": [
+        {
+          "unit": "cup",
+          "form": "cooked",
+          "grams": 198.0,
+          "usda_modifier": "cup",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 198.0
+        }
+      ]
+    },
+    "172470": {
+      "description": "Peanut butter, smooth style, without salt",
+      "portions": [
+        {
+          "unit": "tablespoon",
+          "form": "level",
+          "grams": 16.0,
+          "usda_modifier": "tbsp",
+          "usda_amount": 2.0,
+          "usda_gram_weight": 32.0
+        }
+      ]
+    },
+    "172475": {
+      "description": "Tofu, raw, firm, prepared with calcium sulfate",
+      "portions": [
+        {
+          "unit": "cup",
+          "form": "firm tofu",
+          "grams": 252.0,
+          "usda_modifier": "cup",
+          "usda_amount": 0.5,
+          "usda_gram_weight": 126.0
+        },
+        {
+          "unit": "block",
+          "form": "324g reference block",
+          "grams": 324.0,
+          "usda_modifier": "block",
+          "usda_amount": 0.25,
+          "usda_gram_weight": 81.0
+        }
+      ]
+    },
+    "172688": {
+      "description": "Bread, whole-wheat, commercially prepared",
+      "portions": [
+        {
+          "unit": "slice",
+          "form": "wholegrain bread reference",
+          "grams": 32.0,
+          "usda_modifier": "slice",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 32.0
+        }
+      ]
+    },
+    "173439": {
+      "description": "Cheese, low fat, cheddar or colby",
+      "portions": [
+        {
+          "unit": "cup",
+          "form": "shredded",
+          "grams": 113.0,
+          "usda_modifier": "cup, shredded",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 113.0
+        }
+      ]
+    },
+    "173740": {
+      "description": "Beans, kidney, all types, mature seeds, cooked, boiled, without salt",
+      "portions": [
+        {
+          "unit": "cup",
+          "form": "cooked",
+          "grams": 177.0,
+          "usda_modifier": "cup",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 177.0
+        }
+      ]
+    },
+    "173757": {
+      "description": "Chickpeas (garbanzo beans, bengal gram), mature seeds, cooked, boiled, without salt",
+      "portions": [
+        {
+          "unit": "cup",
+          "form": "cooked",
+          "grams": 164.0,
+          "usda_modifier": "cup",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 164.0
+        }
+      ]
+    },
+    "173904": {
+      "description": "Cereals, oats, regular and quick, not fortified, dry",
+      "portions": [
+        {
+          "unit": "cup",
+          "form": "dry rolled oats",
+          "grams": 81.0,
+          "usda_modifier": "cup",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 81.0
+        },
+        {
+          "unit": "cup",
+          "form": "dry rolled oats",
+          "grams": 81.8182,
+          "usda_modifier": "cup",
+          "usda_amount": 0.33,
+          "usda_gram_weight": 27.0
+        }
+      ]
+    },
+    "173905": {
+      "description": "Cereals, oats, regular and quick, unenriched, cooked with water (includes boiling and microwaving), without salt",
+      "portions": [
+        {
+          "unit": "cup",
+          "form": "cooked porridge",
+          "grams": 234.0,
+          "usda_modifier": "cup",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 234.0
+        },
+        {
+          "unit": "cup",
+          "form": "cooked porridge",
+          "grams": 233.3333,
+          "usda_modifier": "cup",
+          "usda_amount": 0.75,
+          "usda_gram_weight": 175.0
+        }
+      ]
+    },
+    "173910": {
+      "description": "Cereals ready-to-eat, POST, Shredded Wheat, original big biscuit",
+      "portions": [
+        {
+          "unit": "biscuit",
+          "form": "large shredded-wheat reference biscuit",
+          "grams": 23.5,
+          "usda_modifier": "biscuits (1 NLEA serving)",
+          "usda_amount": 2.0,
+          "usda_gram_weight": 47.0
+        }
+      ]
+    },
+    "173944": {
+      "description": "Bananas, raw",
+      "portions": [
+        {
+          "unit": "medium banana",
+          "form": "peeled",
+          "grams": 118.0,
+          "usda_modifier": "medium (7\" to 7-7/8\" long)",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 118.0
+        }
+      ]
+    },
+    "174081": {
+      "description": "Tortillas, ready-to-bake or -fry, whole wheat",
+      "portions": [
+        {
+          "unit": "wrap",
+          "form": "41g wholewheat reference wrap",
+          "grams": 41.0,
+          "usda_modifier": "tortilla 1 serving",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 41.0
+        }
+      ]
+    },
+    "175167": {
+      "description": "Fish, salmon, Atlantic, farmed, raw",
+      "portions": [
+        {
+          "unit": "raw salmon fillet",
+          "form": "reference size; fillets vary",
+          "grams": 396.0,
+          "usda_modifier": "fillet",
+          "usda_amount": 0.5,
+          "usda_gram_weight": 198.0
+        }
+      ]
+    },
+    "175215": {
+      "description": "Soymilk (all flavors), unsweetened, with added calcium, vitamins A and D",
+      "portions": [
+        {
+          "unit": "cup",
+          "form": "",
+          "grams": 243.0,
+          "usda_modifier": "cup",
+          "usda_amount": 1.0,
+          "usda_gram_weight": 243.0
+        }
+      ]
+    }
+  }
+}

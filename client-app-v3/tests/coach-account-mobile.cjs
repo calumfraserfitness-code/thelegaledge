@@ -1,0 +1,9 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert'),{JSDOM}=require('jsdom');
+const dom=new JSDOM('<div id="coachApp"><header class="mobile-head"><button id="mobileMenu">More</button></header><nav id="coachNav"><button id="csPhoneAlerts" data-settings-only="true">Phone alerts</button></nav><main id="coachMain"></main><button class="logout">Original sign out</button></div>',{runScripts:'outside-only',pretendToBeVisual:true}),w=dom.window;let alerts=0,signouts=0;
+Object.assign(w,{$:s=>w.document.querySelector(s),matchMedia:()=>({matches:true}),scrollTo(){},coachingSettings(){},state:{role:'coach',client:null,coachView:'dashboard',user:{id:'one'}},renderCoach(){w.$('#coachMain').innerHTML='Home';}});w.$('#csPhoneAlerts').onclick=()=>alerts++;w.$('.logout').onclick=()=>signouts++;
+vm.runInContext(fs.readFileSync(__dirname+'/../coach-mobile.js','utf8'),dom.getInternalVMContext());w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
+w.CoachMobile.sync();assert(w.$('#cmSignOut'));assert.equal(signouts,0);w.$('#cmSignOut').click();assert.equal(signouts,1);
+w.$('[data-cm-view="mobile-more"]').click();const buttons=[...w.document.querySelectorAll('.cm-account-actions button')];assert.deepEqual(buttons.map(b=>b.textContent),['Phone alerts','Sign out']);assert.equal(alerts,0);buttons[0].click();assert.equal(alerts,1);buttons[1].click();assert.equal(signouts,2);
+w.state.user.id='two';buttons[0].click();buttons[1].click();assert.equal(alerts,1);assert.equal(signouts,2,'stale account controls cannot act');
+const app=fs.readFileSync(__dirname+'/../app-v2.js','utf8');assert(app.includes("coachView: 'dashboard'"));assert(app.includes("get('section') === 'corporate' ? 'firms' : 'dashboard'"));
+setTimeout(()=>{dom.window.close();console.log('PASS explicit mobile alert/sign-out controls preserve native handlers, require taps, reject stale accounts; coach starts on Home');},100);
