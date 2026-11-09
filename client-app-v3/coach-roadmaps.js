@@ -45,8 +45,8 @@
      const row=await query('Save private coaching roadmap',db.rpc('save_coach_client_roadmap',{p_client:id,p_expected_revision:revision,p_payload:submitted}));
      if(!active()||request!==serial)return;
      if(!row||row.client_id!==id||row.coach_id!==owner||row.revision!==revision+1)throw Error('The save was not confirmed. Reload the saved version before retrying.');
-     validate(row.payload);revision=row.revision;payload=row.payload;
-     if(JSON.stringify(read(form))===sent){dirty=false;paint();box.querySelector('.cr-editor').open=true;box.querySelector('[data-cr-save-status]').textContent='Saved privately · revision '+revision+'. No client plan changed.';}
+     validate(row.payload);const unchanged=JSON.stringify(read(form))===sent;revision=row.revision;payload=row.payload;
+     if(unchanged){dirty=false;paint();box.querySelector('.cr-editor').open=true;box.querySelector('[data-cr-save-status]').textContent='Saved privately · revision '+revision+'. No client plan changed.';}
      else status.textContent='Earlier edits saved. Your newer edits are still unsaved.';
     }catch(e){if(active()&&request===serial)status.textContent=(e.message||'Could not save.')+' Your draft is still here.';}
     finally{busy=false;if(active()&&form.isConnected){button.disabled=false;form.querySelector('[data-cr-add-goal]').disabled=false;}}
