@@ -46,6 +46,8 @@ Use client-app-v3/RELEASE_20261009.md as the authoritative release checklist. Pr
 
 ## Evidence and safeguards
 
+- Private client roadmaps live in coach_client_roadmaps, separate from published client goals and plan prescriptions. Preserve original agreement IDs and evidence; explicitly mark proposed, paused and historical targets rather than silently promoting them. Review horizons are not calendar bookings. Coach Summary links to Roadmap & goals; the published target editor stays secondary and clearly labelled. Current client assignment AND record-coach ownership are required for both RLS and recovery exports, including reassigned-client cases. Use revision-checked saves, preserve failed/newer typing, and never put client roadmap content in this public repository or browser storage. Only active real clients receive new roadmap preparation; recoverable test removal and inactive status do not erase history.
+
 - Preserve existing client records and approved prescriptions. Missing plans require coach input; never fabricate approved training or nutrition.
 - Unknown health values remain unknown; zero is a recorded value. Imported check-in timestamps are not proof of original submission time.
 - Calculate check-in weeks and deadlines in each client’s named timezone, including daylight saving. An unset due day must not mark the client overdue.

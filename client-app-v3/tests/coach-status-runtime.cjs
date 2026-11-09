@@ -3,6 +3,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
 const root=path.resolve(__dirname,'..'),browser=fs.readFileSync(path.join(root,'tests/browser/mobile-coach-flow.cjs'),'utf8');
 const fixtureCode=browser.slice(browser.indexOf('const ids='),browser.indexOf('async function checkNoOverflow'));
 const {fixture,routeApi,ids}=new Function('crypto','Buffer',fixtureCode+';return {fixture,routeApi,ids};')(crypto,Buffer),store=fixture(),errors=[];let statusCalls=0;
+store.tables.coach_client_roadmaps=[{client_id:ids.client,coach_id:ids.coach,revision:1,payload:{version:1,phase:'Synthetic private priority',destination:'Original direction',evidence:'Dated synthetic evidence',goals:[{id:'S1',title:'Useful goal',status:'agreed',detail:'Original agreement'}],trajectory:[{label:'Next review',detail:'Agree before progressing'}],scorecard:'Agreed measures',coach:'Private follow-up',next_call:'Confirm the minimum',review:'Proposed, not booked',sources:[]}}];
 class Local extends ResourceLoader{fetch(url){const value=new URL(url);if(value.hostname!=='localhost')return null;const file=path.join(root,value.pathname);return fs.existsSync(file)&&fs.statSync(file).isFile()?Promise.resolve(fs.readFileSync(file)):null;}}
 class Socket{constructor(){this.readyState=0;}addEventListener(){}removeEventListener(){}send(){}close(){this.readyState=3;}}
 const virtualConsole=new VirtualConsole();virtualConsole.on('jsdomError',error=>errors.push(error.message));
@@ -10,6 +11,9 @@ const dom=new JSDOM(fs.readFileSync(path.join(root,'index.html'),'utf8'),{url:'h
  w.Response=Response;w.Headers=Headers;w.Request=Request;w.WebSocket=Socket;w.matchMedia=()=>({matches:true,addEventListener(){},removeEventListener(){}});w.HTMLElement.prototype.scrollIntoView=function(){};w.scrollTo=()=>{};
  w.fetch=async(input,options={})=>{
   const url=new URL(typeof input==='string'?input:input.url,'http://localhost/');
+  if(url.pathname==='/rest/v1/rpc/save_coach_client_roadmap'){
+   const args=JSON.parse(options.body),row=store.tables.coach_client_roadmaps[0];assert.equal(args.p_client,ids.client);assert.equal(args.p_expected_revision,row.revision);Object.assign(row,{revision:row.revision+1,payload:args.p_payload});return new Response(JSON.stringify(row),{headers:{'Content-Type':'application/json'}});
+  }
   if(url.pathname==='/rest/v1/rpc/coach_operational_status'){
    statusCalls++;return new Response(JSON.stringify({format:'legal-edge-operational-status',coach_id:ids.coach,checked_at:new Date().toISOString(),alerts:{capped:false,enabled_devices:0,pending:1,pending_unattempted:1,failed:0,provider_accepted:0},backup:null,health:{capped:false,keys_with_receipt:0,weekly_reports:15,report_clients:4}}),{headers:{'Content-Type':'application/json'}});
   }
@@ -35,6 +39,11 @@ async function until(check,label){for(let n=0;n<200;n++){if(check())return;await
  assert(panel.textContent.includes('No enabled devices'));assert(panel.textContent.includes('No snapshot recorded'));assert(!panel.textContent.includes('Browser Fixture Client'),'aggregate panel contains no client identity');
  const count=w.document.querySelectorAll('*').length;await new Promise(resolve=>setTimeout(resolve,50));assert.equal(w.document.querySelectorAll('*').length,count,'combined observers settle rather than rewrapping');
  assert.equal(w.document.querySelectorAll('#coachReliability').length,1);assert.deepEqual(errors,[]);
- console.log('PASS actual runtime/SDK synthetic coach login, collapsed status, one owner, on-demand request, privacy and settled mobile/Home observers.');
+ $('[data-home-route="clients"]').click();await until(()=>$('.client-row[data-client-id]'),'client directory');await $('.client-row[data-client-id]').onclick();await until(()=>$('#coachRoadmap [data-cr-open]'),'private overview');
+ $('#coachRoadmap [data-cr-open]').click();await until(()=>$('#coachRoadmap [data-cr-form]'),'full roadmap');await until(()=>$('#cmClientTab option[value="goals"]')?.textContent==='Roadmap & goals','mobile roadmap label');
+ assert(!$('.cr-published').open);assert.equal($('#coachRoadmap h2').textContent,'Synthetic private priority');const form=$('[data-cr-form]');form.elements.phase.value='Changed synthetic priority';await form.onsubmit({preventDefault(){}});await until(()=>$('#coachRoadmap h2')?.textContent==='Changed synthetic priority','confirmed private save');assert.equal(store.tables.coach_client_roadmaps[0].revision,2);
+ w.eval('state.clientTab="overview";renderClientWorkspace()');await until(()=>$('#coachRoadmap h2')?.textContent==='Changed synthetic priority','private save/reload');const settled=w.document.querySelectorAll('*').length;await new Promise(r=>setTimeout(r,70));assert.equal(w.document.querySelectorAll('*').length,settled,'roadmap/mobile observers settle');assert.deepEqual(errors,[]);
+ w.eval('state.role="client";state.clientView="today";show("#clientApp");renderClient()');await tick();assert(!$('#clientApp #coachRoadmap'));assert(!$('#clientApp').textContent.includes('Changed synthetic priority'));
+ console.log('PASS actual runtime/SDK synthetic login, on-demand status, private roadmap save/reload, mobile navigation label, client invisibility and settled combined observers.');
  await w.eval('db.auth.dispose()');w.close();
 })().catch(async error=>{console.error(error);try{await dom.window.eval('db.auth.dispose()');}catch{}dom.window.close();process.exitCode=1;});
