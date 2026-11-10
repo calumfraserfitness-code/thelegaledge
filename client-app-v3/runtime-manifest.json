@@ -86,6 +86,7 @@
     "weekly-recap.js",
     "coach-reliability.js",
     "phase-planning.js",
+    "roadmap-call-review.js",
     "coach-roadmaps.js",
     "recovery-trends.js"
   ],
@@ -143,6 +144,7 @@
     "weekly-recap.css",
     "coach-reliability.css",
     "coach-roadmaps.css",
+    "roadmap-call-review.css",
     "coaching-progression.css"
   ]
 }

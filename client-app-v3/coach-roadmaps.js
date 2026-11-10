@@ -15,9 +15,9 @@
   for(const s of p.sources)if(!s||typeof s.label!=='string'||s.label.length>200||typeof s.url!=='string'||s.url.length>1500||(s.url&&!safeSource(s.url)))throw Error('A source link needs review.');
   return window.CoachingPhasePlan?window.CoachingPhasePlan.validate(p):p;
  }
- const blank=()=>({version:1,phase:'Set the current priority',destination:'',evidence:'',goals:[{title:'Agree the next useful goal',status:'proposed',detail:''}],trajectory:[{label:'Next two weeks',detail:''},{label:'Following two weeks',detail:''},{label:'Next review',detail:''}],scorecard:'',coach:'',next_call:'',review:'',sources:[]});
+ const blank=()=>({version:1,phase:'Set the current priority',destination:'',evidence:'',goals:[{id:'goal-'+Date.now().toString(36),title:'Agree the next useful goal',status:'proposed',detail:''}],trajectory:[{label:'Next two weeks',detail:''},{label:'Following two weeks',detail:''},{label:'Next review',detail:''}],scorecard:'',coach:'',next_call:'',review:'',sources:[]});
  function markup(p,compact){
-  const goal=g=>'<article class="cr-goal"><span class="cr-badge cr-'+g.status+'">'+esc(statuses[g.status])+'</span><h3>'+esc(g.title)+'</h3><p>'+esc(g.detail)+'</p>'+(window.CoachingPhasePlan?.goal(g,esc)||'')+'</article>';
+  const goal=g=>'<article class="cr-goal"><span class="cr-badge cr-'+g.status+'">'+esc(statuses[g.status])+'</span><h3>'+esc(g.title)+'</h3><p>'+esc(g.detail)+'</p>'+(window.CoachingPhasePlan?.goal(g,esc,compact)||'')+'</article>';
   const direction='<div class="cr-north-star"><span class="eyebrow">THE BIGGER PICTURE</span><h2>Long-term goals & coaching plan</h2><p class="cr-lead">'+esc(p.destination||'The long-term outcome still needs agreeing.')+'</p></div><div class="cr-current"><span class="eyebrow">CURRENT PHASE</span><h3>'+esc(p.phase)+'</h3></div>';
   const goals='<h3>Goals we keep coming back to</h3><div class="cr-goals">'+p.goals.map(goal).join('')+'</div>';
   const timeline='<h3>The plan from here</h3><p class="muted">Each phase has a purpose, review criteria and explicit training, nutrition, activity and recovery decisions. These are private coaching plans—not automatic client changes or guaranteed results.</p><ol class="cr-timeline cp-timeline">'+p.trajectory.map((t,i)=>window.CoachingPhasePlan?window.CoachingPhasePlan.phase(t,i,esc):'<li><strong>'+esc(t.label)+'</strong><p>'+esc(t.detail)+'</p></li>').join('')+'</ol>'+(window.CoachingPhasePlan?.guidance()||'');
@@ -35,14 +35,14 @@
   const active=()=>box.isConnected&&eligible()&&state.user.id===owner&&state.client.id===id&&state.clientTab===tab;
   const header=()=>'<div class="panel-head"><div><span class="eyebrow">PRIVATE COACH ROADMAP</span><p class="muted">Agreements, current priorities and the next review. Clients cannot see these notes.</p></div><button type="button" class="btn ghost small" data-cr-refresh>Reload saved</button></div>';
   function bind(){
-   box.querySelector('[data-cr-refresh]')?.addEventListener('click',()=>{if(!active()||busy)return;if(dirty&&!window.confirm('Discard unsaved edits and reload the saved roadmap?'))return;load();});
+   box.querySelector('[data-cr-refresh]')?.addEventListener('click',()=>{if(!active()||busy)return;if((dirty||window.RoadmapCallReview?.hasDraft(box))&&!window.confirm('Discard unsaved edits and reload the saved roadmap?'))return;window.RoadmapCallReview?.clearDraft(box);load();});
    box.querySelector('[data-cr-open]')?.addEventListener('click',()=>{if(!active())return;state.clientTab='goals';renderClientWorkspace();});
    const form=box.querySelector('[data-cr-form]');if(!form)return;
    form.addEventListener('input',()=>{dirty=true;form.querySelector('[data-cr-save-status]').textContent='Unsaved private changes';});
    form.querySelector('[data-cr-add-goal]').onclick=()=>{if(!active()||busy)return;const next=read(form);if(next.goals.length>=12)return;next.goals.push({id:'goal-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,9),title:'New goal',status:'proposed',detail:''});payload=next;paint();box.querySelector('.cr-editor').open=true;dirty=true;};
    form.onsubmit=async event=>{
     event.preventDefault();if(!active()||busy)return;const status=form.querySelector('[data-cr-save-status]'),button=form.querySelector('[type=submit]');let submitted;
-    try{submitted=validate(read(form));}catch(e){status.textContent=e.message;return;}
+    try{if(window.RoadmapCallReview?.hasDraft(box))throw Error('Save or discard the call-review draft first.');submitted=validate(read(form));}catch(e){status.textContent=e.message;return;}
     busy=true;button.disabled=true;form.querySelector('[data-cr-add-goal]').disabled=true;status.textContent='Saving privately…';
     const sent=JSON.stringify(submitted),request=++serial;
     try{
@@ -57,7 +57,7 @@
    };
   }
   function read(form){const next=JSON.parse(JSON.stringify(payload));for(const k of Object.keys(fields))next[k]=form.elements.namedItem(k).value;next.goals=next.goals.map((g,i)=>({...g,title:form.elements.namedItem('goal-title-'+i).value,status:form.elements.namedItem('goal-status-'+i).value,detail:form.elements.namedItem('goal-detail-'+i).value}));next.trajectory=next.trajectory.map((t,i)=>({...t,label:form.elements.namedItem('horizon-'+i).value,detail:form.elements.namedItem('trajectory-'+i).value}));return window.CoachingPhasePlan?window.CoachingPhasePlan.read(form,next):next;}
-  function paint(){box.innerHTML=header()+markup(payload,compact)+(compact?'<button class="btn primary" type="button" data-cr-open>Open roadmap & goals</button>':'<p class="cr-saved">'+(revision?'Saved private roadmap · revision '+revision:'Not saved yet')+'</p>'+editor(payload));bind();}
+  function paint(){box.innerHTML=header()+markup(payload,compact)+(compact?'<button class="btn primary" type="button" data-cr-open>Open roadmap & goals</button>':'<p class="cr-saved">'+(revision?'Saved private roadmap · revision '+revision:'Not saved yet')+'</p>'+editor(payload));bind();if(!compact&&revision)window.RoadmapCallReview?.mount(box,{id,owner,active,get:()=>({revision,payload}),lock:()=>{if(busy||dirty)throw Error('Save or discard the private-roadmap edits first.');busy=true;const inputs=[...box.querySelectorAll('[data-cr-form] input,[data-cr-form] select,[data-cr-form] textarea,[data-cr-form] button')];inputs.forEach(x=>x.disabled=true);return()=>{busy=false;inputs.forEach(x=>x.disabled=false);};},accept:(row,message)=>{if(!active())return;revision=row.revision;payload=validate(row.payload);dirty=false;paint();box.querySelector('[data-cr-save-status]').textContent=message;}});}
   async function load(){
    const request=++serial;box.innerHTML=header()+'<p role="status">Loading saved roadmap…</p>';bind();
    try{
