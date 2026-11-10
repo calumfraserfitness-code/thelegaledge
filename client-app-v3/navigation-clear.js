@@ -38,14 +38,14 @@ renderCoach=function(){
 };
 function clearWorkspaceTabs(){
  const tabs=$('#clientTabs');if(!tabs)return;
- const names={overview:'Summary',planner:'Weekly plan',training:'Training',nutrition:'Nutrition',checkins:'Check-ins',checkin:'Check-ins',progress:'Progress'};
+ const names={overview:'Summary',goals:'Goals & long-term plan',planner:'Weekly plan',training:'Training',nutrition:'Nutrition',checkins:'Check-ins',checkin:'Check-ins',progress:'Progress'};
  let details=tabs.querySelector('.le-more-tabs');
  if(!details){details=document.createElement('details');details.className='le-more-tabs';details.innerHTML='<summary>Client details</summary><div></div>';tabs.append(details);}
  else details.querySelector('summary').textContent='Client details';
- const extras={onboarding:'Intake answers',legal:'Agreement & consent',diagnostics:'Bloods & genetics',goals:'Goals',support:'Calls & messages',connections:'Health reports & devices'};
+ const extras={onboarding:'Intake answers',legal:'Agreement & consent',diagnostics:'Bloods & genetics',support:'Calls & messages',connections:'Health reports & devices'};
  for(const b of [...tabs.querySelectorAll('[data-client-tab]')]){
   const key=b.dataset.clientTab;
-  if(names[key])b.textContent=names[key];
+  if(names[key]){b.textContent=names[key];if(key==='goals'&&b.parentElement!==tabs){const anchor=tabs.querySelector('[data-client-tab="overview"]');if(anchor)anchor.after(b);else tabs.prepend(b);}}
   if(extras[key]){b.textContent=extras[key];details.lastElementChild.append(b);if(state.clientTab===key)details.open=true;}
  }
  tabs.classList.add('clear-client-tabs');

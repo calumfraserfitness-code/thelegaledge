@@ -20,7 +20,7 @@ coachTraining=function(){trainingBeforeClarity();simplifyCoachTraining();};
 function simplifyCoachTabs(){
  const tabs=$('#clientTabs');if(!tabs)return;
  let more=tabs.querySelector(':scope > .le-more-tabs');if(!more){more=document.createElement('details');more.className='le-more-tabs';more.innerHTML='<summary>More</summary><div></div>';}
- const advanced=['onboarding','legal','diagnostics','goals','support'];
+ const advanced=['onboarding','legal','diagnostics','support'];
  for(const button of [...tabs.querySelectorAll('button')])if(advanced.includes(button.dataset.clientTab)){if(button.parentElement!==more.lastElementChild)more.lastElementChild.append(button);if(button.classList.contains('active'))more.open=true;}
  if(more.lastElementChild.childElementCount&&more.parentElement!==tabs)tabs.append(more);
 }

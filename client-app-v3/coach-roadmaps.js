@@ -4,7 +4,8 @@
  const statuses={agreed:'Agreed',proposed:'Needs confirmation',paused:'Paused',historical:'Historical—not current',complete:'Complete'};
  const fields={phase:'Current phase',destination:'Long-term direction & original agreements',evidence:'Latest dated evidence',scorecard:'Weekly scorecard',coach:'Your coaching actions',next_call:'Questions for the next call',review:'Next review / unresolved decisions'};
  const safeSource=value=>{try{const u=new URL(value);return u.protocol==='https:'&&['fathom.video','www.loom.com','loom.com'].includes(u.hostname)?u.href:null;}catch{return null;}};
- function eligible(){const c=state.client;return state.role==='coach'&&!state.preview&&state.user?.id&&c&&c.coach_id===state.user.id&&!c.deleted_at&&['active','ending'].includes(c.status)&&c.profile_id!==state.user.id&&c.source_system!=='coach_health_test'&&!/demo|test data/i.test(c.display_name||'');}
+ function realClient(c){return c&&c.coach_id===state.user?.id&&!c.deleted_at&&['active','ending'].includes(c.status)&&!c.archived_at&&c.profile_id!==state.user?.id&&c.source_system!=='coach_health_test'&&!/demo|test data/i.test(c.display_name||'');}
+ function eligible(){return state.role==='coach'&&!state.preview&&state.user?.id&&realClient(state.client);}
  function validate(p){
   if(!p||p.version!==1||!Array.isArray(p.goals)||p.goals.length<1||p.goals.length>12||!Array.isArray(p.trajectory)||p.trajectory.length<1||p.trajectory.length>6||!Array.isArray(p.sources)||p.sources.length>30)throw Error('Saved roadmap format needs review.');
   for(const k of Object.keys(fields))if(typeof p[k]!=='string'||p[k].length>(k==='phase'?500:5000))throw Error('Roadmap text needs review.');
@@ -17,8 +18,11 @@
  const blank=()=>({version:1,phase:'Set the current priority',destination:'',evidence:'',goals:[{title:'Agree the next useful goal',status:'proposed',detail:''}],trajectory:[{label:'Next two weeks',detail:''},{label:'Following two weeks',detail:''},{label:'Next review',detail:''}],scorecard:'',coach:'',next_call:'',review:'',sources:[]});
  function markup(p,compact){
   const goal=g=>'<article class="cr-goal"><span class="cr-badge cr-'+g.status+'">'+esc(statuses[g.status])+'</span><h3>'+esc(g.title)+'</h3><p>'+esc(g.detail)+'</p></article>';
-  if(compact)return '<h2>'+esc(p.phase)+'</h2><p>'+esc(p.destination)+'</p><div class="cr-goals">'+p.goals.slice(0,3).map(goal).join('')+'</div><p class="cr-review">'+esc(p.review)+'</p>';
-  return '<h2>'+esc(p.phase)+'</h2><p class="cr-lead">'+esc(p.destination)+'</p><div class="cr-evidence"><h3>What the latest evidence says</h3><p>'+esc(p.evidence)+'</p></div><h3>Persistent goals</h3><div class="cr-goals">'+p.goals.map(goal).join('')+'</div><h3>Proposed roadmap</h3><p class="muted">Review horizons—not booked calls or promised outcomes. Progress depends on the next agreed review.</p><ol class="cr-timeline">'+p.trajectory.map(t=>'<li><strong>'+esc(t.label)+'</strong><p>'+esc(t.detail)+'</p></li>').join('')+'</ol><div class="cr-grid">'+['scorecard','coach','next_call','review'].map(k=>'<article><h3>'+fields[k]+'</h3><p>'+esc(p[k]||'Not agreed yet.')+'</p></article>').join('')+'</div><details class="cr-sources"><summary>Evidence & original agreements · '+p.sources.length+' references</summary><ul>'+p.sources.map(s=>'<li>'+(safeSource(s.url)?'<a href="'+esc(safeSource(s.url))+'" target="_blank" rel="noopener noreferrer">'+esc(s.label)+' ↗</a>':esc(s.label))+'</li>').join('')+'</ul><p>Recordings and saved check-ins are evidence. Older targets stay historical until you explicitly agree a new one.</p></details>';
+  const direction='<div class="cr-north-star"><span class="eyebrow">THE BIGGER PICTURE</span><h2>Long-term goals & coaching plan</h2><p class="cr-lead">'+esc(p.destination||'The long-term outcome still needs agreeing.')+'</p></div><div class="cr-current"><span class="eyebrow">CURRENT PHASE</span><h3>'+esc(p.phase)+'</h3></div>';
+  const goals='<h3>Goals we keep coming back to</h3><div class="cr-goals">'+p.goals.map(goal).join('')+'</div>';
+  const timeline='<h3>The plan from here</h3><p class="muted">Proposed review horizons—not booked calls, new prescriptions or promised outcomes.</p><ol class="cr-timeline">'+p.trajectory.map(t=>'<li><strong>'+esc(t.label)+'</strong><p>'+esc(t.detail)+'</p></li>').join('')+'</ol>';
+  if(compact)return direction+goals+'<div class="cr-review"><strong>Next review</strong><p>'+esc(p.review)+'</p></div>';
+  return direction+goals+timeline+'<div class="cr-grid">'+['scorecard','coach','next_call','review'].map(k=>'<article><h3>'+fields[k]+'</h3><p>'+esc(p[k]||'Not agreed yet.')+'</p></article>').join('')+'</div><details class="cr-sources"><summary>What this is based on · '+p.sources.length+' references</summary><div class="cr-evidence"><h3>Latest dated evidence</h3><p>'+esc(p.evidence)+'</p></div><ul>'+p.sources.map(s=>'<li>'+(safeSource(s.url)?'<a href="'+esc(safeSource(s.url))+'" target="_blank" rel="noopener noreferrer">'+esc(s.label)+' ↗</a>':esc(s.label))+'</li>').join('')+'</ul><p>Older targets stay historical until you explicitly agree a new one. No unsupported long-term deadline or outcome has been invented.</p></details>';
  }
  function editor(p){
   const area=(key,label,value,max=5000)=>'<label>'+esc(label)+'<textarea name="'+key+'" maxlength="'+max+'" rows="3">'+esc(value)+'</textarea></label>';
@@ -35,7 +39,7 @@
    box.querySelector('[data-cr-open]')?.addEventListener('click',()=>{if(!active())return;state.clientTab='goals';renderClientWorkspace();});
    const form=box.querySelector('[data-cr-form]');if(!form)return;
    form.addEventListener('input',()=>{dirty=true;form.querySelector('[data-cr-save-status]').textContent='Unsaved private changes';});
-   form.querySelector('[data-cr-add-goal]').onclick=()=>{if(!active()||busy)return;const next=read(form);if(next.goals.length>=12)return;next.goals.push({title:'New goal',status:'proposed',detail:''});payload=next;paint();box.querySelector('.cr-editor').open=true;dirty=true;};
+   form.querySelector('[data-cr-add-goal]').onclick=()=>{if(!active()||busy)return;const next=read(form);if(next.goals.length>=12)return;next.goals.push({id:'goal-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,9),title:'New goal',status:'proposed',detail:''});payload=next;paint();box.querySelector('.cr-editor').open=true;dirty=true;};
    form.onsubmit=async event=>{
     event.preventDefault();if(!active()||busy)return;const status=form.querySelector('[data-cr-save-status]'),button=form.querySelector('[type=submit]');let submitted;
     try{submitted=validate(read(form));}catch(e){status.textContent=e.message;return;}
@@ -71,6 +75,41 @@
   const disclosure=document.createElement('details');disclosure.className='panel cr-published';disclosure.innerHTML='<summary>Client-visible targets · existing editor</summary><p>Separate from your private roadmap. Changes here affect the goals clients see.</p>';
   while(host.firstChild)disclosure.append(host.firstChild);host.append(disclosure);mount(false);return result;
  };
- const workspace=renderClientWorkspace;renderClientWorkspace=function(){const result=workspace();if(state.role==='coach'){document.querySelectorAll('[data-client-tab="goals"]').forEach(b=>{if(b.textContent!=='Roadmap & goals')b.textContent='Roadmap & goals';});window.CoachMobile?.sync?.();}return result;};
- window.CoachRoadmaps={mount,validate,markup,safeSource,eligible,blank};
+ const workspace=renderClientWorkspace;renderClientWorkspace=function(){const result=workspace();if(state.role==='coach'){const tabs=document.querySelector('#clientTabs');tabs?.querySelectorAll('[data-client-tab="goals"]').forEach(b=>{if(b.textContent!=='Goals & long-term plan')b.textContent='Goals & long-term plan';if(b.parentElement!==tabs)tabs.querySelector('[data-client-tab="overview"]')?.after(b);b.classList.add('cr-primary-tab');});window.CoachMobile?.sync?.();}return result;};
+ let hubSequence=0,openSequence=0;
+ function hubAllowed(){return state.role==='coach'&&!state.preview&&state.user?.id&&!state.client&&state.coachView==='roadmaps';}
+ function goHub(){if(state.role!=='coach'||state.preview)return;state.client=null;state.coachView='roadmaps';renderCoach();}
+ function entries(){
+  if(state.role!=='coach'||state.preview)return;const owner=state.user?.id,nav=document.querySelector('#coachNav');
+  if(nav){let b=nav.querySelector('[data-coach-view="roadmaps"]');if(!b){b=document.createElement('button');b.type='button';b.className='side-link';b.dataset.coachView='roadmaps';b.innerHTML='<span>◎</span>Goals & plans';nav.querySelector('[data-coach-view="clients"]')?.after(b);}b.onclick=()=>{if(b.isConnected&&state.role==='coach'&&state.user?.id===owner)goHub();};}
+  const anchor=!state.client&&state.coachView==='dashboard'?document.querySelector('#coachHomeFocus .home-focus-heading > div'):!state.client&&state.coachView==='clients'?document.querySelector('#coachMain .page-head'):null;
+  if(anchor&&!anchor.querySelector('[data-cr-hub]')){const b=document.createElement('button');b.type='button';b.className='btn primary cr-hub-entry';b.dataset.crHub='';b.textContent='Goals & long-term plans';b.onclick=()=>{if(b.isConnected&&state.user?.id===owner&&state.role==='coach')goHub();};anchor.prepend(b);}
+ }
+ async function openRoadmap(id,button){
+  if(!hubAllowed())return;const c=(state.clients||[]).find(c=>c.id===id&&realClient(c));if(!c)return;
+  const owner=state.user.id,seq=++openSequence;button.disabled=true;
+  state.client=c;state.clientTab='goals';if(typeof emptyData==='function')state.data=emptyData();
+  const active=()=>seq===openSequence&&state.role==='coach'&&state.user?.id===owner&&state.client?.id===id&&state.coachView==='roadmaps';
+  const host=document.querySelector('#coachMain');host.innerHTML='<section class="panel" role="status">Opening this client’s goals and saved plan…</section>';
+  try{if(await loadClientData(id)===false||!active())return;renderCoach();}
+  catch(e){if(active()){state.client=null;renderHub(e.message||'The workspace could not open. Retry.');}}
+ }
+ async function renderHub(message=''){
+  if(!hubAllowed())return;const host=document.querySelector('#coachMain');if(!host)return;const owner=state.user.id,request=++hubSequence,clients=(state.clients||[]).filter(realClient);
+  host.innerHTML='<section class="cr-hub"><header class="cr-hub-head"><span class="eyebrow">PRIVATE COACH WORKSPACE</span><h1>Goals & long-term plans</h1><p>Why they started. Where they are going. What you are working on next.</p><p class="muted">Active real clients only. Agreed goals stay separate from proposals and historical targets. These notes are not client prescriptions.</p><button type="button" class="btn ghost" data-cr-hub-refresh>Refresh saved plans</button></header><p role="status" data-cr-hub-status></p><div class="cr-client-grid"></div></section>';
+  const box=host.querySelector('.cr-hub'),active=()=>box.isConnected&&hubAllowed()&&state.user.id===owner&&request===hubSequence&&clients.every(c=>(state.clients||[]).some(current=>current.id===c.id&&realClient(current)));
+  box.querySelector('[data-cr-hub-refresh]').onclick=()=>{if(active())renderHub();};entries();window.CoachMobile?.sync?.();
+  const status=box.querySelector('[data-cr-hub-status]');status.textContent=message||'Reading saved coaching plans…';
+  if(clients.length>200){status.textContent='Client scope is too large. Use the individual workspace.';return;}
+  if(!clients.length){status.textContent='No active real clients are available in this account.';return;}
+  try{
+   const rows=await query('Active client long-term plans',db.from('coach_client_roadmaps').select('client_id,coach_id,revision,payload,updated_at').eq('coach_id',owner).in('client_id',clients.map(c=>c.id)).limit(201));if(!active())return;
+   if(!Array.isArray(rows)||rows.length>200||new Set(rows.map(r=>r.client_id)).size!==rows.length||rows.some(r=>r.coach_id!==owner||!clients.some(c=>c.id===r.client_id)||!Number.isInteger(r.revision)||r.revision<1))throw Error('Saved plan ownership or completeness could not be verified.');
+   rows.forEach(r=>validate(r.payload));const byId=new Map(rows.map(r=>[r.client_id,r]));status.textContent=clients.length+' active clients · '+rows.length+' saved private plans';
+   box.querySelector('.cr-client-grid').innerHTML=clients.map(c=>{const row=byId.get(c.id),p=row?.payload;return '<article class="cr-client-card"><header><span class="eyebrow">ACTIVE CLIENT</span><h2>'+esc(c.display_name)+'</h2></header>'+(p?'<div class="cr-hub-direction"><span class="eyebrow">LONG-TERM DIRECTION</span><p>'+esc(p.destination)+'</p></div><div class="cr-hub-now"><strong>Working on now</strong><p>'+esc(p.phase)+'</p></div><ul class="cr-hub-goals">'+p.goals.map(g=>'<li><span class="cr-badge cr-'+g.status+'">'+esc(statuses[g.status])+'</span><strong>'+esc(g.title)+'</strong></li>').join('')+'</ul><div class="cr-hub-review"><strong>Next review</strong><p>'+esc(p.review||'Not agreed yet.')+'</p></div>':'<p>No private roadmap saved yet. Open this client to agree their direction; missing data is not a completed plan.</p>')+'<button class="btn primary" type="button" data-cr-client="'+esc(c.id)+'">Open goals & full coaching plan</button></article>';}).join('');
+   box.querySelectorAll('[data-cr-client]').forEach(b=>b.onclick=()=>{if(active())openRoadmap(b.dataset.crClient,b);});
+  }catch(e){if(active())status.textContent='Plans unavailable. '+(e.message||'Refresh to retry. No empty or completed status is inferred.');}
+ }
+ if(typeof renderCoach==='function'){const coach=renderCoach;renderCoach=function(){if(hubAllowed()){document.querySelectorAll('#coachNav [data-coach-view]').forEach(b=>b.classList.toggle('active',b.dataset.coachView==='roadmaps'));return renderHub();}const result=coach();entries();return result;};}
+ window.CoachRoadmaps={mount,validate,markup,safeSource,eligible,blank,renderHub,goHub,realClient};
 })();

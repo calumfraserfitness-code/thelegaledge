@@ -42,6 +42,7 @@
   if(!shell){
    shell=document.createElement('div');shell.id='coachHomeFocus';
    shell.innerHTML='<header class="home-focus-heading"><span class="eyebrow">YOUR COACHING DESK</span><h1>What needs you today?</h1><p>Review check-ins first. Everything else is below when you need it.</p><div><button type="button" class="btn primary" data-home-route="reviews">Review check-ins</button><button type="button" class="btn ghost" data-home-route="clients">All clients</button></div></header><div data-home-primary></div><div class="home-focus-tools">'+sections.map(([key,title,sub])=>'<details data-home-group="'+key+'"><summary><span><strong>'+title+'</strong><small>'+sub+'</small></span><span aria-hidden="true">+</span></summary><div data-home-content="'+key+'"></div></details>').join('')+'</div>';
+   if(!state.preview)shell.querySelector('.home-focus-heading > div').insertAdjacentHTML('beforeend','<button type="button" class="btn ghost cr-hub-entry" data-home-route="roadmaps" data-cr-hub>Goals & long-term plans</button>');
    host.prepend(shell);const user=state.user?.id;
    shell.querySelectorAll('[data-home-route]').forEach(button=>button.onclick=()=>{if(!button.isConnected||!eligible()||state.user?.id!==user)return;state.coachView=button.dataset.homeRoute;renderCoach();});
   }
