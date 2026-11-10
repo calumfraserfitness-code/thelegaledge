@@ -39,7 +39,7 @@
    box.querySelector('[data-cr-open]')?.addEventListener('click',()=>{if(!active())return;state.clientTab='goals';renderClientWorkspace();});
    const form=box.querySelector('[data-cr-form]');if(!form)return;
    form.addEventListener('input',()=>{dirty=true;form.querySelector('[data-cr-save-status]').textContent='Unsaved private changes';});
-   form.querySelector('[data-cr-add-goal]').onclick=()=>{if(!active()||busy)return;const next=read(form);if(next.goals.length>=12)return;next.goals.push({id:'goal-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,9),title:'New goal',status:'proposed',detail:''});payload=next;paint();box.querySelector('.cr-editor').open=true;dirty=true;};
+   form.querySelector('[data-cr-add-goal]').onclick=()=>{if(!active()||busy)return;if(window.RoadmapCallReview?.hasDraft(box)){form.querySelector('[data-cr-save-status]').textContent='Save or discard the call-review draft first.';return;}const next=read(form);if(next.goals.length>=12)return;next.goals.push({id:'goal-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,9),title:'New goal',status:'proposed',detail:''});payload=next;paint();box.querySelector('.cr-editor').open=true;dirty=true;};
    form.onsubmit=async event=>{
     event.preventDefault();if(!active()||busy)return;const status=form.querySelector('[data-cr-save-status]'),button=form.querySelector('[type=submit]');let submitted;
     try{if(window.RoadmapCallReview?.hasDraft(box))throw Error('Save or discard the call-review draft first.');submitted=validate(read(form));}catch(e){status.textContent=e.message;return;}
