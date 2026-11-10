@@ -85,7 +85,9 @@
     "weekly-recap-model.js",
     "weekly-recap.js",
     "coach-reliability.js",
-    "coach-roadmaps.js"
+    "phase-planning.js",
+    "coach-roadmaps.js",
+    "recovery-trends.js"
   ],
   "styles": [
     "app.css",
@@ -140,6 +142,7 @@
     "client-home-quick-log.css",
     "weekly-recap.css",
     "coach-reliability.css",
-    "coach-roadmaps.css"
+    "coach-roadmaps.css",
+    "coaching-progression.css"
   ]
 }

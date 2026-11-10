@@ -139,7 +139,8 @@
      statusEntries(base+(needsDisplay&&!canRepaint?' New saved records are loaded. Your current edits and video stay open; reopen Overview, Check-ins or Progress when ready.':needsDisplay?' Updated entries are shown.':''));
     }else if(role==='client'){reviewCard();window.PracticeFeedback?.refresh?.();}
     if(role==='coach'&&typeof refreshCoachReplyAvailability==='function')refreshCoachReplyAvailability();
-    refreshHealthFacts();window.CoachHealthReports?.mount?.();window.WeighInRoutine?.mount?.();
+    state.recoveryTrendRefresh={accountId:user,clientId:id,checkins:reads[0].status==='fulfilled'?'ready':'error',daily:reads[3].status==='fulfilled'?'ready':'error'};
+    refreshHealthFacts();window.CoachHealthReports?.mount?.();window.WeighInRoutine?.mount?.();window.RecoveryTrends?.mount?.();
     Promise.resolve(window.WeeklyRecap?.refresh?.()).catch(()=>{});
    }
    if(!active())return;
