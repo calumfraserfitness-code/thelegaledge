@@ -1,6 +1,18 @@
 const SUPABASE_URL = 'https://baxvhilvrhshlfizakak.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_DRoPSo_3TPlU8mMeLQNruw_82hanHNi';
-const db = window.supabase?.createClient?.(SUPABASE_URL, SUPABASE_KEY) ?? null;
+async function secureFetch(input, options = {}) {
+  const url=String(input?.url||input),timeout=url.includes('/auth/v1/')?15000:url.includes('/storage/v1/')?120000:url.includes('/functions/v1/')?100000:25000;
+  const controller=new AbortController(),signal=options.signal;
+  const abort=()=>controller.abort(signal?.reason);
+  if(signal?.aborted)abort();else signal?.addEventListener('abort',abort,{once:true});
+  const timer=setTimeout(()=>controller.abort(),timeout);
+  try{return await fetch(input,{...options,signal:controller.signal});}
+  finally{clearTimeout(timer);signal?.removeEventListener('abort',abort);}
+}
+const db = window.supabase?.createClient?.(SUPABASE_URL, SUPABASE_KEY, {global:{fetch:secureFetch}}) ?? null;
+function withinDeadline(promise,label,ms=15000){let timer;return Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error(label+' took too long. Try again; your saved data is safe.')),ms);})]).finally(()=>clearTimeout(timer));}
+let bootRequest=null;
+function boot(){if(bootRequest)return bootRequest;bootRequest=bootAccount().finally(()=>bootRequest=null);return bootRequest;}
 let recoveryMode = new URLSearchParams(location.hash.slice(1)).get('type') === 'recovery';
 
 const $ = (selector) => document.querySelector(selector);
@@ -28,7 +40,7 @@ const state = {
   profile: null,
   role: null,
   preview: false,
-  coachView: 'clients',
+  coachView: 'dashboard',
   clientView: 'today',
   hasPilot: false,
   selectedSessionId: null,
@@ -48,7 +60,7 @@ function emptyData() {
   return {
     weeks: [], sessions: [], exercises: [], programs: [], nutritionPlans: [],
     nutritionDays: [], meals: [], habits: [], habitLogs: [], steps: [],
-    checkins: [], progress: [], onboarding: [], legal: [], diagnostics: [], files: [],
+    checkins: [], reviewDrafts: [], reviewDraftsAvailable: false, progress: [], onboarding: [], legal: [], diagnostics: [], files: [],
     mealAssignments: [], exerciseLogs: [], exerciseBank: [], mealBank: [], healthConnections: [], healthDaily: [], healthWorkouts: [], healthImports: []
   };
 }
@@ -96,15 +108,18 @@ function displayWeight(kg, signed = false) {
 }
 
 function currentWeek() {
-  const start = iso(monday());
-  return state.data.weeks.find((week) => week.week_start === start) || null;
+  let start=iso(monday());
+  if(state.client?.id){
+    try{const parts=Object.fromEntries(new Intl.DateTimeFormat('en-GB',{timeZone:state.client.timezone||'Europe/Dublin',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date()).filter(p=>p.type!=='literal').map(p=>[p.type,p.value])),date=new Date(`${parts.year}-${parts.month}-${parts.day}T12:00:00Z`);date.setUTCDate(date.getUTCDate()-((date.getUTCDay()+6)%7));start=date.toISOString().slice(0,10);}catch{return null;}
+  }
+  return state.data.weeks.find((week) => week.week_start===start&&(!week.client_id||week.client_id===state.client?.id)) || null;
 }
 
 function safeStepGoal(client = state.client) {
   const goal = Number(client?.daily_steps_goal);
   return Number.isFinite(goal) && goal > 0 ? goal : 8000;
 }
-function normalizeClient(client){return {...client,display_name:client.display_name||client.profile?.full_name||'Unnamed client',daily_steps_goal:safeStepGoal(client)};}
+function normalizeClient(client){return {...client,display_name:client.display_name||client.profile?.full_name||'Unnamed client',email:client.email||client.profile?.email||null,coach_notes:client.private_details?.coach_notes??client.coach_notes,daily_steps_goal:safeStepGoal(client)};}
 
 async function query(label, promise) {
   const result = await promise;
@@ -113,29 +128,39 @@ async function query(label, promise) {
 }
 
 async function loadCoach() {
-  const [clients, memberships] = await Promise.all([query('Clients', db.from('clients')
-    .select('*,profile:profiles!clients_profile_id_fkey(full_name,email)')
-    .order('start_date')), query('Corporate memberships', db.from('firm_participants').select('client_id'))]);
+  async function allRows(label,build){
+    const rows=[],size=500;
+    for(let offset=0;;offset+=size){const page=await query(label,build().range(offset,offset+size-1));rows.push(...page);if(page.length<size)return rows;}
+  }
+  const account=state.user?.id;
+  const clients=await withinDeadline(allRows('Clients',()=>db.from('clients').select('*').eq('coach_id',account).order('start_date').order('id')),'Client list');
+  state.corporateMemberships=[];
+  if(clients.length)query('Corporate memberships',db.from('firm_participants').select('client_id').in('client_id',clients.map(c=>c.id))).then(rows=>{if(state.user?.id===account&&state.role==='coach')state.corporateMemberships=rows;}).catch(()=>{});
   state.clients = clients.filter(c => c.source_system !== 'coach_health_test').map(normalizeClient);
   state.qaRows = [];
   state.qaStatus = 'loading';
-  state.corporateMemberships = memberships;
-  // Completeness reporting is optional and must never gate successful sign-in.
-  const coachId = state.user?.id;
-  query('Client QA', db.from('client_qa_summary').select('*')).then(rows => {
-    if (state.user?.id !== coachId || state.preview || state.role !== 'coach') return;
-    state.qaRows = rows.filter(row => state.clients.some(c => c.id === row.client_id));
-    state.qaStatus = 'ready';
-    if (!$('#coachApp').classList.contains('hidden')) renderCoach();
-  }).catch(() => {
-    if (state.user?.id !== coachId || state.preview || state.role !== 'coach') return;
-    state.qaStatus = 'unavailable';
-    if (!$('#coachApp').classList.contains('hidden')) renderCoach();
-  });
+
+  // A slow optional completeness report must never turn a valid sign-in into an error.
+  const controller = new AbortController();
+  const deadline = setTimeout(() => controller.abort(), 8000);
+  query('Client QA', db.from('client_qa_summary').select('*').abortSignal(controller.signal))
+    .then(rows => {
+      if (state.user?.id !== account || state.role !== 'coach') return;
+      state.qaRows = rows.filter(row => state.clients.some(c => c.id === row.client_id));
+      state.qaStatus = 'ready';
+    }).catch(() => {
+      if (state.user?.id === account && state.role === 'coach') state.qaStatus = 'unavailable';
+    }).finally(() => {
+      clearTimeout(deadline);
+      if (state.user?.id === account && state.role === 'coach' && !state.client && state.coachView === 'dashboard' && !document.activeElement?.matches('input,textarea,select')) renderCoach();
+    });
 }
 
+let clientDataLoadSequence = 0;
 async function loadClientData(clientId) {
   const clientAtStart = clientId;
+  const loadSequence = ++clientDataLoadSequence, accountAtStart = state.user?.id, roleAtStart = state.role;
+  const currentLoad = () => loadSequence === clientDataLoadSequence && state.client?.id === clientAtStart && state.user?.id === accountAtStart && state.role === roleAtStart;
   const requests = await Promise.all([
     query('Weeks', db.from('program_weeks').select('*').eq('client_id', clientId).order('week_start', { ascending: false }).limit(104)),
     query('Programmes', db.from('training_programs').select('*,days:training_program_days(*,exercises:program_exercises(*,bank:exercise_bank(video_url,image_url,instructions)))').eq('client_id', clientId).order('created_at', { ascending: false })),
@@ -154,11 +179,14 @@ async function loadClientData(clientId) {
     query('Health summaries', db.from('client_health_daily').select('*').eq('client_id', clientId).order('date', { ascending: false }).limit(90)),
     query('Imported workouts', db.from('client_health_workouts').select('*').eq('client_id', clientId).order('started_at', { ascending: false }).limit(100)),
     query('Health imports', db.from('client_health_imports').select('*').eq('client_id', clientId).order('imported_at', { ascending: false }).limit(20)),
-    state.role === 'coach' ? query('Exercise Bank', db.from('exercise_bank').select('*').order('name').limit(1000)) : Promise.resolve([]),
-    Promise.resolve([]) // Meal bank is searched on demand by meal-library.js.
+    Promise.resolve([]), // Exercise/video library loads only when opened in Training.
+    state.role==='coach'?query('Private client details',db.from('client_private_details').select('coach_notes').eq('client_id',clientId)):Promise.resolve([]),
+    Promise.resolve([]), // Meal bank is searched on demand by meal-library.js.
+    state.role==='coach'?query('Private check-in reply drafts',db.from('coach_checkin_reply_drafts').select('*').eq('client_id',clientId).eq('coach_id',accountAtStart).order('updated_at',{ascending:false}).limit(250)).then(rows=>({rows,available:true})).catch(()=>({rows:[],available:false})):Promise.resolve({rows:[],available:false})
   ]);
-  if (state.client?.id !== clientAtStart) return;
-  const [weeks, programs, nutritionPlans, habits, steps, checkins, progress, onboarding, legal, diagnostics, files, mealAssignments, exerciseLogs, healthConnections, healthDaily, healthWorkouts, healthImports, exerciseBank, mealBank] = requests;
+  if (!currentLoad()) return false;
+  const [weeks, programs, nutritionPlans, habits, steps, checkins, progress, onboarding, legal, diagnostics, files, mealAssignments, exerciseLogs, healthConnections, healthDaily, healthWorkouts, healthImports, exerciseBank, privateDetails, mealBank, replyDraftRead] = requests;
+  if(state.role==='coach')state.client.coach_notes=privateDetails[0]?.coach_notes||'';
   let sessions = [];
   let exercises = [];
   let nutritionDays = [];
@@ -169,13 +197,17 @@ async function loadClientData(clientId) {
       query('Scheduled sessions', db.from('training_sessions').select('*').in('week_id', ids).order('session_date')),
       query('Nutrition days', db.from('nutrition_days').select('*').in('week_id', ids).order('nutrition_date'))
     ]);
-    if (sessions.length) exercises = await query('Exercises', db.from('exercises').select('*').in('session_id', sessions.map((s) => s.id)).order('sort_order'));
-    if (nutritionDays.length) meals = await query('Meals', db.from('meals').select('*').in('nutrition_day_id', nutritionDays.map((d) => d.id)).order('sort_order'));
+    [exercises,meals]=await Promise.all([
+      sessions.length?query('Exercises',db.from('exercises').select('*').in('session_id',sessions.map(s=>s.id)).order('sort_order')):Promise.resolve([]),
+      nutritionDays.length?query('Meals',db.from('meals').select('*').in('nutrition_day_id',nutritionDays.map(d=>d.id)).order('sort_order')):Promise.resolve([])
+    ]);
   }
-  if (state.client?.id !== clientAtStart) return;
+  if (!currentLoad()) return false;
   const recoveredExercises = programs.flatMap((program) => (program.days || []).flatMap((day) => day.exercises || []));
   const exerciseIndex = new Map([...recoveredExercises, ...exercises].map((exercise) => [exercise.id, exercise]));
-  state.data = { weeks, programs, nutritionPlans, habits, habitLogs: [], steps, checkins, progress, onboarding, legal, diagnostics, files, mealAssignments, exerciseLogs, exerciseBank, mealBank, healthConnections, healthDaily, healthWorkouts, healthImports, sessions, exercises: [...exerciseIndex.values()], nutritionDays, meals };
+  state.data = { weeks, programs, nutritionPlans, habits, habitLogs: [], steps, checkins, progress, onboarding, legal, diagnostics, files, mealAssignments, exerciseLogs, exerciseBank, mealBank, healthConnections, healthDaily, healthWorkouts, healthImports, reviewDrafts:roleAtStart==='coach'?(replyDraftRead.rows||[]).filter(row=>row.client_id===clientId&&row.coach_id===accountAtStart):[], reviewDraftsAvailable:roleAtStart==='coach'&&replyDraftRead.available===true, sessions, exercises: [...exerciseIndex.values()], nutritionDays, meals };
+  state.healthReportsStatus={clientId,accountId:accountAtStart,files:'ready',imports:'ready',daily:'ready'};
+  return true;
 }
 
 function demoData() {
@@ -199,20 +231,21 @@ function demoData() {
   };
 }
 
-async function boot() {
+async function bootAccount() {
   try {
     if (new URLSearchParams(location.search).get('onboarding') === 'demo'||new URLSearchParams(location.search).get('pilot') === 'demo'||new URLSearchParams(location.search).get('workspace') === 'demo') return;
     if (!db) throw new Error('The secure connection did not load. Refresh the page.');
     if (recoveryMode) return show('#recovery');
-    const { data: { user } } = await db.auth.getUser();
+    const { data: { user },error:authError } = await withinDeadline(db.auth.getUser(),'Secure sign-in');
+    if(authError&&authError.name!=='AuthSessionMissingError')throw authError;
     if (recoveryMode) return show('#recovery');
     if (!user) return show('#auth');
     state.user = user;
-    state.profile = await query('Profile', db.from('profiles').select('*').eq('id', user.id).single());
+    state.profile = await withinDeadline(query('Profile', db.from('profiles').select('*').eq('id', user.id).single()),'Account profile');
     state.role = state.profile.role;
     if (state.role === 'coach') {
       await loadCoach();
-      state.coachView = new URLSearchParams(location.search).get('section') === 'corporate' ? 'firms' : 'clients';
+      state.coachView = new URLSearchParams(location.search).get('section') === 'corporate' ? 'firms' : 'dashboard';
       $('#coachName').textContent = state.profile.full_name || 'Coach';
       show('#coachApp');
       renderCoach();
@@ -237,6 +270,7 @@ async function boot() {
 }
 
 function preview(role) {
+  if (window.legalEdgeProduction) return;
   state.preview = true;
   state.role = role;
   const demoClient = {
@@ -273,26 +307,23 @@ function clientRows(clients) {
     <span class="avatar">${esc(client.display_name.split(' ').map((part) => part[0]).slice(0, 2).join(''))}</span>
     <span><span class="name">${esc(client.display_name)}</span><span class="sub">${esc(title(client.status || 'active'))} · ${client.weight_unit === 'lbs' ? 'US / lb' : 'Ireland / kg'}</span></span>
     <span class="hide-mobile"><span class="sub">Daily steps</span>${safeStepGoal(client).toLocaleString()}</span>
-    <span class="hide-mobile"><span class="sub">Goal</span>${client.track_weight === false ? 'Performance / health' : (client.goal_weight_kg ? `${Number(client.goal_weight_kg) * (client.weight_unit === 'lbs' ? 2.20462 : 1) | 0} ${client.weight_unit === 'lbs' ? 'lb' : 'kg'}` : 'Not set')}</span>
+    <span class="hide-mobile"><span class="sub">Goal</span>${client.track_weight === false ? 'Performance / health' : (client.goal_weight_kg ? `${Math.round(Number(client.goal_weight_kg) * (client.weight_unit === 'lbs' ? 2.20462 : 1))} ${client.weight_unit === 'lbs' ? 'lb' : 'kg'}` : 'Not set')}</span>
     <span class="status">Open</span>
   </button>`).join('');
 }
 
+let clientWorkspaceOpenSequence=0;
 function bindClientRows() {
-  $$('[data-client-id]').forEach((row) => row.onclick = async () => {
-    const client = state.clients.find((item) => item.id === row.dataset.clientId);
-    if (!client) return;
-    state.client = client;
-    state.data = emptyData();
-    state.clientTab = 'overview';
-    $('#coachMain').innerHTML = '<div class="loading-state">Loading client workspace…</div>';
-    try {
-      if (!state.preview) await loadClientData(client.id);
-      else state.data = state.sampleClientData?.get(client.id) || demoData();
-      renderCoach();
-    } catch (error) {
-      renderError($('#coachMain'), error, () => row.click());
-    }
+  $$('[data-client-id]').forEach(row=>row.onclick=async()=>{
+    const client=state.clients.find(item=>item.id===row.dataset.clientId);if(!client)return;
+    const request=++clientWorkspaceOpenSequence,account=state.user?.id,role=state.role;
+    state.client=client;state.clientTab='overview';state.data=emptyData();
+    const active=()=>request===clientWorkspaceOpenSequence&&state.user?.id===account&&state.role===role&&state.client?.id===client.id;
+    const host=$('#coachMain');delete host.dataset.workspaceOwner;delete host.dataset.workspaceClient;
+    host.innerHTML=pageHead('CLIENT WORKSPACE',client.display_name,'<button type="button" class="btn ghost small" id="openingClientBack">Back to clients</button>')+'<section class="panel workspace-opening" role="status"><h2>Opening your client’s workspace</h2><p>Reading their saved plans and history…</p></section>';
+    $('#openingClientBack').onclick=()=>{if(!active())return;state.client=null;state.coachView='clients';renderCoach();};
+    try{if(!state.preview){if(await loadClientData(client.id)===false||!active())return;}else state.data=state.sampleClientData?.get(client.id)||demoData();if(active())renderCoach();}
+    catch(error){if(active())renderError(host,error,()=>row.click());}
   });
 }
 
@@ -330,7 +361,7 @@ function directCoachingClients() {
 
 function renderRoster() {
   const clients = directCoachingClients();
-  const past = client => ['past','inactive'].includes(client.status) || Boolean(client.archived_at);
+  const past = client => ['past','inactive','archived'].includes(client.status) || Boolean(client.archived_at);
   const current = clients.filter(client => !past(client));
   const historical = clients.filter(past);
   $('#coachMain').innerHTML = pageHead('1-TO-1 COACHING', '1-to-1 Clients', '<input id="clientSearch" class="search" placeholder="Search your clients…"><button class="btn primary" data-add-client>+ Add client</button>') + `<section class="panel"><div class="panel-head"><div><h3>Current clients · ${current.length}</h3><p class="muted">Your personal coaching roster. Firm participants are managed in Corporate.</p></div></div>${clientRows(current)}</section>${historical.length ? `<details class="le-fold" id="pastClientRoster"><summary>Past clients · ${historical.length}</summary><section class="panel">${clientRows(historical)}</section></details>` : ''}`;
@@ -348,19 +379,28 @@ function bindAddClient() { $$('[data-add-client]').forEach((button) => button.on
 
 function showAddClient() {
   const modal = document.createElement('div'); modal.className='modal-backdrop';
-  modal.innerHTML=`<section class="modal-card"><div class="panel-head"><div><span class="eyebrow">5-MINUTE SETUP</span><h2>Add a client</h2></div><button class="icon-btn" data-close-modal>✕</button></div><form id="addClientForm" class="editor-grid"><label>Full name<input name="full_name" required></label><label>Email<input name="email" type="email" required></label><label>Phone<input name="phone" type="tel"></label><label>Temporary password<input name="password" type="password" minlength="12" autocomplete="new-password" required></label><label>Region<select name="market_region"><option value="us">United States · lb/oz</option><option value="ireland">Ireland · kg/g</option><option value="uk">United Kingdom</option><option value="other">Other</option></select></label><label>Check-in day<select name="checkin_day">${DAYS.map((day,index)=>`<option value="${index}" ${index===5?'selected':''}>${day}</option>`).join('')}</select></label><label>Daily steps<input name="daily_steps_goal" type="number" min="1" step="1" value="8000"></label><label>Starting weight<input name="start_weight_display" type="number" min="1" step="0.1" required></label><label class="wide">Goals<textarea name="goal_summary" rows="3" required></textarea></label><label class="toggle-field"><input name="cardio_enabled" type="checkbox"> Cardio required</label><label class="toggle-field"><input name="mobility_enabled" type="checkbox" checked> Mobility required</label><p class="wide muted">The client must accept legal/privacy terms and complete onboarding before their plan unlocks.</p><button class="btn primary wide">Create secure client login</button></form></section>`;
+  modal.innerHTML=`<section class="modal-card"><div class="panel-head"><div><span class="eyebrow">CLIENT SETUP</span><h2>Create login & start onboarding</h2></div><button class="icon-btn" data-close-modal>✕</button></div><form id="addClientForm" class="editor-grid"><label>Full name<input name="full_name" autocomplete="name" required></label><label>Email<input name="email" type="email" autocomplete="email" required></label><label>Region<select name="market_region"><option value="us">United States · lb/oz</option><option value="ireland">Ireland · kg/g</option><option value="uk">United Kingdom</option><option value="other">Other</option></select></label><input name="password" type="hidden"><label class="toggle-field wide"><input name="start_onboarding" type="checkbox" checked>Start their welcome and coaching profile immediately</label><p class="wide muted">Your saved, approved agreement and privacy notice are used. Payment is handled on your call. Share the login details after creation; no invitation email is sent automatically.</p><details class="wide"><summary>Optional coaching defaults</summary><label>Phone<input name="phone" type="tel"></label><label>Check-in day<select name="checkin_day">${DAYS.map((day,index)=>`<option value="${index}" ${index===5?'selected':''}>${day}</option>`).join('')}</select></label><label>Daily steps<input name="daily_steps_goal" type="number" min="1" step="1" value="8000"></label><label>Starting weight<input name="start_weight_display" type="number" min="1" step="0.1"></label><label>Goals<textarea name="goal_summary" rows="3"></textarea></label><label class="toggle-field"><input name="cardio_enabled" type="checkbox"> Cardio required</label><label class="toggle-field"><input name="mobility_enabled" type="checkbox" checked> Mobility required</label></details><button class="btn primary wide">Create login & onboarding</button></form></section>`;
+  modal.querySelector('[name=password]').value=Array.from(crypto.getRandomValues(new Uint8Array(18)),n=>n.toString(16).padStart(2,'0')).join('');
   document.body.append(modal); modal.querySelector('[data-close-modal]').onclick=()=>modal.remove(); modal.onclick=(e)=>{if(e.target===modal)modal.remove();}; modal.querySelector('form').onsubmit=createClientAccount;
 }
 
 async function createClientAccount(event) {
-  event.preventDefault(); const fd=new FormData(event.target); const payload=Object.fromEntries(fd.entries()); payload.cardio_enabled=fd.has('cardio_enabled'); payload.mobility_enabled=fd.has('mobility_enabled'); payload.daily_steps_goal=Number(payload.daily_steps_goal); payload.checkin_day=Number(payload.checkin_day); payload.start_weight_display=Number(payload.start_weight_display);
+  event.preventDefault(); const fd=new FormData(event.target); const payload=Object.fromEntries(fd.entries()); payload.cardio_enabled=fd.has('cardio_enabled'); payload.mobility_enabled=fd.has('mobility_enabled'); payload.daily_steps_goal=Number(payload.daily_steps_goal); payload.checkin_day=Number(payload.checkin_day); payload.start_weight_display=payload.start_weight_display===''?null:Number(payload.start_weight_display);payload.start_onboarding=fd.has('start_onboarding');
   setBusy(event.submitter,true);
   try {
     if (state.preview) {
       state.clients.unshift(normalizeClient({id:`preview-${Date.now()}`,display_name:payload.full_name,email:payload.email,phone:payload.phone,market_region:payload.market_region,status:'active',daily_steps_goal:payload.daily_steps_goal,checkin_day:payload.checkin_day,goal_summary:payload.goal_summary,cardio_enabled:payload.cardio_enabled,mobility_enabled:payload.mobility_enabled,onboarding_status:'pending',plan_status:'draft'}));
       event.target.closest('.modal-backdrop').remove(); toast('Preview client created locally'); renderCoach(); return;
     }
-    const client = await provisionClientAccount(payload); state.clients.unshift(normalizeClient(client)); event.target.closest('.modal-backdrop').remove(); toast('Client login created'); renderCoach();
+    const coachId=state.user?.id;
+    const client = await provisionClientAccount(payload);if(state.user?.id!==coachId)return;state.clients.unshift(normalizeClient(client));
+    const modal=event.target.closest('.modal-backdrop');renderCoach();
+    modal.querySelector('.modal-card').innerHTML=`<div class="panel-head"><h2>Client login created</h2><button class="icon-btn" data-close-modal>✕</button></div><p>${payload.start_onboarding?'Their first sign-in opens a personal welcome, then the agreement and coaching profile.':'Their first sign-in opens the existing onboarding flow.'} No email has been sent.</p><label>Email<input readonly value="${esc(payload.email)}"></label><label>Temporary password<input type="password" readonly autocomplete="off" id="createdClientPassword"></label><button class="btn ghost" type="button" id="revealClientPassword">Show password</button><p>Share these details privately with your client. You can copy them now; the password is not saved in your browser.</p><a class="btn ghost" href="https://legal-edge-client-app.vercel.app/" target="_blank" rel="noopener">Open client sign-in</a><button class="btn primary" type="button" id="copyClientAccess">Copy login details</button><p id="clientAccessStatus" role="status"></p>`;
+    modal.querySelector('#createdClientPassword').value=payload.password;
+    modal.querySelector('[data-close-modal]').onclick=()=>modal.remove();
+    modal.querySelector('#revealClientPassword').onclick=e=>{const p=modal.querySelector('#createdClientPassword');p.type=p.type==='password'?'text':'password';e.target.textContent=p.type==='password'?'Show password':'Hide password';};
+    modal.querySelector('#copyClientAccess').onclick=async()=>{try{await navigator.clipboard.writeText(`Your Legal Edge account is ready.\nSign in: https://legal-edge-client-app.vercel.app/\nEmail: ${payload.email}\nTemporary password: ${payload.password}\nComplete your agreement and coaching profile after signing in.`);modal.querySelector('#clientAccessStatus').textContent='Copied. Share privately with this client.';}catch{modal.querySelector('#clientAccessStatus').textContent='Copy unavailable. Select the details above.';}};
+
   }
   catch(error){toast(error.message||'Could not create client','error');setBusy(event.submitter,false);}
 }
@@ -383,30 +423,23 @@ async function provisionClientAccount(payload) {
 const COACH_TABS = ['overview', 'planner', 'training', 'nutrition', 'check-ins', 'progress', 'onboarding', 'legal', 'diagnostics'];
 
 function renderClientWorkspace() {
-  const client = state.client;
-  $('#coachMain').innerHTML = pageHead('CLIENT WORKSPACE', client.display_name, '<button class="btn ghost small" id="viewAsClient">View as client</button>') + `
-    <div class="tabs" id="clientTabs">${COACH_TABS.map((tab) => `<button data-client-tab="${tab}" class="${state.clientTab === tab ? 'active' : ''}">${title(tab.replace('-', ' '))}</button>`).join('')}</div>
-    <div id="clientWorkspaceBody"></div>`;
-  $('#clientTabs').onclick = (event) => {
-    const button = event.target.closest('[data-client-tab]');
-    if (!button) return;
-    state.clientTab = button.dataset.clientTab;
-    renderClientWorkspace();
-  };
-  $('#viewAsClient').onclick = () => {
-    $('#clientHello').textContent = client.display_name;
-    $('#returnCoach').classList.remove('hidden');
-    show('#clientApp');
-    state.clientView = 'today';
-    renderClient();
-  };
-  const views = {
-    overview: coachOverview, planner: coachPlanner, training: coachTraining,
-    nutrition: coachNutrition, 'check-ins': coachCheckins, progress: coachProgress,
-    onboarding: coachOnboarding, legal: coachLegal, diagnostics: coachDiagnostics
-  };
-  try { views[state.clientTab](); }
-  catch (error) { renderError($('#clientWorkspaceBody'), error, renderClientWorkspace); }
+  const client=state.client,host=$('#coachMain'),owner=String(state.user?.id||'preview')+':'+state.role+':'+String(state.preview);
+  const retained=host.dataset.workspaceOwner===owner&&host.dataset.workspaceClient===client.id&&host.querySelector('#clientTabs')&&host.querySelector('#clientWorkspaceBody');
+  if(!retained){
+    host.innerHTML=pageHead('CLIENT WORKSPACE',client.display_name,'<button class="btn ghost small" id="viewAsClient">View as client</button>')+`<div class="tabs" id="clientTabs">${COACH_TABS.map(tab=>`<button data-client-tab="${tab}">${title(tab.replace('-',' '))}</button>`).join('')}</div><div id="clientWorkspaceBody"></div>`;
+    host.dataset.workspaceOwner=owner;host.dataset.workspaceClient=client.id;
+  }
+  const heading=host.querySelector('.page-head h1');if(heading&&heading.textContent!==client.display_name)heading.textContent=client.display_name;
+  host.querySelectorAll('[data-client-tab]').forEach(button=>{const active=button.dataset.clientTab===state.clientTab;button.classList.toggle('active',active);if(active)button.setAttribute('aria-current','page');else button.removeAttribute('aria-current');});
+  $('#clientTabs').onclick=event=>{const button=event.target.closest('[data-client-tab]');if(!button||button.dataset.clientTab===state.clientTab)return;state.clientTab=button.dataset.clientTab;renderClientWorkspace();};
+  $('#viewAsClient').onclick=()=>{$('#clientHello').textContent=client.display_name;$('#returnCoach').classList.remove('hidden');show('#clientApp');state.clientView='today';renderClient();};
+  const views={overview:coachOverview,planner:coachPlanner,training:coachTraining,nutrition:coachNutrition,'check-ins':coachCheckins,progress:coachProgress,onboarding:coachOnboarding,legal:coachLegal,diagnostics:coachDiagnostics};
+  try{
+    if(state.clientTab==='goals')return coachCoachingGoals();
+    if(state.clientTab==='support')return coachCoachingSupport();
+    if(state.clientTab==='connections')return renderConnectionsHub($('#clientWorkspaceBody')).catch(error=>{if(state.client?.id===client.id&&state.clientTab==='connections')renderError($('#clientWorkspaceBody'),error,renderClientWorkspace);});
+    return (views[state.clientTab]||views.overview)();
+  }catch(error){renderError($('#clientWorkspaceBody'),error,renderClientWorkspace);}
 }
 
 function coachOverview() {
@@ -432,8 +465,8 @@ function coachOverview() {
       <button class="btn primary wide">Save controls</button>
     </form></section><section class="panel"><div class="panel-head"><h3>Latest check-in</h3></div>${last ? `<div class="score">${last.week_score ?? '—'}/10</div><p><b>Win</b><br>${esc(last.wins || '—')}</p><p><b>Challenge</b><br>${esc(last.challenges || '—')}</p>` : '<div class="empty">No check-ins yet.</div>'}</section></div>`;
   const form = $('#clientSettings');
-  form.status.value = client.status || 'active';
-  form.checkin_day.value = String(client.checkin_day ?? 5);
+  form.elements.status.value = client.status || 'active';
+  form.elements.checkin_day.value = String(client.checkin_day ?? 5);
   form.onsubmit = saveClientControls;
   $('#linkSavedClient') && ($('#linkSavedClient').onsubmit = linkSavedClientAccount);
 }
@@ -598,7 +631,7 @@ function coachPlanner() {
   $('#weekEditor')?.addEventListener('submit', saveWeekDetails);
   $('#autofillNutrition')?.addEventListener('click', autofillNutritionWeek);
   $('#prepareWeek')?.addEventListener('click', prepareCurrentWeek);
-  $$('[data-session-editor]').forEach((form) => { form.training_type.value = state.data.sessions.find((session) => session.id === form.dataset.sessionEditor)?.training_type || 'weights'; form.onsubmit = savePlannerSession; });
+  $$('[data-session-editor]').forEach((form) => { form.elements.training_type.value = state.data.sessions.find((session) => session.id === form.dataset.sessionEditor)?.training_type || 'weights'; form.onsubmit = savePlannerSession; });
   $$('[data-delete-session]').forEach((button) => button.onclick = () => deletePlannerSession(button.dataset.deleteSession));
   $$('[data-nutrition-date]').forEach(select=>select.onchange=()=>savePlannerNutrition(select));
 }
@@ -811,7 +844,7 @@ function bindTrainingSetupTools(){
   $('#scheduleProgrammeForm')?.addEventListener('submit',scheduleProgrammeWeek);
   $('#addBankExercise')?.addEventListener('submit',addExerciseFromBank);
   $('#exerciseBankSearch')?.addEventListener('input',(event)=>$$('[data-bank-search]').forEach(card=>card.classList.toggle('hidden',!card.dataset.bankSearch.includes(event.target.value.toLowerCase()))));
-  $$('[data-session-editor]').forEach(form=>{form.training_type.value=state.data.sessions.find(s=>s.id===form.dataset.sessionEditor)?.training_type||'weights';form.onsubmit=saveActivitySession;});
+  $$('[data-session-editor]').forEach(form=>{form.elements.training_type.value=state.data.sessions.find(s=>s.id===form.dataset.sessionEditor)?.training_type||'weights';form.onsubmit=saveActivitySession;});
   $$('[data-delete-session]').forEach(button=>button.onclick=()=>deleteActivitySession(button.dataset.deleteSession));
 }
 
@@ -922,7 +955,7 @@ function nutritionUnit(amount, unit) {
   const raw = `${amount}${unit ? ` ${unit}` : ''}`;
   if (!Number.isFinite(n)) return raw;
   const us = (state.foodUnits || (state.client?.weight_unit === 'lbs' ? 'us' : 'metric')) === 'us';
-  const rounded = value => Number(value.toFixed(2));
+  const rounded = value => Number(value.toFixed(1));
   if (us) {
     if (u === 'g') return `${rounded(n / 28.349523125)} oz`;
     if (u === 'kg') return `${rounded(n * 35.27396195)} oz`;
@@ -1169,13 +1202,15 @@ function flattenCheckinAnswers(value, prefix = '') {
 }
 
 function checkinCard(checkin, coach = false) {
-  const answers = answersFor(checkin);
+  if(!coach&&checkin.client_id&&checkin.client_id!==state.client?.id)return '';
+  const answers = answersFor(checkin), appFeedback = coach || Boolean(checkin.reviewed_at && checkin.review_channel !== 'whatsapp');
   return `<details class="checkin-card rich-checkin" ${checkin === state.data.checkins[0] ? 'open' : ''}><summary><div><span class="eyebrow">WEEK ${checkin.week_number || '—'}</span><h3>${esc(checkin.original_date_text || fmt(checkin.submitted_at))}</h3></div><div class="score">${checkin.week_score ?? '—'}/10</div></summary>
-    <div class="detail-list"><div class="detail"><label>Weight</label>${displayWeight(checkin.weight_kg)}</div><div class="detail"><label>Energy</label>${checkin.energy ?? '—'}/10</div><div class="detail"><label>Sleep</label>${checkin.sleep ?? '—'}/10</div><div class="detail"><label>Stress</label>${checkin.stress ?? '—'}/10</div><div class="detail"><label>Training</label>${checkin.training_adherence == null ? '—' : checkin.training_adherence + '%'}</div><div class="detail"><label>Nutrition</label>${checkin.nutrition_adherence == null ? '—' : checkin.nutrition_adherence + '%'}</div><div class="detail"><label>Average steps</label>${checkin.average_steps != null ? Number(checkin.average_steps).toLocaleString() : '—'}</div></div>
+    <div class="detail-list"><div class="detail"><label>Weight</label>${displayWeight(checkin.weight_kg)}</div><div class="detail"><label>Energy</label>${checkin.energy ?? '—'}/10</div><div class="detail"><label>Sleep</label>${checkin.sleep ?? '—'}/10</div><div class="detail"><label>Stress</label>${checkin.stress ?? '—'}/10</div><div class="detail"><label>Training · self-reported</label>${checkin.training_adherence == null ? '—' : checkin.training_adherence + '%'}</div><div class="detail"><label>Nutrition · self-reported</label>${checkin.nutrition_adherence == null ? '—' : checkin.nutrition_adherence + '%'}</div><div class="detail"><label>Average steps</label>${checkin.average_steps != null ? Number(checkin.average_steps).toLocaleString() : '—'}</div></div>
     <div class="original-answers">${answers.length ? answers.map(([question, answer]) => `<div class="answer-block"><h4>${esc(question)}</h4><p>${esc(answer)}</p></div>`).join('') : '<p class="source-gap">No written response was submitted for this week.</p>'}</div>
-    ${safeMediaUrl(checkin.voice_note_url) ? `<a class="loom-card" href="${esc(safeMediaUrl(checkin.voice_note_url))}" target="_blank" rel="noopener"><span>▶</span><div><b>Weekly check-in video</b><small>Open coach review</small></div></a>` : ''}
-    ${!coach && checkin.focus_next_week ? `<div class="coach-note"><b>Agreed action points</b><p>${esc(checkin.focus_next_week)}</p></div>` : ''}
-    ${coach ? `<label class="field">Coach response<textarea data-checkin-response="${checkin.id}">${esc(checkin.coach_response || '')}</textarea></label><label class="field">Weekly video URL<input type="url" data-checkin-video="${checkin.id}" value="${esc(checkin.voice_note_url || '')}"></label>` : (checkin.coach_response ? `<div class="coach-note"><b>Coach response</b><p>${esc(checkin.coach_response)}</p></div>` : '')}
+    ${!coach && checkin.reviewed_at && checkin.review_channel === 'whatsapp' ? '<div class="coach-note"><b>Reviewed via WhatsApp</b><p>Your coach replied in WhatsApp. Open that conversation for the response.</p></div>' : ''}
+    ${appFeedback && safeMediaUrl(checkin.voice_note_url) ? `<a class="loom-card" href="${esc(safeMediaUrl(checkin.voice_note_url))}" target="_blank" rel="noopener"><span>▶</span><div><b>Weekly check-in video</b><small>Open coach review</small></div></a>` : ''}
+    ${!coach && appFeedback && checkin.focus_next_week ? `<div class="coach-note"><b>Agreed action points</b><p>${esc(checkin.focus_next_week)}</p></div>` : ''}
+    ${coach ? `<label class="field">Coach response<textarea data-checkin-response="${checkin.id}">${esc(checkin.coach_response || '')}</textarea></label><label class="field">Weekly video URL<input type="url" data-checkin-video="${checkin.id}" value="${esc(checkin.voice_note_url || '')}"></label>` : (appFeedback && checkin.coach_response ? `<div class="coach-note"><b>Coach response</b><p>${esc(checkin.coach_response)}</p></div>` : '')}
   </details>`;
 }
 
@@ -1199,14 +1234,17 @@ function parsedQaLines(text) {
 }
 
 async function addCoachCheckin(event) {
-  event.preventDefault(); const fd = new FormData(event.target), display = Number(fd.get('weight_display') || 0);
-  const row = { client_id: state.client.id, submitted_at: `${fd.get('submitted_date')}T12:00:00.000Z`, original_date_text: fd.get('submitted_date'), original_answers: parsedQaLines(fd.get('original_answers')) };
+  event.preventDefault(); const fd = new FormData(event.target), display = Number(fd.get('weight_display') || 0), clientId=state.client.id, userId=state.user?.id, role=state.role;
+  const active=()=>state.client?.id===clientId&&state.user?.id===userId&&state.role===role;
+  const row = { client_id: clientId, submitted_at: `${fd.get('submitted_date')}T12:00:00.000Z`, original_date_text: fd.get('submitted_date'), original_answers: parsedQaLines(fd.get('original_answers')) };
   for (const key of ['week_number','week_score','energy','sleep','stress','average_steps','training_adherence','nutrition_adherence']) row[key] = fd.get(key) === '' ? null : Number(fd.get(key));
   for (const key of ['wins','challenges','support_needed','coach_response','voice_note_url']) row[key] = String(fd.get(key) || '').trim() || null;
   row.weight_kg = display ? display / (state.client.weight_unit === 'lbs' ? 2.20462 : 1) : null;
   setBusy(event.submitter, true, 'Saving…');
   try {
-    const saved = state.preview ? { ...row, id: `preview-checkin-${Date.now()}` } : (await query('Historical check-in', db.from('checkins').insert(row).select()))[0];
+    const saved = state.preview ? { ...row, coach_response:null, voice_note_url:null, focus_next_week:null, id: `preview-checkin-${Date.now()}` } : (await query('Historical check-in', db.from('checkins').insert(row).select()))[0];
+    if(saved?.id==null||saved.client_id!==clientId)throw Error('The historical check-in was not confirmed.');if(!active())return;
+    if(typeof rememberCoachReplyDraft==='function'&&(row.coach_response||row.voice_note_url||row.focus_next_week))rememberCoachReplyDraft(saved,{response_text:row.coach_response||'',video_url:row.voice_note_url||'',action_points:row.focus_next_week||''});
     state.data.checkins.push(saved); state.data.checkins.sort((a,b)=>String(b.submitted_at).localeCompare(String(a.submitted_at)));
     toast('Historical check-in saved to the correct week'); coachCheckins();
   } catch (error) { toast(error.message, 'error'); setBusy(event.submitter, false); }
@@ -1242,10 +1280,23 @@ async function addCoachProgress(event) {
 }
 
 function progressData() {
-  const entries = [...state.data.progress].filter((entry) => entry.weight_kg != null).sort((a, b) => String(a.entry_date).localeCompare(String(b.entry_date)));
+  // Include weights recorded in check-ins even when no separate progress row exists.
+  const byDate = new Map();
+  for (const row of [...(state.data.checkins || [])].sort((a,b) => String(a.submitted_at).localeCompare(String(b.submitted_at)))) {
+    if (row.client_id && row.client_id !== state.client.id) continue;
+    const date = String(row.submitted_at || '').slice(0,10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(date) && row.weight_kg != null && row.weight_kg !== '' && Number.isFinite(Number(row.weight_kg)) && Number(row.weight_kg)>0)
+      byDate.set(date, {entry_date:date, weight_kg:Number(row.weight_kg), source:'checkin'});
+  }
+  for (const row of state.data.progress || []) {
+    if (row.client_id && row.client_id !== state.client.id) continue;
+    if (row.entry_date && row.weight_kg != null && row.weight_kg !== '' && Number.isFinite(Number(row.weight_kg)) && Number(row.weight_kg)>0)
+      byDate.set(String(row.entry_date).slice(0,10),row);
+  }
+  const entries = [...byDate.values()].sort((a,b) => String(a.entry_date).localeCompare(String(b.entry_date)));
   const start = Number(state.client.start_weight_kg ?? entries[0]?.weight_kg);
   const current = Number(entries.at(-1)?.weight_kg);
-  const goal = Number(state.client.goal_weight_kg);
+  const goal = state.client.goal_weight_kg == null || state.client.goal_weight_kg === '' || Number(state.client.goal_weight_kg) <= 0 ? NaN : Number(state.client.goal_weight_kg);
   const change = Number.isFinite(start) && Number.isFinite(current) ? current - start : null;
   const remaining = Number.isFinite(goal) && Number.isFinite(current) ? goal - current : null;
   const journey = Number.isFinite(goal) && Number.isFinite(start) ? goal - start : null;
@@ -1260,11 +1311,43 @@ function rangeEntries(entries) {
   return entries.filter((entry) => new Date(`${entry.entry_date}T12:00:00`) >= cutoff);
 }
 
+function strengthProgressMarkup() {
+  const exerciseNames = new Map((state.data.exercises || []).map((exercise) => [exercise.id, exercise.name]));
+  const groups = new Map();
+  for (const log of state.data.exerciseLogs || []) {
+    if (log.client_id && log.client_id !== state.client.id) continue;
+    const load = Number(log.load), reps = Number(log.reps);
+    if (!finiteRecorded(log.load) || load < 0 || !Number.isFinite(reps) || reps <= 0 || !log.performed_at) continue;
+    const name = String(log.exercise_name || exerciseNames.get(log.program_exercise_id) || 'Exercise').trim();
+    const unit = String(log.load_unit || (state.client.weight_unit === 'lbs' ? 'lb' : 'kg'));
+    const key = `${name.toLowerCase()}|${unit}`;
+    if (!groups.has(key)) groups.set(key, { name, unit, rows: [] });
+    groups.get(key).rows.push({ ...log, load, reps, estimate: load * (1 + reps / 30) });
+  }
+  const exercises = [...groups.values()].map((group) => {
+    const bestByDay = new Map();
+    for (const row of group.rows.sort((a, b) => String(a.performed_at).localeCompare(String(b.performed_at)))) {
+      const day = String(row.performed_at).slice(0, 10), saved = bestByDay.get(day);
+      if (!saved || row.estimate > saved.estimate) bestByDay.set(day, row);
+    }
+    const rows = [...bestByDay.values()], latest = rows.at(-1), previous = rows.at(-2);
+    return { ...group, allRows: group.rows, rows, latest, previous, lastAt: latest?.performed_at || '' };
+  }).sort((a, b) => String(b.lastAt).localeCompare(String(a.lastAt)));
+  if (!exercises.length) return `<section class="panel strength-progress"><div class="panel-head"><div><h3>Strength progress</h3><span class="sub">Your best working sets appear here automatically</span></div></div><div class="empty"><b>No strength sets logged yet.</b><p>Save the weight and reps after a workout to start the chart. No unverified history is shown or invented.</p></div></section>`;
+  const cards = exercises.map((exercise) => {
+    const change = exercise.previous ? exercise.latest.estimate - exercise.previous.estimate : null;
+    return `<article><span class="eyebrow">${esc(fmt(exercise.latest.performed_at))}</span><h4>${esc(exercise.name)}</h4><strong>${exercise.latest.load.toLocaleString(undefined,{maximumFractionDigits:1})} ${esc(exercise.unit)} × ${exercise.latest.reps.toLocaleString(undefined,{maximumFractionDigits:1})}</strong>${exercise.previous ? `<small>Previous best ${exercise.previous.load.toLocaleString(undefined,{maximumFractionDigits:1})} ${esc(exercise.unit)} × ${exercise.previous.reps.toLocaleString(undefined,{maximumFractionDigits:1})} · ${change >= 0 ? '+' : ''}${change.toFixed(1)} estimated</small>` : '<small>First recorded baseline</small>'}<p class="muted">Weight used (${esc(exercise.unit)})</p>${chart(exercise.rows.map(row=>row.load))}<p class="muted">Reps at that weight</p>${chart(exercise.rows.map(row=>row.reps))}<details><summary>All recorded sets</summary>${exercise.allRows.slice().reverse().map(row=>`<div class="note-row"><b>${esc(fmt(row.performed_at))} · Set ${esc(row.set_number??'—')}</b><span>${esc(row.load)} ${esc(exercise.unit)} × ${esc(row.reps)} reps</span></div>`).join('')}</details></article>`;
+  });
+  return `<section class="panel strength-progress"><div class="panel-head"><div><h3>Strength progress</h3><span class="sub">Best estimated set per day; charts show its recorded weight and reps</span></div></div><div class="strength-progress-grid">${cards.slice(0,6).join('')}</div>${cards.length>6?'<details class="strength-more"><summary>More exercise charts · '+(cards.length-6)+'</summary><div class="strength-progress-grid">'+cards.slice(6).join('')+'</div></details>':''}</section>`;
+}
+
 function progressDashboardMarkup() {
   const model = progressData(), shown = rangeEntries(model.entries), factor = state.client.weight_unit === 'lbs' ? 2.20462 : 1;
   const value = (kg, signed = false) => Number.isFinite(kg) ? displayWeight(kg, signed) : '—';
+  const previous = model.entries.at(-2)?.weight_kg == null ? NaN : Number(model.entries.at(-2).weight_kg);
+  const sincePrevious = Number.isFinite(model.current) && Number.isFinite(previous) ? model.current - previous : NaN;
   const measures = ['waist_cm','chest_cm','hips_cm','arm_cm','thigh_cm'].map((key) => { const rows = state.data.progress.filter((entry) => entry[key] != null).sort((a,b) => String(a.entry_date).localeCompare(String(b.entry_date))); return rows.length ? { name: title(key.replace('_cm','')), start: Number(rows[0][key]), current: Number(rows.at(-1)[key]) } : null; }).filter(Boolean);
-  return `<div class="progress-hero"><div><span>Current</span><strong>${value(model.current)}</strong><small>${model.entries.at(-1) ? `Latest weigh-in ${fmt(model.entries.at(-1).entry_date)}` : 'No weigh-ins'}</small></div><div class="goal-progress"><span>Goal progress</span><strong>${model.progress == null ? '—' : `${model.progress}%`}</strong><div class="progress-bar"><i style="width:${model.progress || 0}%"></i></div></div></div><div class="progress-metrics"><div><span>Start</span><strong>${value(model.start)}</strong></div><div><span>Total change</span><strong>${value(model.change, true)}</strong></div><div><span>Goal</span><strong>${value(model.goal)}</strong></div><div><span>To goal</span><strong>${value(model.remaining, true)}</strong></div><div><span>Weekly rate</span><strong>${value(model.weeklyRate, true)}</strong></div><div><span>Weigh-ins</span><strong>${model.entries.length}</strong></div></div><section class="panel"><div class="panel-head"><h3>Weight trend</h3><div class="range-tabs">${['4','8','12','all'].map((range) => `<button data-progress-range="${range}" class="${state.progressRange === range ? 'active' : ''}">${range === 'all' ? 'All time' : `${range} weeks`}</button>`).join('')}</div></div>${chart(shown.map((entry) => Number(entry.weight_kg) * factor))}<div>${shown.slice().reverse().map((entry) => `<div class="note-row"><b>${fmt(entry.entry_date)}</b><span>${displayWeight(entry.weight_kg)}${entry.waist_cm ? ` · Waist ${entry.waist_cm} cm` : ''}</span></div>`).join('') || '<div class="empty">No entries in this range.</div>'}</div></section>${measures.length ? `<section class="panel measurement-panel"><div class="panel-head"><h3>Measurements</h3></div><div class="measurement-grid">${measures.map((measure) => `<div><span>${measure.name}</span><strong>${measure.current} cm</strong><small>${measure.start} cm start · ${(measure.current - measure.start).toFixed(1)} cm</small></div>`).join('')}</div></section>` : ''}${milestones()}`;
+  return `<div class="progress-hero"><div><span>Current</span><strong>${value(model.current)}</strong><small>${model.entries.at(-1) ? `Latest weigh-in ${fmt(model.entries.at(-1).entry_date)}` : 'No weigh-ins'}</small></div><div class="goal-progress"><span>Goal progress</span><strong>${model.progress == null ? '—' : `${model.progress}%`}</strong><div class="progress-bar"><i style="width:${model.progress || 0}%"></i></div></div></div><div class="progress-metrics"><div><span>Previous</span><strong>${value(previous)}</strong></div><div><span>Since previous</span><strong>${value(sincePrevious, true)}</strong></div><div><span>Start</span><strong>${value(model.start)}</strong></div><div><span>Total change</span><strong>${value(model.change, true)}</strong></div><div><span>Goal</span><strong>${value(model.goal)}</strong></div><div><span>To goal</span><strong>${value(model.remaining, true)}</strong></div><div><span>Weekly rate</span><strong>${value(model.weeklyRate, true)}</strong></div><div><span>Weigh-ins</span><strong>${model.entries.length}</strong></div></div><section class="panel"><div class="panel-head"><h3>Weight trend</h3><div class="range-tabs">${['4','8','12','all'].map((range) => `<button data-progress-range="${range}" class="${state.progressRange === range ? 'active' : ''}">${range === 'all' ? 'All time' : `${range} weeks`}</button>`).join('')}</div></div>${chart(shown.map((entry) => Number(entry.weight_kg) * factor))}<div>${shown.slice().reverse().map((entry) => `<div class="note-row"><b>${fmt(entry.entry_date)}</b><span>${displayWeight(entry.weight_kg)}${entry.waist_cm ? ` · Waist ${entry.waist_cm} cm` : ''}</span></div>`).join('') || '<div class="empty">No entries in this range.</div>'}</div></section>${strengthProgressMarkup()}${measures.length ? `<section class="panel measurement-panel"><div class="panel-head"><h3>Measurements</h3></div><div class="measurement-grid">${measures.map((measure) => `<div><span>${measure.name}</span><strong>${measure.current} cm</strong><small>${measure.start} cm start · ${(measure.current - measure.start).toFixed(1)} cm</small></div>`).join('')}</div></section>` : ''}${milestones()}`;
 }
 
 function bindProgressRange(render) { $$('[data-progress-range]').forEach((button) => button.onclick = () => { state.progressRange = button.dataset.progressRange; render(); }); }
@@ -1389,7 +1472,7 @@ function clientToday() {
 }
 
 function milestones() {
-  const entries = [...state.data.progress].filter((entry) => entry.weight_kg != null).sort((a, b) => String(a.entry_date).localeCompare(String(b.entry_date)));
+  const entries = progressData().entries;
   const latest = entries.at(-1)?.weight_kg;
   const loss = latest != null && state.client.start_weight_kg != null ? (Number(state.client.start_weight_kg) - Number(latest)) * (state.client.weight_unit === 'lbs' ? 2.20462 : 1) : 0;
   const checkins = state.data.checkins;
@@ -1462,6 +1545,89 @@ function bindCompletionActions() {
   });
 }
 
+
+function cardioLogForm(session) {
+  const actual=session?.source_metadata?.cardio_log||{},own=!session;
+  const opts=['Run','Walk','Incline treadmill','Cycling','Spin','Swimming','Rowing','Elliptical','Boxing'];
+  const name=String(session?.title||'').toLowerCase();
+  const suggested=actual.activity||(name.includes('treadmill')?'Incline treadmill':opts.find(x=>name.includes(x.toLowerCase()))||(/cycl|bike/.test(name)?'Cycling':/swim/.test(name)?'Swimming':/row/.test(name)?'Rowing':''));
+  const list='cardio-activities-'+(session?.id||'extra');
+  let date;try{date=window.CheckinStatus.localDate(new Date(),state.client?.timezone||'Europe/Dublin');}catch{date=iso(new Date());}
+  return `<form class="cardio-entry-form" data-cardio-id="${session?.id||''}">
+    <label>What did you do?<input name="activity" list="${esc(list)}" maxlength="80" value="${esc(suggested)}" placeholder="Choose or type an activity" required><datalist id="${esc(list)}">${opts.map(x=>`<option value="${x}">`).join('')}</datalist></label>
+    <label>Time completed (minutes)<input name="duration" type="number" inputmode="numeric" min="1" max="1440" step="1" value="${esc(actual.duration_minutes??'')}" placeholder="e.g. 25" required></label>
+    ${own?'<label>Date completed<input name="session_date" type="date" required value="'+date+'"></label>':''}
+    <details class="cardio-more"><summary>Add more details (optional)</summary><div class="cardio-extra-fields">
+      <label>Distance (km)<input name="distance" type="number" inputmode="decimal" min="0" max="1000" step="0.01" value="${esc(actual.distance_km??'')}"></label>
+      <label>Average heart rate (bpm)<input name="heart_rate" type="number" inputmode="numeric" min="30" max="240" value="${esc(actual.heart_rate??'')}"></label>
+      <label>Effort (1–10)<input name="rpe" type="number" inputmode="numeric" min="1" max="10" value="${esc(actual.rpe??'')}"></label>
+      <label>Notes<textarea name="notes" rows="2" maxlength="2000" placeholder="Anything you want Calum to know">${esc(actual.notes||'')}</textarea></label>
+    </div></details>
+    <button type="submit" class="btn primary">${actual.duration_minutes?'Update saved cardio':'Save cardio'}</button>
+    <p class="muted">${own?'Saves this as an extra completed session.':'Saving marks this session complete. You do not need a separate tick.'}</p>
+    <p data-cardio-status role="status" aria-live="polite"></p>
+  </form>`;
+}
+function cardioLogCard(session,open=false) {
+ const a=session.source_metadata?.cardio_log,manual=session.source_system==='client_manual_cardio',complete=session.status==='completed';
+ return `<article class="activity-session cardio-simple"><div class="panel-head"><h3>${esc(session.title)}</h3><span class="pill">${complete?'Completed':'To do'}</span></div>
+ ${!manual?`<p class="activity-rx"><strong>Coach’s plan:</strong> ${session.duration_minutes?esc(session.duration_minutes)+' min · ':''}${session.distance_km?esc(session.distance_km)+' km · ':''}${esc(session.zone||'')}${session.heart_rate_target?' · '+esc(session.heart_rate_target):''}</p><p class="muted">Complete when it suits you. Record what you actually did.</p>`:''}
+ ${a?`<p class="cardio-saved-result"><strong>Saved:</strong> ${esc(a.activity)} · ${esc(a.duration_minutes)} min${a.distance_km!=null?' · '+esc(a.distance_km)+' km':''}</p>`:complete?'<p>Marked complete. No cardio time has been recorded yet.</p>':''}
+ ${manual?'<p class="muted">'+esc(fmt(session.session_date))+' · Extra session</p>':''}
+ <details class="cardio-log-toggle" ${open?'open':''}><summary>${a?'Edit saved cardio':complete?'Add completed time':'Log this session'}</summary>${cardioLogForm(session)}</details></article>`;
+}
+function bindCardioLogForms() {
+ $$('[data-cardio-id]').forEach(form => form.onsubmit = async (event) => {
+   event.preventDefault();
+   if(form.dataset.saving==='true')return;
+   const clientId=state.client?.id,account=state.user?.id;
+   const active=()=>state.client?.id===clientId&&state.user?.id===account&&form.isConnected;
+   const fd = new FormData(form);
+   const id=form.dataset.cardioId;
+   const session=state.data.sessions.find(x=>x.id===id);
+   if(id&&!session)return toast('Session unavailable. Reload Training.', 'error');
+   const week=currentWeek();
+   if (!week?.published) return toast('Your current week must be published first.', 'error');
+   const duration=Number(fd.get('duration'));
+   if (!Number.isFinite(duration)||duration<1||duration>1440) return toast('Enter a valid duration.', 'error');
+   const distanceText=String(fd.get('distance')||'');
+   const distance=distanceText===''?null:Number(distanceText);
+   const hrText=String(fd.get('heart_rate')||'');
+   const hr=hrText===''?null:Number(hrText);
+   const effortText=String(fd.get('rpe')||'');
+   const rpe=effortText===''?null:Number(effortText);
+   if ((distance!==null&&(!Number.isFinite(distance)||distance<0||distance>1000))||(hr!==null&&(!Number.isFinite(hr)||hr<30||hr>240))||(rpe!==null&&(!Number.isFinite(rpe)||rpe<1||rpe>10))) return toast('Check distance, heart rate and effort.', 'error');
+   const activity=String(fd.get('activity')||'').trim().slice(0,80);
+   if(!activity)return toast('Choose or type the activity you did.','error');
+   const actual={activity,duration_minutes:duration,distance_km:distance,heart_rate:hr,rpe,notes:String(fd.get('notes')||'').trim().slice(0,2000),logged_at:new Date().toISOString()};
+   const submit=form.querySelector('[type=submit]'),status=form.querySelector('[data-cardio-status]');
+   form.dataset.saving='true';if(status)status.textContent='Saving cardio…';setBusy(submit,true);
+   try {
+     let saved;
+     if(session) {
+       const patch={source_metadata:{...(session.source_metadata||{}),cardio_log:actual},status:'completed',completed_at:new Date().toISOString()};
+       if(state.preview) saved={...session,...patch};
+       else { const result=await query('Save cardio results',db.rpc('save_session_completion',{p_session:id,p_complete:true,p_cardio:actual}));if(result?.session_id!==id||result.client_id!==clientId)throw Error('Cardio save was not confirmed');saved={...session,status:result.status,completed_at:result.completed_at,source_metadata:result.source_metadata}; }
+       if(!active())return;
+       Object.assign(session,saved);
+     } else {
+       const date=String(fd.get('session_date')||'');
+       const weekStart=week.week_start;
+       const offset=Math.round((new Date(date+'T12:00:00')-new Date(weekStart+'T12:00:00'))/864e5);
+       if(offset<0||offset>6||!Number.isFinite(offset))throw Error('Choose a date within the current training week');
+       const payload={week_id:week.id,session_date:date,training_type:'cardio',title:actual.activity+' · '+duration+' min',status:'completed',completed_at:new Date().toISOString(),source_system:'client_manual_cardio',source_metadata:{cardio_log:actual},sort_order:99};
+       if(state.preview)saved={...payload,id:'preview-cardio-'+Date.now()};
+       else {const rows=await query('Add cardio session',db.from('training_sessions').insert(payload).select());saved=rows[0];if(!saved)throw Error('Session could not be saved');}
+       if(!active())return;
+       state.data.sessions.push(saved);
+     }
+     toast('Cardio saved');
+     clientTraining();
+     const confirmation=document.getElementById('cardioSaveStatus');if(confirmation)confirmation.textContent='Saved: '+activity+' · '+duration+' min. '+(session?'Session complete.':'Extra session added.');
+   } catch(error){if(active()){if(status)status.textContent='Not saved. Your entries are still here—please retry.';toast(error.message,'error');}} finally {delete form.dataset.saving;if(submit.isConnected)setBusy(submit,false);}
+ });
+}
+
 function clientTraining() {
   const week = currentWeek();
   const allSessions = state.data.sessions.filter((session) => week?.published && session.week_id === week.id);
@@ -1472,9 +1638,17 @@ function clientTraining() {
   ];
   const categoryTabs = `<div class="training-category-tabs">${categories.map(([key, label, count]) => `<button type="button" data-training-category="${key}" class="${state.trainingCategory === key ? 'active' : ''}"><b>${label}</b><span>${count}</span></button>`).join('')}</div>`;
   if (state.trainingCategory === 'steps') state.trainingCategory = 'weights';
-  if (state.trainingCategory === 'cardio' || state.trainingCategory === 'mobility') {
-    const sessions = allSessions.filter((session) => state.trainingCategory === 'cardio' ? session.training_type === 'cardio' : ['mobility', 'recovery'].includes(session.training_type));
-    $('#clientMain').innerHTML = clientHeader('', 'Training & activity', 'Your workouts, cardio and mobility. Daily step goals are in Schedule.') + categoryTabs + `<section class="panel"><div class="panel-head"><div><h2>${state.trainingCategory === 'cardio' ? 'Cardio' : 'Mobility & recovery'}</h2><span class="sub">${sessions.length} sessions this week</span></div></div><div class="activity-list">${sessions.map((session) => `<div class="activity-session">${taskMarkup(session)}${session.notes ? `<p>${esc(session.notes)}</p>` : ''}<div class="activity-rx">${session.duration_minutes ? `<span>${session.duration_minutes} min</span>` : ''}${session.distance_km ? `<span>${session.distance_km} km</span>` : ''}${session.zone ? `<span>${esc(session.zone)}</span>` : ''}${session.heart_rate_target ? `<span>${esc(session.heart_rate_target)}</span>` : ''}</div>${activityPrescription(session)}</div>`).join('') || '<div class="empty">Nothing assigned in this section.</div>'}</div></section>`;
+  if (state.trainingCategory === 'cardio') {
+    const sessions=allSessions.filter(session=>session.training_type==='cardio').sort((a,b)=>a.session_date.localeCompare(b.session_date));
+    const pending=sessions.filter(s=>s.status!=='completed'),completed=sessions.filter(s=>s.status==='completed');
+    $('#clientMain').innerHTML=clientHeader('','Training & activity','Choose a session, enter your minutes and save.')+categoryTabs+`<p id="cardioSaveStatus" role="status" aria-live="polite"></p><section class="panel"><h2>Your cardio sessions</h2><p class="muted">Work through these whenever you can. Saving your time completes the session.</p><div class="activity-list">${pending.map((s,i)=>cardioLogCard(s,i===0||s.id===state.selectedSessionId)).join('')||'<p>No assigned cardio left to log.</p>'}</div></section><details class="panel cardio-own"><summary>+ Log extra cardio</summary><p>For an additional session you did yourself.</p>${cardioLogForm(null)}</details>${completed.length?`<details class="panel cardio-history"><summary>Saved cardio (${completed.length})</summary>${completed.map(s=>cardioLogCard(s)).join('')}</details>`:''}`;
+    bindTrainingCategoryTabs();
+    bindCardioLogForms();
+    return;
+  }
+  if (state.trainingCategory === 'mobility') {
+    const sessions = allSessions.filter((session) => ['mobility', 'recovery'].includes(session.training_type));
+    $('#clientMain').innerHTML = clientHeader('', 'Training & activity', 'Your weights, cardio, mobility and steps in one clear place.') + categoryTabs + `<section class="panel"><div class="panel-head"><div><h2>Mobility & recovery</h2><span class="sub">${sessions.length} sessions this week</span></div></div><div class="activity-list">${sessions.map((session) => `<div class="activity-session">${taskMarkup(session)}${session.notes ? `<p>${esc(session.notes)}</p>` : ''}${activityPrescription(session)}</div>`).join('') || '<div class="empty">Nothing assigned in this section.</div>'}</div></section>`;
     bindTrainingCategoryTabs(); bindCompletionActions(); return;
   }
   const sessions = allSessions.filter((session) => ['weights', 'resistance'].includes(session.training_type));
@@ -1483,7 +1657,7 @@ function clientTraining() {
     $('#clientMain').innerHTML = clientHeader('', 'Training & activity', 'Your workouts, cardio and mobility. Daily step goals are in Schedule.') + categoryTabs + `<div class="session-picker">${sessions.map((session) => `<button class="session-tile" data-open-session="${session.id}"><span>${fmt(session.session_date, { weekday: 'short', day: 'numeric', month: 'short' })}</span><strong>${esc(session.title)}</strong><small>${exercisesForSession(session).length} exercises · ${session.status === 'completed' ? 'Completed' : 'Planned'}</small></button>`).join('') || '<div class="empty">No weights or resistance session is scheduled this week.</div>'}</div>`;
     bindTrainingCategoryTabs(); return bindOpenSessions();
   }
-  $('#clientMain').innerHTML = `<button class="text-btn back-to-sessions" id="backToSessions">← All sessions</button>` + clientHeader('', selected.title, fmt(selected.session_date, { weekday: 'long', day: 'numeric', month: 'long' })) + categoryTabs + `<section class="panel workout"><div class="panel-head"><div><h2>Workout prescription</h2><span class="sub">${exercisesForSession(selected).length} exercises</span></div>${taskMarkup(selected)}</div>${exercisesForSession(selected).map((exercise) => exerciseCard(exercise, true)).join('') || '<div class="empty">No exercise prescription is attached to this workout.</div>'}</section>`;
+  $('#clientMain').innerHTML = `<button class="text-btn back-to-sessions" id="backToSessions">← All sessions</button>` + clientHeader('', selected.title, 'Complete when ready. Session numbers show programme order, not fixed weekdays.') + categoryTabs + `<section class="panel workout"><div class="panel-head"><div><h2>Workout prescription</h2><span class="sub">${exercisesForSession(selected).length} exercises</span></div>${taskMarkup(selected)}</div>${exercisesForSession(selected).map((exercise) => exerciseCard(exercise, true)).join('') || '<div class="empty">No exercise prescription is attached to this workout.</div>'}</section>`;
   $('#backToSessions').onclick = () => { state.selectedSessionId = null; clientTraining(); };
   bindTrainingCategoryTabs();
   bindCompletionActions();
@@ -1595,8 +1769,9 @@ async function hydrateProgressPhotos() {
   if (!db || state.preview) return;
   for (const card of $$('[data-photo-path]')) {
     const { data, error } = await db.storage.from('client-files').createSignedUrl(card.dataset.photoPath, 900);
-    if (!error && data?.signedUrl) card.querySelector('.photo-placeholder').outerHTML = `<img src="${esc(data.signedUrl)}" alt="Private progress photo" loading="lazy">`;
-    else card.querySelector('.photo-placeholder').textContent = 'Photo unavailable';
+    const placeholder=card.querySelector('.photo-placeholder');if(!card.isConnected||!placeholder)continue;
+    if (!error && data?.signedUrl) placeholder.outerHTML = `<img src="${esc(data.signedUrl)}" alt="Private progress photo" loading="lazy">`;
+    else placeholder.textContent = 'Photo unavailable';
   }
 }
 
@@ -1643,42 +1818,56 @@ function clientDiagnostics() {
 }
 
 function bindShell() {
+  if ($('#authMsg').textContent === 'Loading secure sign-in…') $('#authMsg').textContent = '';
   $('#loginForm').onsubmit = async (event) => {
     event.preventDefault();
     $('#authMsg').textContent = 'Signing in…';
     if (!db) return $('#authMsg').textContent = 'Secure login failed to load. Refresh the page.';
-    const { error } = await db.auth.signInWithPassword({ email: $('#email').value.trim(), password: $('#password').value });
-    if (error) return $('#authMsg').textContent = error.message;
-    await boot();
+    const button=event.submitter||$('#loginForm button[type="submit"]');
+    if(button?.disabled)return;
+    setBusy(button,true,'Signing in…');
+    try{
+      const { error } = await withinDeadline(db.auth.signInWithPassword({ email: $('#email').value.trim().toLowerCase(), password: $('#password').value }),'Sign-in request');
+      if(error)throw error;
+      $('#authMsg').textContent='Opening your coaching workspace…';
+      await boot();
+    }catch(error){$('#authMsg').textContent=/abort|timeout|too long|fetch|network/i.test(error.message||'')?'The connection timed out. Your records are safe. Tap Sign in to retry.':error.message||'Sign-in could not complete. Try again.';}
+    finally{setBusy(button,false);}
+
   };
   $('#resetBtn').onclick = async () => {
-    const email = $('#email').value.trim();
-    if (!email) return $('#authMsg').textContent = 'Enter your email first.';
-    const { error } = await db.auth.resetPasswordForEmail(email, { redirectTo: location.origin });
-    $('#authMsg').textContent = error ? error.message : 'Password reset email sent.';
+    const button=$('#resetBtn'),message=$('#authMsg');if(button.disabled)return;
+    const email=$('#email').value.trim().toLowerCase();
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return message.textContent='Enter your account email first.';
+    if(!db)return message.textContent='Secure connection failed to load. Refresh the page.';
+    setBusy(button,true,'Requesting reset…');message.textContent='Requesting your reset link…';
+    try{const {error}=await withinDeadline(db.auth.resetPasswordForEmail(email,{redirectTo:location.origin}),'Password reset request');if(error)throw error;message.textContent='Reset link requested. Check your inbox and spam folder.';}
+    catch(error){message.textContent=/abort|timeout|too long|fetch|network/i.test(error.message||'')?'Reset request was not confirmed. Check your email before retrying.':error.message||'The reset link could not be requested. Try again.';}
+    finally{setBusy(button,false);}
   };
   $('#recoveryForm').onsubmit = async (event) => {
     event.preventDefault();
-    const form = event.target;
+    const form = event.target;if(form.dataset.saving==='true')return;
     const password = form.elements.new_password.value;
     const message = $('#recoveryMsg');
     if (password !== form.elements.confirm_password.value) return message.textContent = 'Passwords do not match.';
+    if(password.length<(form.elements.new_password.minLength||12))return message.textContent='Use at least '+(form.elements.new_password.minLength||12)+' characters for your new password.';
     if (!db) return message.textContent = 'Secure connection failed to load. Refresh the page.';
-    const button = event.submitter;
-    setBusy(button, true);
+    const button = event.submitter||form.querySelector('button[type="submit"]');
+    form.dataset.saving='true';setBusy(button, true);message.textContent='Updating your password…';let updated=false,updateStarted=false;
     try {
-      const { data: { session }, error: sessionError } = await db.auth.getSession();
+      const { data: { session }, error: sessionError } = await withinDeadline(db.auth.getSession(),'Reset session check');
       if (sessionError || !session) throw new Error('This reset link has expired. Request a new one from the sign-in screen.');
-      const { error } = await db.auth.updateUser({ password });
-      if (error) throw error;
-      await db.auth.signOut();
+      updateStarted=true;const { error } = await withinDeadline(db.auth.updateUser({ password }),'Password update');
+      if (error) throw error;updated=true;
+      const {error:signOutError}=await withinDeadline(db.auth.signOut(),'Reset sign-out');if(signOutError)throw signOutError;
       recoveryMode = false;
       history.replaceState({}, '', location.pathname);
       form.reset();
       show('#auth');
       $('#authMsg').textContent = 'Password updated. Sign in with your new password.';
-    } catch (error) { message.textContent = error.message || 'Password could not be updated.'; }
-    finally { setBusy(button, false); }
+    } catch (error) { message.textContent = updated?'Your password was updated, but sign-out was not confirmed. Return to sign-in and use your new password.':/abort|timeout|too long|fetch|network/i.test(error.message||'')?(updateStarted?'The password update was not confirmed. Your entries are still here. Try signing in with the new password before retrying.':'The reset session could not be checked. Your entries are still here; retry.'):error.message||'Password could not be updated.'; }
+    finally { delete form.dataset.saving;setBusy(button, false); }
   };
   $('#recoveryBack').onclick = () => {
     recoveryMode = false;
@@ -1693,7 +1882,7 @@ function bindShell() {
   });
   $('#coachNav').onclick = (event) => {
     const button = event.target.closest('[data-coach-view]');
-    if (!button) return;
+    if (!button||(!state.client&&state.coachView===button.dataset.coachView)) return;
     state.coachView = button.dataset.coachView;
     state.client = null;
     state.data = emptyData();
@@ -1701,7 +1890,7 @@ function bindShell() {
   };
   $('#clientNav').onclick = (event) => {
     const button = event.target.closest('[data-client-view]');
-    if (!button || button.classList.contains('hidden')) return;
+    if (!button || button.classList.contains('hidden') || state.clientView===button.dataset.clientView) return;
     state.clientView = button.dataset.clientView;
     renderClient();
   };

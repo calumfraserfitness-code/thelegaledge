@@ -1,0 +1,28 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert'),{JSDOM}=require('jsdom');
+const dom=new JSDOM('<main id="clientWorkspaceBody"></main>',{runScripts:'outside-only'}),w=dom.window;
+const client={id:'a',coach_id:'u',goal_summary:'Maintain weight'},state={user:{id:'u'},role:'coach',client,clientTab:'check-ins',data:{checkins:[{id:'check-a',client_id:'a',submitted_at:'2026-11-01',wins:'REAL WIN'},{client_id:'b',wins:'PEER SECRET'}],weeks:[],exerciseLogs:[],coachingGuidance:[]}};
+let invocation,release,copy=0,fail=false,savedRows=[],savePayload;
+const draft={id:'draft-a',client_id:'a',coach_id:'u',status:'draft',created_at:'2026-11-02',updated_at:'2026-11-02',payload:{summary:'Dated snapshot',wins:[{text:'Recorded a session',evidence:['session-1']}],attention:[],questions:['How was recovery?'],suggested_response:'Good work recording your training.',gaps:['Some activity may be unrecorded.'],sources:[{id:'session-1',label:'Completed session',date:'2026-11-01'}]}};
+Object.assign(w,{state,$:s=>w.document.querySelector(s),esc:v=>String(v??'').replaceAll('<','&lt;'),renderClientWorkspace(){},renderCoach(){},query:async(_label,q)=>q.save?[{...draft,payload:savePayload,updated_at:'2026-11-03'}]:savedRows,db:{functions:{invoke:(_name,args)=>{invocation=args.body;if(fail)return Promise.resolve({error:{context:{json:async()=>({error:'AI unavailable. Saved draft kept.'})}}});return new Promise(r=>release=r);}},from:()=>{const q={save:false};for(const name of ['select','eq','order','limit'])q[name]=()=>q;q.update=p=>{q.save=true;savePayload=p.payload;return q;};return q;}}});
+Object.defineProperty(w.navigator,'clipboard',{value:{writeText:async()=>copy++}});
+vm.runInContext(fs.readFileSync(__dirname+'/../coach-review-brief.js','utf8'),dom.getInternalVMContext());
+const tick=()=>new Promise(r=>setImmediate(r));
+(async()=>{
+ const text=w.CoachReviewBrief.build(client,state.data,[{client_id:'b',coach_id:'u',matching_status:'matched',analysis:'PRIVATE CALL'}],new Date('2026-11-02'));
+ assert(text.includes('REAL WIN'));assert(!text.includes('PEER SECRET'));assert(!text.includes('PRIVATE CALL'));
+ w.renderClientWorkspace();await tick();assert(w.$('#coachReviewBrief'));assert(!invocation,'No paid generation without coach click');
+ let task=w.$('[data-brief-generate]').onclick();assert.equal(invocation.client_id,'a');release({data:{draft}});await task;
+ assert(w.$('[data-brief-draft]').textContent.includes('Completed session'));assert.equal(w.$('[data-brief-response]').value,draft.payload.suggested_response);
+ w.$('[data-brief-response]').value='My edited response';w.$('[data-brief-response]').dispatchEvent(new w.Event('input'));await w.$('[data-brief-generate]').onclick();assert(w.$('[data-brief-status]').textContent.includes('Save or copy'),'Regeneration preserves unsaved edits');
+ await w.$('[data-brief-save]').onclick();assert.equal(savePayload.suggested_response,'My edited response');assert(w.$('[data-brief-status]').textContent.includes('saved'));
+ await w.$('[data-brief-copy-response]').onclick();assert.equal(copy,1);
+ const review=w.document.createElement('form');review.dataset.coachReview='check-a';review.innerHTML='<textarea name="response_text"></textarea>';w.$('#clientWorkspaceBody').append(review);w.$('[data-brief-use]').click();assert.equal(review.elements.response_text.value,'My edited response');assert(w.$('[data-brief-status]').textContent.includes('nothing has been published'));
+ w.$('[data-brief-use]').click();assert(w.$('[data-brief-status]').textContent.includes('existing review text is kept'));
+ task=w.$('[data-brief-generate]').onclick();w.$('[data-brief-response]').value='Newer edit during generation';w.$('[data-brief-response]').dispatchEvent(new w.Event('input'));release({data:{draft:{...draft,id:'new-draft',payload:{...draft.payload,suggested_response:'Fresh generated response'}}}});await task;assert.equal(w.$('[data-brief-response]').value,'Newer edit during generation','Late generation never overwrites newer response edits');assert(w.$('[data-brief-status]').textContent.includes('newer response edits'));await w.$('[data-brief-save]').onclick();
+ task=w.$('[data-brief-generate]').onclick();state.clientTab='overview';w.$('#coachReviewBrief').remove();w.renderClientWorkspace();assert(w.$('[data-brief-generate]').disabled,'Pending request is shared across coach tabs');release({data:{draft:{...draft,payload:{...draft.payload,summary:'Fresh brief after tab switch'}}}});await task;assert(!w.$('[data-brief-generate]').disabled,'Returning request unlocks the current tab');assert(w.$('[data-brief-draft]').textContent.includes('Fresh brief after tab switch'));
+ fail=true;await w.$('[data-brief-generate]').onclick();assert(w.$('[data-brief-draft]').textContent.includes('Fresh brief after tab switch'),'Provider failure preserves saved draft');assert(w.$('[data-brief-status]').textContent.includes('unavailable'));
+ fail=false;task=w.$('[data-brief-prepare]').onclick();release({data:{context:{scope:'Saved sources'}}});await task;assert(!w.$('[data-brief-output]').hidden);assert.equal(invocation.action,'context');
+ task=w.$('[data-brief-generate]').onclick();state.user.id='other';release({data:{draft:{...draft,payload:{...draft.payload,summary:'STALE PRIVATE'}}}});await task;assert(!w.$('[data-brief-draft]').textContent.includes('STALE PRIVATE'));
+ w.$('#clientWorkspaceBody').innerHTML='';state.role='client';w.renderClientWorkspace();assert(!w.$('#coachReviewBrief'));
+ dom.window.close();console.log('PASS private AI brief: explicit generation, sourced result, editing, private save, no automatic publication, preserved drafts, stale owner and client denial');
+})().catch(e=>{console.error(e);process.exitCode=1;dom.window.close();});

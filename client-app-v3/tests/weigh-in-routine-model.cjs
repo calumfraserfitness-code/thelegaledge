@@ -1,0 +1,12 @@
+const assert=require('assert'),M=require('../weigh-in-routine-model.js');
+const client={id:'own',track_weight:true,timezone:'Europe/Dublin'},now='2026-11-08T18:00:00Z',row=(date,weight=80)=>({client_id:'own',entry_date:date,weight_kg:weight});
+let data={progress:[row('2026-11-03'),row('2026-11-05'),row('2026-11-07')],checkins:[{client_id:'own',submitted_at:'2026-11-07T12:00:00Z',weight_kg:80}]};
+let p=M.plan(client,data,{now});assert.equal(p.count,3);assert(p.complete&&p.weekendDone&&p.spreadDone);assert.equal(p.weekStart,'2026-11-02');assert.equal(p.weekEnd,'2026-11-08');
+p=M.plan(client,{progress:[row('2026-11-06'),row('2026-11-07'),row('2026-11-08')]},{now});assert.equal(p.count,3);assert(p.weekendDone&&!p.spreadDone&&!p.complete,'Consecutive end-week readings retain count but guidance requests spreading');
+p=M.plan(client,{progress:[row('2026-11-02'),row('2026-11-04'),row('2026-11-06')]},{now});assert.equal(p.count,3);assert(!p.weekendDone&&!p.complete);
+p=M.plan(client,{progress:[row('2026-11-03'),row('2026-11-03'),row('2026-11-09'),row('2026-11-01'),row('2026-11-04',null),row('2026-11-04',0),row('2026-11-05',true),{...row('2026-11-05'),client_id:'peer'},{entry_date:'2026-11-06',weight_kg:80}],checkins:[{client_id:'own',weight_kg:80,submitted_at:'invalid'}]},{now});assert.deepEqual(p.recordedDays,['2026-11-03']);
+assert.equal(M.plan({...client,track_weight:false},data,{now}),null);assert.equal(M.plan({...client,timezone:'invalid'},data,{now}),null);
+p=M.plan({...client,timezone:'America/New_York'},{checkins:[{client_id:'own',weight_kg:80,submitted_at:'2026-11-02T01:00:00Z'},{client_id:'own',weight_kg:80,submitted_at:'2026-11-09T01:00:00Z'}]},{now:'2026-11-09T02:00:00Z'});assert.deepEqual(p.recordedDays,['2026-11-08']);assert(p.weekendDone);assert.equal(p.weekStart,'2026-11-02');
+p=M.plan(client,{progress:[row('2026-11-03'),row('2026-11-05'),row('2026-11-07')]},{now:'2026-11-05T12:00:00Z'});assert.equal(p.count,2,'Future-dated rows do not count');
+p=M.plan(client,{progress:[{entry_date:'2026-11-03',weight_kg:80}]},{now,preview:true});assert.equal(p.count,1);
+console.log('PASS distinct own weigh-in days, local week/DST boundaries, no future/blank/peer counts, spaced weekend target, duplicates and explicit tracking choice.');

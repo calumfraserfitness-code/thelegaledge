@@ -97,17 +97,35 @@ function rpDemoForExercise(exercise){
 function rpDemoMarkup(demo){
  if(demo.parts)return `<section class="rp-demo"><p class="muted">Use the equipment and variation prescribed by your coach. These are separate technique examples.</p>${[...demo.parts.map(name=>rpTechniqueDemos.find(d=>d.name===name)),...(demo.links||[])].filter(Boolean).map(d=>`<h4>${esc(d.name)}</h4>${rpDemoMarkup(d)}`).join('')}</section>`;
 
- if(demo.sourceUrl)return `<section class="rp-demo"><a class="btn ghost small" href="${esc(demo.sourceUrl)}" target="_blank" rel="noopener noreferrer">▶ Watch ${demo.seconds?demo.seconds+"-second ":""}demo ↗</a><p class="muted">${esc(demo.source)} · opens the official demonstration. ${esc(demo.note||'')}</p></section>`;
+ if(demo.sourceUrl)return `<section class="rp-demo"><details><summary><b>Technique guide</b><small>Open guidance here</small></summary><p>${esc(demo.source)} · source reference; an in-app video has not been added for this movement.</p>${demo.cues.length?`<ol>${demo.cues.map(cue=>`<li>${esc(cue)}</li>`).join('')}</ol>`:''}<p>${esc(demo.note||'Follow your coach’s prescribed range and instructions.')}</p><a class="text-btn" href="${esc(demo.sourceUrl)}" target="_blank" rel="noopener noreferrer">Official source reference ↗</a></details></section>`;
  // Load only after opening: dozens of hidden players must not slow the planner.
  const url='https://www.youtube-nocookie.com/embed/'+demo.id+'?start=0&end=45&rel=0&playsinline=1';
  return `<section class="rp-demo"><details class="rp-video"><summary><span class="rp-play" aria-hidden="true">▶</span><span><b>Watch exercise demo</b><small>${esc(demo.source||'Renaissance Periodization')} · ${demo.seconds?demo.seconds+' seconds':'up to 45-second segment'}</small></span></summary><template><iframe src="${url}" title="${esc(demo.name)} — ${esc(demo.source||'Renaissance Periodization')} demonstration" loading="lazy" allow="encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></template><div class="rp-player-slot"></div><p class="muted">Follow your prescribed range and coach instructions.</p></details><h4>How to do it</h4><ol>${demo.cues.map(cue=>`<li>${esc(cue)}</li>`).join('')}</ol></section>`;
+}
+// Assigned routines play in full; a ten-minute routine must not become a demo excerpt.
+function assignedTrainingVideo(value){
+ try{const u=new URL(value);if(u.protocol!=='https:'||u.username||u.password)return null;
+ const host=u.hostname.toLowerCase();let id;
+ if(host==='youtu.be')id=u.pathname.slice(1);
+ else if(['youtube.com','www.youtube.com','m.youtube.com','youtube-nocookie.com','www.youtube-nocookie.com'].includes(host))id=u.searchParams.get('v')||u.pathname.match(/^\/(?:embed|shorts)\/([\w-]{11})\/?$/)?.[1];
+ if(/^[\w-]{11}$/.test(id||''))return 'https://www.youtube-nocookie.com/embed/'+id+'?rel=0&playsinline=1';
+ if(['vimeo.com','www.vimeo.com','player.vimeo.com'].includes(host)){id=u.pathname.match(/^\/(?:video\/)?(\d+)\/?$/)?.[1];if(id)return 'https://player.vimeo.com/video/'+id;}
+ if(['loom.com','www.loom.com'].includes(host)){id=u.pathname.match(/^\/(?:share|embed)\/([a-f0-9]{32})\/?$/i)?.[1];if(id)return 'https://www.loom.com/embed/'+id;}
+ return null;}catch{return null;}
+}
+function assignedTrainingVideoMarkup(exercise){
+ const src=assignedTrainingVideo(exercise.video_url||exercise.bank?.video_url);if(!src)return '';
+ return `<section class="rp-demo"><details class="rp-video"><summary><span class="rp-play" aria-hidden="true">▶</span><span><b>Watch coach-assigned video</b><small>Plays here · full routine</small></span></summary><template><iframe src="${esc(src)}" title="${esc(exercise.name)} — coach-assigned video" loading="lazy" allow="encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></template><div class="rp-player-slot"></div><p class="muted">Close this panel to stop playback. Follow your prescribed sets, range and coach instructions.</p></details></section>`;
 }
 const exerciseCardBeforeDemos=exerciseCard;
 exerciseCard=function(exercise,loggable=false){
  const demo=rpDemoForExercise(exercise);
  let html=exerciseCardBeforeDemos(exercise,loggable);
+ html=html.replace(/<a class="btn ghost small"[^>]*>Watch video<\/a>/,'');
+ const assigned=assignedTrainingVideoMarkup(exercise);
+ if(assigned)return html.replace(/<a class="btn ghost small"[^>]*>Watch video<\/a>/,'').replace('<div class="prescription-grid">',assigned+'<div class="prescription-grid">');
  if(!demo&&/^(?:steps|daily steps|brisk walk|walking|treadmill or outdoor walk|incline treadmill walk|easy run|comfortable bike|bike intervals)$/i.test(exercise.name||''))return html.replace('<span class="pill">NO VIDEO</span>','');
- if(!demo&&(exercise.video_url||exercise.bank?.video_url))return html;
+ if(!demo&&(exercise.video_url||exercise.bank?.video_url))return html.replace('<div class="prescription-grid">','<p class="source-gap">This video cannot play inside the app. Ask Calum for a supported video.</p><div class="prescription-grid">');
  if(!demo)return html.replace('<span class="pill">NO VIDEO</span>','<span class="pill">Demo not yet added</span>');
  html=html.replace(/<span class="pill">NO VIDEO<\/span>/,`<span class="pill">${demo.source||'RP'} technique demo</span>`);
  return html.replace('<div class="prescription-grid">',rpDemoMarkup(demo)+'<div class="prescription-grid">');

@@ -1,11 +1,12 @@
 /* Client-bound views and clear evidence for imported records. */
-let integrityLoadedClient=null;
+let integrityLoadedClient=null,integrityLoadSequence=0;
 const integrityLoad=loadClientData;
 loadClientData=async function(id){
+ const request=++integrityLoadSequence,user=state.user?.id,role=state.role;
  if(integrityLoadedClient!==id){state.data=emptyData();state.selectedNutritionPlanId=null;state.selectedNutritionDate=null;state.selectedSessionId=null;state.mealKind=null;state.mealBatchPortions=1;state.progressRange='all';state.foodUnits=state.client?.weight_unit==='kg'?'metric':'us';}
  integrityLoadedClient=null;
- await integrityLoad(id);
- if(state.client?.id!==id)return false;
+ const result=await integrityLoad(id);
+ if(result===false||request!==integrityLoadSequence||state.client?.id!==id||state.user?.id!==user||state.role!==role)return false;
  integrityLoadedClient=id;return true;
 };
 function legacyIntakeSections(record){

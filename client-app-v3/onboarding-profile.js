@@ -8,7 +8,7 @@ const profileSections=[
  ['pregnancy','Are you pregnant, recently postpartum, or returning after surgery?','yesno'],
  ['joint_condition','Do you have a bone, joint or muscle problem that activity could worsen?','yesno'],
  ['medication','Do you take medication that could affect exercise, appetite or recovery?','yesno'],
- ['health_details','Anything your coach should know about the answers above?','text'],
+ ['health_details','If you answered Yes above, briefly explain what Calum needs to know.','text'],
  ['injuries','Current pain, injuries or movement limitations — enter none if there are none.','text',true],
  ['medical_support','Relevant clinician advice or exercise restrictions, if any.','text']]},
  {key:'training',title:'Your training',intro:'Tell us what you have done before and what fits your week.',fields:[
@@ -22,21 +22,26 @@ const profileSections=[
  ['equipment','Where will you train and what equipment can you use?','text',true],
  ['gym_name','Gym name, if applicable','short'],['gym_location','Gym town or city','short'],
  ['training_barriers','What has stopped you staying consistent before?','text',true]]},
- {key:'nutrition',title:'Your nutrition',intro:'We will build around your preferences, schedule and comfort with tracking.',fields:[
+ {key:'nutrition',title:'Your nutrition',intro:'Describe what you eat now, then tell Calum what meals would work for you. Examples help; exact calorie numbers are not needed.',fields:[
  ['current_weight','Current body weight','number',true,1,1500],['weight_unit','Weight unit','select',true,['lb','kg']],
  ['height','Height','number',true,1,300],['height_unit','Height unit','select',true,['inches','cm']],
  ['nutrition_target_context','Relevant sex-related factors for energy estimates, if you are comfortable sharing','select',false,['Prefer not to say','Female','Male','Other / discuss with coach']],
- ['typical_eating','A normal day of food and drinks — breakfast, lunch, dinner and snacks','text',true],
- ['food_restrictions','Food allergies, intolerances and dietary requirements — enter none if there are none','text',true],
- ['foods_to_include','Foods and meals you enjoy','text',true],['foods_to_avoid','Foods you dislike or avoid','text'],
- ['meals_per_day','Preferred meals per day','number',true,1,8],
- ['meal_prep_time','Usual cooking time','select',true,['Under 15 minutes','Up to 30 minutes','Up to 60 minutes']],
- ['meal_routine','Kitchen access, food shopping and meal preparation routine','text',true],
- ['workday_meals','Meals out, business travel, late meetings and delivery habits','text',true],
- ['nutrition_approach','Which food approach feels manageable?','select',true,['Visual portions','Weighed ingredients','Calories and macros','Discuss with my coach']],
- ['nutrition_history','Previous diets or coaching: what worked and what did not?','text'],
- ['tracking_safety','Would calorie or weight tracking feel uncomfortable or unsuitable?','select',true,['No','Yes — please discuss privately','Not sure']],
- ['supplements','Current supplements, caffeine and usual water intake','text']]},
+ ['typical_eating','What did you eat and drink yesterday? List breakfast, lunch, dinner and snacks, with rough amounts.','text',true],
+ ['food_restrictions','Do you have any food allergies, intolerances, religious rules or dietary requirements? Write none if not.','text',true],
+ ['foods_to_include','Which foods or meals would you like included in your plan? Give a few examples.','text',true],['foods_to_avoid','Which foods do you dislike or never want in your plan? Write none if not.','text'],
+ ['meals_per_day','How many main meals would you like each day? Do not count snacks.','number',true,1,8],
+ ['meal_prep_time','How much time can you spend preparing one meal?','select',true,['Under 15 minutes','Up to 30 minutes','Up to 60 minutes']],
+ ['meal_routine','Can you cook at home and prepare leftovers for another day? Tell us what kitchen equipment you have.','text',true],
+ ['workday_meals','Where do you usually get lunch on a workday: home, packed lunch, restaurant or delivery? Name any regular places.','text',true],
+ ['nutrition_approach','How would you prefer your meal portions shown?','select',true,['Visual portions','Weighed ingredients','Calories and macros','Discuss with my coach']],
+ ['snack_preferences','Would you like snacks in your plan? What snacks do you enjoy?','text'],
+ ['food_budget','Any food budget or shopping limits Calum should plan around?','text'],
+ ['weekend_meals','How is weekend eating different from your workdays? Include takeaways or meals out.','text'],
+ ['caffeine','How many coffees, energy drinks or other caffeinated drinks do you usually have each day?','short'],
+ ['water_intake','Roughly how much water do you drink daily? Cups or bottles are fine.','short'],
+ ['nutrition_history','Have you tried a diet or meal plan before? What helped, and what was hard to keep doing?','text'],
+ ['tracking_safety','Would weighing food, counting calories or regular weigh-ins feel uncomfortable for you?','select',true,['No','Yes — please discuss privately','Not sure']],
+ ['supplements','Which supplements do you take, if any?','text']]},
  {key:'lifestyle',title:'Your lifestyle',intro:'The practical details help us make a plan you can use.',fields:[
  ['work_pattern','Work pattern','select',true,['Office','Hybrid','Remote','Shift work','Travel frequently','Other']],
  ['work_hours','Typical hours, commute and busiest days','text',true],
@@ -56,9 +61,9 @@ const profileSections=[
  ['non_negotiables','What must your plan make room for?','text',true],
  ['anything_else','Anything else you would like Calum to understand?','text']]}
 ];
-let profileDraft={},profileStep=0,profileLoad=0;
+let profileDraft={},profileStep=0,profileLoad=0,profileSubmitting=false;
 function profileField(f){const [name,label,type,required,min,max]=f,r=(required||type==='yesno')?'required':'',a=`name="${name}" ${r}`;
- const control=type==='text'?`<textarea ${a} rows="3"></textarea>`:type==='select'||type==='yesno'?`<select ${a}><option value="">Choose an answer</option>${(type==='yesno'?['no','yes']:min).map(v=>`<option value="${esc(v)}">${esc(v==='yes'?'Yes':v==='no'?'No':v)}</option>`).join('')}</select>`:`<input ${a} type="${type==='number'?'number':'text'}" ${type==='number'?`min="${min}" max="${max}" step="any"`:''}>`;
+ const control=type==='text'?`<textarea ${a} rows="3"></textarea>`:type==='select'||type==='yesno'?`<select ${a}><option value="">Choose an answer</option>${(type==='yesno'?['no','yes']:min).map(v=>`<option value="${esc(v)}">${esc(v==='yes'?'Yes':v==='no'?'No':({'Visual portions':'Simple portions: cups, handfuls and food counts','Weighed ingredients':'Ingredients weighed in grams or ounces','Calories and macros':'Calories and protein to aim for','Discuss with my coach':'Help me choose with Calum'}[v]||v))}</option>`).join('')}</select>`:`<input ${a} type="${type==='number'?'number':'text'}" ${type==='number'?`min="${min}" max="${max}" step="any"`:''}>`;
  return `<label class="${type==='text'||type==='yesno'?'wide':''}">${esc(label)}${required||type==='yesno'?'':' <small>Optional</small>'}${control}</label>`;}
 const originalJourneyWizard=renderOnboardingWizard;
 renderOnboardingWizard=function(){
@@ -69,27 +74,45 @@ renderOnboardingWizard=function(){
  if(!journeyDemo&&journeyCurrent?.stage==='intake')query('Saved profile',db.from('onboarding_drafts').select('responses,step').eq('client_id',state.client.id)).then(rows=>{if(request!==profileLoad||!$('#onboardingWizard'))return;const row=rows[0];if(!row)return;profileDraft=row.responses||{};profileStep=row.step||0;for(const [k,v] of Object.entries(profileDraft)){const field=$('#onboardingWizard').elements.namedItem(k);if(field)field.value=String(v??'');}$('#profileSave').textContent='Your saved answers have been restored.';window.profilePaint?.();}).catch(()=>{if(request===profileLoad&&$('#profileSave'))$('#profileSave').textContent='Unable to restore saved answers. Refresh before continuing if you saved earlier.';});
 };
 async function profileSave(step){
- const form=$('#onboardingWizard');profileDraft=Object.fromEntries(new FormData(form));profileStep=step;
- if(!journeyDemo&&journeyCurrent?.stage==='intake')await query('Save profile progress',db.from('onboarding_drafts').upsert({client_id:state.client.id,responses:profileDraft,step,updated_at:new Date().toISOString()},{onConflict:'client_id'}));
- $('#profileSave').textContent=journeyDemo?'Preview progress retained on this page.':'✓ Progress saved securely';
+ const form=$('#onboardingWizard');const answers=Object.fromEntries(new FormData(form)),clientId=state.client.id,userId=state.user?.id;
+ if(!journeyDemo&&journeyCurrent?.stage==='intake')await query('Save profile progress',db.from('onboarding_drafts').upsert({client_id:state.client.id,responses:answers,step,updated_at:new Date().toISOString()},{onConflict:'client_id'}));
+ if(!form.isConnected||state.client?.id!==clientId||state.user?.id!==userId)return false;profileDraft=answers;profileStep=step;
+ $('#profileSave').textContent=journeyDemo?'Preview progress retained on this page.':'✓ Progress saved securely';return true;
 }
-function profileValidate(grid){grid.querySelector('[name=health_details]')?.setCustomValidity('');const invalid=[...grid.querySelectorAll('input,textarea,select')].find(x=>!x.checkValidity());if(invalid){invalid.reportValidity();return false;}if(grid.dataset.profileSection==='health'&&[...grid.querySelectorAll('select')].some(x=>x.value==='yes')&&!grid.querySelector('[name=health_details]').value.trim()){grid.querySelector('[name=health_details]').setCustomValidity('Please add details for your coach to review.');grid.querySelector('[name=health_details]').reportValidity();return false;}return true;}
+function profileValidate(grid){
+ const details=grid.querySelector('[name=health_details]');details?.setCustomValidity('');
+ if(details&&[...grid.querySelectorAll('select')].some(x=>x.value==='yes')&&details.value.trim().length<3)details.setCustomValidity('Briefly explain your Yes answer so Calum can review it. Please use at least three characters.');
+ const invalid=[...grid.querySelectorAll('input,textarea,select')].find(x=>!x.checkValidity());
+ if(!invalid)return true;
+ const status=$('#profileSave');if(status){status.textContent=invalid===details?invalid.validationMessage:'Please complete: '+invalid.closest('label').childNodes[0].textContent.trim();status.style.color='var(--red)';}
+ invalid.setAttribute('aria-invalid','true');invalid.scrollIntoView({block:'center'});invalid.focus();invalid.reportValidity();return false;
+}
 journeyIntakePages=function(){
  const f=$('#onboardingWizard'),headings=[...f.querySelectorAll('h2')],grids=[...f.querySelectorAll('.editor-grid')],submit=f.querySelector('button[type=submit]');
- f.querySelector('[name=health_details]').oninput=e=>e.target.setCustomValidity('');
+ f.querySelector('[name=health_details]').oninput=e=>e.target.setCustomValidity('');f.addEventListener('input',e=>{e.target.removeAttribute('aria-invalid');$('#profileSave').style.color='';});
  const controls=document.createElement('div');controls.className='journey-intake-controls';controls.innerHTML='<button type="button" class="btn ghost" id="journeyBack">Back</button><button type="button" class="btn primary" id="journeyNext">Save & continue</button>';f.append(controls);
  function paint(){headings.forEach((h,i)=>h.hidden=i!==profileStep);grids.forEach((g,i)=>g.hidden=i!==profileStep);submit.hidden=profileStep!==grids.length-1;$('#journeyBack').hidden=profileStep===0;$('#journeyNext').hidden=profileStep===grids.length-1;$('#profileProgress').style.width=((profileStep+1)/grids.length*100)+'%';($('#journeyExisting .eyebrow')||$('#clientMain .eyebrow')).textContent=`COACHING PROFILE · ${profileStep+1} OF ${grids.length}`;}
  window.profilePaint=paint;
- $('#journeyBack').onclick=()=>{profileStep--;paint();f.scrollIntoView({block:'start'});};$('#journeyNext').onclick=async e=>{if(!profileValidate(grids[profileStep]))return;setBusy(e.target,true);try{await profileSave(profileStep+1);paint();f.scrollIntoView({block:'start'});}catch(err){toast(err.message,'error');}finally{setBusy(e.target,false);}};paint();
+ $('#journeyBack').onclick=()=>{profileStep--;paint();f.scrollIntoView({block:'start'});};$('#journeyNext').onclick=async e=>{if(!profileValidate(grids[profileStep]))return;setBusy(e.target,true);try{if(!await profileSave(profileStep+1))return;paint();f.scrollIntoView({block:'start'});}catch(err){toast(err.message,'error');}finally{setBusy(e.target,false);}};paint();
 };
 async function profileSubmit(e){
- e.preventDefault();const grids=[...e.target.querySelectorAll('.editor-grid')];for(let i=0;i<grids.length;i++){profileStep=i;window.profilePaint?.();if(!profileValidate(grids[i]))return;}
- const f=Object.fromEntries(new FormData(e.target)),sections={};for(const s of profileSections)sections[s.key]=Object.fromEntries(s.fields.map(([key])=>[key,f[key]??'']));
- // Existing coach exports read these section keys too.
- Object.assign(sections.training,{experience:f.training_experience,preferred_time:f.preferred_training_time,style:f.preferred_style,injuries:f.injuries});Object.assign(sections.nutrition,{restrictions:f.food_restrictions});sections.lifestyle.goals=f.goals;
- setBusy(e.submitter,true);try{if(journeyDemo){journeyCurrent.stage='review';journeyCurrent.intake_completed_at=new Date().toISOString();journeyCurrent.screening_status=profileSections[0].fields.filter(f=>f[2]==='yesno').some(([k])=>f[k]==='yes')?'needs_review':'no_flags';return renderJourney(journeyCurrent);}
- const now=new Date().toISOString();await query('Coaching profile',db.from('onboarding_responses').upsert({client_id:state.client.id,version:3,submitted_at:now,completed_at:now,responses:{sections}},{onConflict:'client_id,version'}));state.client.onboarding_status='complete';state.client.plan_status='coach_building';await renderClient();
- }catch(err){toast(err.message,'error');setBusy(e.submitter,false);}
+ e.preventDefault();if(profileSubmitting)return;
+ const form=e.target,grids=[...form.querySelectorAll('.editor-grid')],clientId=state.client.id,userId=state.user?.id;
+ const active=()=>form.isConnected&&state.client?.id===clientId&&state.user?.id===userId;
+ for(let i=0;i<grids.length;i++){profileStep=i;window.profilePaint?.();if(!profileValidate(grids[i]))return;}
+ const answers=Object.fromEntries(new FormData(form)),sections={};for(const section of profileSections)sections[section.key]=Object.fromEntries(section.fields.map(([key])=>[key,answers[key]??'']));
+ Object.assign(sections.training,{experience:answers.training_experience,preferred_time:answers.preferred_training_time,style:answers.preferred_style,injuries:answers.injuries});Object.assign(sections.nutrition,{restrictions:answers.food_restrictions});sections.lifestyle.goals=answers.goals;
+ profileSubmitting=true;setBusy(e.submitter,true,'Sending profile…');$('#profileSave').textContent='Sending your profile to Calum…';
+ try{
+  if(journeyDemo){journeyCurrent.stage='review';journeyCurrent.intake_completed_at=new Date().toISOString();journeyCurrent.screening_status=profileSections[0].fields.filter(field=>field[2]==='yesno').some(([key])=>answers[key]==='yes')?'needs_review':'no_flags';return renderJourney(journeyCurrent);}
+  const now=new Date().toISOString();const saved=await query('Coaching profile',db.from('onboarding_responses').upsert({client_id:clientId,version:3,submitted_at:now,completed_at:now,responses:{sections}},{onConflict:'client_id,version'}).select('id,client_id,completed_at').single());
+  if(saved?.client_id!==clientId||!saved.id||!saved.completed_at)throw Error('Your profile submission was not confirmed. Your answers are still here; please retry.');
+  if(!active())return;state.client.onboarding_status='complete';state.client.plan_status='coach_building';await renderClient();
+ }catch(err){
+  if(!active())return;
+  if(/health screening|health.*details/i.test(err.message)){profileStep=0;window.profilePaint?.();}
+  $('#profileSave').textContent='Not submitted yet: '+err.message;$('#profileSave').style.color='var(--red)';$('#profileSave').scrollIntoView({block:'center'});toast(err.message,'error');
+ }finally{profileSubmitting=false;if(e.submitter?.isConnected)setBusy(e.submitter,false);}
 }
 const originalJourneyLegal=renderLegalGate;
 renderLegalGate=function(){
