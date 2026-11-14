@@ -25,3 +25,10 @@ let pulse=vm.runInContext('sharedSamplePulse()',ctx);assert.equal(pulse.count,6)
 ctx.firmState.consents.splice(0,2);pulse=vm.runInContext('sharedSamplePulse()',ctx);assert.equal(pulse.suppressed,true);assert.equal(pulse.energy,null);
 ctx.firmState.consents.push({participant_id:'member-0'},{participant_id:'member-1'});ctx.state.sampleClientData.get('person-0').checkins[0].period_start='2026-09-21';assert.equal(vm.runInContext('sharedSamplePulse().count',ctx),5);
 console.log('PASS: shared sample reporting uses current-week consented records, actual metric keys, no private text and five-response suppression.');
+
+ctx.URL=URL;
+assert.equal(vm.runInContext("coachingJoinUrl('https://us06web.zoom.us/j/85632118333?pwd=example&jst=2&mynotes=on')",ctx),'https://us06web.zoom.us/j/85632118333?pwd=example');
+for(const link of ['javascript:alert(1)','https://zoom.us.evil.test/j/85632118333','https://us06web.zoom.us/launch/jc/85632118333','https://us06web.zoom.us/s/85632118333','https://x:y@zoom.us/j/85632118333'])assert.equal(vm.runInContext(`coachingJoinUrl(${JSON.stringify(link)})`,ctx),'');
+ctx.state.data.coachingCalls=[{title:'Call',scheduled_at:'2026-11-20T14:00:00Z',duration_minutes:30,status:'scheduled',join_url:'https://evil.test/meeting'}];
+assert.match(vm.runInContext('coachingCallsMarkup()',ctx),/Meeting link needs checking/);
+console.log('PASS Zoom participant links preserve passcodes, reject host/chat/foreign links and surface missing links.');

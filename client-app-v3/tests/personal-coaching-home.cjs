@@ -10,6 +10,8 @@ Object.assign(w,{$:s=>w.document.querySelector(s),esc,db:{from:chain},query:()=>
 vm.runInContext(fs.readFileSync(__dirname+'/../checkin-status-model.js','utf8'),dom.getInternalVMContext());
 const date=w.CheckinStatus.localDate(new Date(),'Europe/Dublin'),period=w.CheckinStatus.week(w.state.client),fixed=new Date('2026-11-02T12:00:00Z');
 w.state.data.weeks=[{id:'week-a',client_id:'a',published:true,week_start:period,coach_note:'Keep two manageable sessions.'},{id:'peer-week',client_id:'peer',published:true,week_start:period,coach_note:'PRIVATE PEER FOCUS'}];
+// This case exercises session navigation, irrespective of the real weekday deadline.
+w.state.data.checkins=[{id:'current-checkin',client_id:'a',period_start:period,submitted_at:date+'T12:00:00Z'}];
 w.state.data.sessions=[{id:'first',week_id:'week-a',title:'First unfinished session',session_date:period,status:'planned',training_type:'weights'},{id:'next',week_id:'week-a',title:'Second session',session_date:date,status:'planned',training_type:'weights'},{id:'peer',week_id:'peer-week',title:'PRIVATE PEER SESSION',session_date:period,status:'planned',training_type:'weights'}];
 vm.runInContext(fs.readFileSync(__dirname+'/../personal-coaching-home.js','utf8'),dom.getInternalVMContext());
 const tick=()=>new Promise(r=>setImmediate(r));
