@@ -17,7 +17,27 @@
   const goal=String(client.goal_summary||goals[0]?.title||'').trim();
   const checkinDue=!saved&&due&&+due<=+now;
   const action=checkinDue?{route:'checkin',label:'Complete your check-in',title:'Let Calum know how your week went.',detail:'Your saved check-in helps shape your next coaching review.'}:next?{route:'training',session:next.id,category:daily(next)?'mobility':next.training_type==='cardio'?'cardio':'weights',label:'Open session',title:next.title||'Your next session',detail:daily(next)?'Tick each practice when you finish. Earlier days stay saved.':'Complete when ready. Your session order is a guide, not a fixed day.'}:week&&sessions.length?{route:'progress',label:'View your progress',title:'Your recorded progress, in one place.',detail:'Your assigned sessions are complete. Review your progress or open Training for practice and extra activity.'}:{route:'support',label:'Open Coach',title:'Your coaching hub is here.',detail:week?'Your current week has no assigned sessions yet. Open Coach for your saved guidance.':'The current week has not been published yet. Your saved feedback and previous work remain available.'};
-  return {date,week,goal,action,focus:String(week?.coach_note||'').trim(),saved,goals};
+  return {date,week,goal,action,next,savedDue:due,focus:String(week?.coach_note||'').trim(),saved,goals};
+ }
+ function checkinMarkup(m,c){
+  const label=c.weekly_checkin_enabled===false?'Not scheduled':m.saved?m.saved.reviewed_at?'Reviewed':'Submitted to Calum':m.savedDue&&+m.savedDue<=Date.now()?'Ready to send':'Your weekly check-in';
+  const detail=m.saved?'Saved '+M.stamp(m.saved.submitted_at,c.timezone||'Europe/Dublin'):m.savedDue?'Due '+M.stamp(m.savedDue,c.timezone||'Europe/Dublin'):c.weekly_checkin_enabled===false?'Use Coach for your agreed support.':'Calum needs to confirm your check-in deadline.';
+  return '<section class="panel pch-checkin"><span class="eyebrow">YOUR CHECK-IN</span><h2>'+esc(label)+'</h2><p>'+esc(detail)+'</p><button type="button" class="btn ghost" data-pch-checkin>'+(m.saved?'View saved check-in':'Open check-in')+'</button><small>Quick scores and a message. Add more detail when it helps.</small></section>';
+ }
+ function milestoneMarkup(m,c){
+  const g=m.goals.find(g=>g.target!==null&&g.target!==''&&g.target!==undefined&&Number.isFinite(Number(g.target)));
+  let text='<p>Your next measurable target will appear when it is agreed with Calum.</p>';
+  if(g){
+   let value=null;try{if(typeof coachingGoalValue==='function')value=coachingGoalValue(g);}catch{}
+   const factor=g.metric==='weight_kg'&&c.weight_unit==='lbs'?2.2046226218:1,unit=factor!==1?'lb':g.unit||'',display=v=>Number((Number(v)*factor).toFixed(1));
+   const known=value!==null&&value!==undefined&&value!==''&&Number.isFinite(Number(value));
+   text='<h3>'+esc(g.title)+'</h3><p><strong>'+(known?esc(display(value)):'Awaiting a recorded measurement')+'</strong> · target '+esc(display(g.target))+' '+esc(unit)+'</p>';
+   if(known&&g.baseline!==null&&g.baseline!==undefined&&g.baseline!==''&&Number.isFinite(Number(g.baseline))&&typeof coachingGoalPercent==='function'){
+    const pct=coachingGoalPercent(g,value);text+='<progress max="100" value="'+pct+'" aria-label="'+esc(g.title)+' progress"></progress>';
+   }
+   text+='<small>'+(g.target_date?'Target date '+esc(g.target_date):'Target date to agree')+' · based on your saved progress</small>';
+  }
+  return '<section class="panel pch-milestone"><span class="eyebrow">YOUR NEXT MILESTONE</span>'+text+(m.week?'<p class="muted">Current published programme'+(m.week.week_number?' · week '+esc(m.week.week_number):'')+'</p>':'')+'<button type="button" class="text-btn" data-pch-progress>View goals & recorded progress</button></section>';
  }
  function eligible(){return !!state.client&&['client','coach'].includes(state.role)&&state.clientView==='today'&&state.client.onboarding_status==='complete';}
  function route(view){state.clientView=view;renderClient();}
@@ -53,9 +73,11 @@
   let m;try{m=model(state.client,state.data);}catch{return;}
   const client=state.client.id,user=state.user?.id,root=document.createElement('div');root.id='personalCoachingHome';root.className='pch-home';
   const name=String(state.client.display_name||'').trim().split(/\s+/)[0];
-  root.innerHTML='<header class="pch-heading"><span class="eyebrow">YOUR PERSONAL COACHING</span><h1>'+esc(name?name+', here’s your focus.':'Your coaching, made clear.')+'</h1><p>One clear next step. Calum’s guidance, around your week.</p></header><section class="panel pch-goal"><span class="eyebrow">YOUR CURRENT GOAL</span><h2>'+esc(m.goal||'Your goals, agreed with Calum.')+'</h2>'+(m.goal?'':'<p>Open Coach to review your saved goals and agree your next target.</p>')+'</section><div data-pch-video hidden></div><section class="panel pch-focus" data-pch-focus></section><section class="panel pch-next"><span class="eyebrow">YOUR NEXT STEP</span><h2>'+esc(m.action.title)+'</h2><p>'+esc(m.action.detail)+'</p><button type="button" class="btn primary" data-pch-next>'+esc(m.action.label)+'</button></section><details class="pch-secondary" data-pch-secondary><summary><span>Your plan & progress</span><small>Meals, check-in, training and saved activity</small></summary><div data-pch-secondary-content></div></details>';
+  root.innerHTML='<header class="pch-heading"><span class="eyebrow">YOUR PERSONAL COACHING</span><h1>'+esc(name?name+', here’s your focus.':'Your coaching, made clear.')+'</h1><p>One clear next step. Calum’s guidance, around your week.</p></header><section class="panel pch-goal"><span class="eyebrow">YOUR CURRENT GOAL</span><h2>'+esc(m.goal||'Your goals, agreed with Calum.')+'</h2>'+(m.goal?'':'<p>Open Coach to review your saved goals and agree your next target.</p>')+'</section><div data-pch-video hidden></div><section class="panel pch-focus" data-pch-focus></section><section class="panel pch-next"><span class="eyebrow">YOUR NEXT STEP</span><h2>'+esc(m.action.title)+'</h2><p>'+esc(m.action.detail)+'</p><button type="button" class="btn primary" data-pch-next>'+esc(m.action.label)+'</button></section>'+checkinMarkup(m,state.client)+milestoneMarkup(m,state.client)+'<details class="pch-secondary" data-pch-secondary><summary><span>Your plan & progress</span><small>Meals, check-in, training and saved activity</small></summary><div data-pch-secondary-content></div></details>';
   host.prepend(root);const active=()=>root.isConnected&&eligible()&&state.user?.id===user&&state.client?.id===client;
   root.querySelector('[data-pch-next]').onclick=()=>{if(!active())return;if(m.action.session){state.selectedSessionId=m.action.session;state.trainingCategory=m.action.category;}route(m.action.route);};
+  root.querySelector('[data-pch-checkin]').onclick=()=>{if(active())route('checkin');};
+  root.querySelector('[data-pch-progress]').onclick=()=>{if(active())route('progress');};
   arrange();watch();focus(root,m);
  }
  const today=clientToday;clientToday=function(){const result=today();mount();return result;};

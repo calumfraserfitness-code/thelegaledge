@@ -1,0 +1,13 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert'),{JSDOM}=require('jsdom');
+const dom=new JSDOM('<main id="coachMain"><section id="priorityAttention"></section></main>',{runScripts:'outside-only'}),w=dom.window;let requests=[],resolve;
+Object.assign(w,{$:s=>w.document.querySelector(s),renderCoach(){},state:{role:'coach',user:{id:'coach'},client:null,coachView:'dashboard',clients:[{id:'c',display_name:'Synthetic client',portal_enabled:true}]},CheckinStatus:{stamp:x=>x},query:(_,q)=>{requests.push(q);return new Promise(r=>resolve=r);},db:{from(table){const q={table,filters:[],select(){return q},eq(k,v){q.filters.push([k,v]);return q},gte(){return q},lte(){return q},order(){return q},limit(){return q}};return q;}}});
+const tick=()=>new Promise(r=>setImmediate(r));
+vm.runInContext(fs.readFileSync(__dirname+'/../coach-home-focus.js','utf8'),dom.getInternalVMContext());
+function paint(){w.$('#priorityAttention').dataset.homeCheckins=JSON.stringify({available:true,pending_available:true,rows:[{id:'check',client_id:'c',source_system:'client_weekly_v3',submitted_at:'2026-11-12T14:09:00Z',reviewed_at:null}],actions:[{client_id:'c',notes:['Current published week missing']}]});w.CoachHomeFocus.mount();}
+(async()=>{
+ paint();assert.equal(requests.length,0,'Home must not fetch call metadata until requested');assert(w.$('.home-next-actions').textContent.includes('published week missing'));
+ const button=w.$('.home-checkin-row>.text-btn');button.click();assert.equal(requests.length,1);assert(requests[0].filters.some(([k,v])=>k==='coach_id'&&v==='coach'));assert(requests[0].filters.some(([k,v])=>k==='client_id'&&v==='c'));resolve([{id:'call',client_id:'c',coach_id:'coach',occurred_at:'2026-11-13T14:00:00Z'}]);await tick();assert(w.$('.home-call-coverage').textContent.includes('until you confirm'));assert(w.$('.home-checkin-badge').textContent.includes('Awaiting'));
+ button.click();resolve([{client_id:'peer',coach_id:'coach',occurred_at:'2026-11-13T14:00:00Z'}]);await tick();assert(w.$('.home-call-coverage').textContent.includes('unavailable'));assert(!w.$('.home-call-coverage').textContent.includes('peer'));
+ button.click();w.state.user.id='other';resolve([{client_id:'c',coach_id:'coach',occurred_at:'2026-11-13T14:00:00Z'}]);await tick();assert(!w.$('.home-call-coverage').textContent.includes('A matched call'));
+ dom.window.close();console.log('PASS on-demand owned call evidence, retained pending review, visible plan gaps, peer rejection and account-switch guard');
+})().catch(e=>{console.error(e);dom.window.close();process.exitCode=1});

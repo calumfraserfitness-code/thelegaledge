@@ -89,7 +89,8 @@
     "roadmap-call-review.js",
     "coach-roadmaps.js",
     "recovery-trends.js",
-    "coach-change-log.js"
+    "coach-change-log.js",
+    "checkin-quick-view.js"
   ],
   "styles": [
     "app.css",
