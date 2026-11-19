@@ -10,10 +10,11 @@
  function publishedWeek(d){
   return state.data.weeks.find(w=>(w.published||state.preview)&&(!w.client_id||w.client_id===state.client.id)&&d>=w.week_start&&d<=iso(new Date(new Date(w.week_start+'T12:00:00Z').getTime()+6*864e5)));
  }
- function date(){
+ function defaultDate(){
   const today=localCoachingDate(),start=state.client?.start_date;
-  return dateChoice||state.selectedNutritionDate||(start>today&&publishedWeek(start)?start:today);
+  return start>today&&publishedWeek(start)?start:today;
  }
+ function date(){return dateChoice||state.selectedNutritionDate||defaultDate();}
  function current(){
   const d=date(),w=publishedWeek(d);
   const day=w?state.data.nutritionDays.find(n=>n.week_id===w.id&&n.nutrition_date===d):null;
@@ -98,11 +99,15 @@
    return '<button type="button" class="btn small '+(selected?'primary':'ghost')+'" data-dn-date="'+esc(d.nutrition_date)+'"'+(selected?' aria-current="true"':'')+'>'+esc(label)+'</button>';
   }).join('')+'</nav>':'';
 
+  const guide=(state.data.coachingGuidance||[]).find(g=>g.client_id===state.client.id&&g.published&&g.category==='eating_out'&&g.body?.trim());
+  const rushGuide=guide?'<details class="dn-rush-guide"><summary>In a rush? <small>Late at work · Takeaway · Eating out</small></summary>'+guide.body.split(/\n\s*\n/).map(note=>'<p>'+esc(note)+'</p>').join('')+'</details>':'';
+  const firstDate=defaultDate();
   state.foodUnits=state.foodUnits||(state.client?.weight_unit==='kg'?'metric':'us');
-  host().innerHTML=`<div class="dn-page"><header class="dn-heading"><div><span class="eyebrow">YOUR NUTRITION</span><h1>Food that fits your day.</h1><p>Choose your meals. Keep it simple.</p></div><button class="btn ghost small" id="dnLibrary">Recipe library</button></header>
+  host().innerHTML=`<div class="dn-page"><header class="dn-heading"><div><span class="eyebrow">YOUR NUTRITION</span><h1>Your meals</h1></div><button class="btn ghost small" id="dnLibrary">Recipe library</button></header>
    ${menuPicker}
+   ${rushGuide}
    ${portionControls('dnPageUnits')}
-   <div class="dn-date-row"><div><span class="dn-dot"></span><strong>${m.date===today?'Today':fmt(m.date,{weekday:'long'})}</strong><span>${fmt(m.date,{day:'numeric',month:'long'})}</span></div><details class="dn-history"><summary>Past logs & another date</summary><label class="dn-date-label">View date<input id="dnDate" type="date" value="${m.date}"></label></details>${m.date!==today?'<button class="text-btn" id="dnToday">Back to today</button>':''}</div>
+   <div class="dn-date-row"><div><span class="dn-dot"></span><strong>${m.date===today?'Today':fmt(m.date,{weekday:'long'})}</strong><span>${fmt(m.date,{day:'numeric',month:'long'})}</span></div><details class="dn-history"><summary>Past logs & another date</summary><label class="dn-date-label">View date<input id="dnDate" type="date" value="${m.date}"></label></details>${m.date!==firstDate?'<button class="text-btn" id="dnToday">'+(firstDate===today?'Back to today':'Back to first day')+'</button>':''}</div>
    <section class="dn-target-panel" aria-label="Daily targets"><div class="dn-target-intro"><span class="eyebrow">YOUR DAILY TARGETS</span><span>${m.plan?esc(m.plan.name||m.plan.day_type||'Assigned plan'):'Coach targets'}</span></div><div class="dn-targets">${M.fields.map((k,i)=>`<div><small>${['Calories','Protein','Carbs','Fat'][i]}</small><strong>${k==='calories'&&m.range?Number(m.range.calorie_min).toLocaleString()+'–'+Number(m.range.calorie_max).toLocaleString():m.targets[k]===null?'To agree':Math.round(m.targets[k]).toLocaleString()}<em>${m.targets[k]===null?'':['kcal','g','g','g'][i]}</em></strong></div>`).join('')}</div></section>
    ${m.range?'<p class="dn-notice">Temporary weekday range agreed with Calum. Comparisons use the upper limit. Older recipe portions need review; carbohydrate and fat targets are not yet agreed for this range. Protein remains the saved coaching target.</p>':''}<section class="dn-intake"><div><span class="eyebrow">LOGGED SO FAR</span><strong>${value(consumed.calories,' kcal')} <small>${m.targets.calories===null?'':`of ${Math.round(m.targets.calories).toLocaleString()} kcal`}</small></strong><p>${eaten} ${eaten===1?'meal':'meals'} logged${m.rows.length?` · ${m.rows.length-eaten} still to go`:''}</p></div><div class="dn-progress-bars">${M.fields.slice(1).map((k,i)=>{const ratio=m.targets[k]>0&&consumed[k]!==null?Math.min(100,consumed[k]/m.targets[k]*100):0;return `<div><span>${['Protein','Carbs','Fat'][i]}</span><b>${value(consumed[k],'g')} ${m.targets[k]===null?'':`/ ${Math.round(m.targets[k])}g`}</b><div class="dn-track"><span style="width:${ratio}%"></span></div></div>`;}).join('')}</div></section>
    ${loadError?`<div class="dn-notice" role="status">${esc(loadError)} <button class="text-btn" id="dnRetry">Retry</button></div>`:!loaded?'<p class="muted" role="status">Loading your saved food log…</p>':''}
@@ -115,8 +120,7 @@
 
    <div id="dnSheetHost"></div></div>`;
   const intake=host().querySelector('.dn-intake');
-  if(intake){const optional=document.createElement('details');optional.className='dn-optional-tracking';optional.open=eaten>0;optional.innerHTML='<summary>Optional food tracking</summary><p>Use this only if tracking helps you or Calum has asked you to. No logs does not mean no food eaten. Your meals, targets and weekly check-in still work without daily logging.</p>';intake.before(optional);optional.append(intake);const count=intake.querySelector('p');if(count)count.textContent=eaten+' '+(eaten===1?'meal':'meals')+' logged · not a complete intake record';}
-  const mealsHeading=host().querySelector('.dn-section-heading');if(mealsHeading){const note=document.createElement('p');note.className='dn-optional-tracking';note.textContent='Follow your agreed meals and use swaps when useful. You do not need to log food every day to use your plan or see strength progress.';mealsHeading.before(note);}
+  if(intake){const optional=document.createElement('details');optional.className='dn-optional-tracking';optional.open=eaten>0;optional.innerHTML='<summary>Food log</summary>'+(portionMenu?'':'<p>Use the log when it helps. No logs does not mean no food eaten.</p>');intake.before(optional);optional.append(intake);const count=intake.querySelector('p');if(count)count.textContent=eaten+' '+(eaten===1?'meal':'meals')+' logged · not a complete intake record';}
   $('#dnLibrary').onclick=()=>openLibrary();$('#dnEmptyLibrary')?.addEventListener('click',()=>openLibrary());
   $('#dnPageUnits').onchange=e=>{saveUnits(e.target.value);paint();};
   $('#dnDate').onchange=e=>{if(e.target.value)changeDate(e.target.value);};

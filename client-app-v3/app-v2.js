@@ -1550,7 +1550,7 @@ function cardioLogForm(session) {
   const actual=session?.source_metadata?.cardio_log||{},own=!session;
   const opts=['Run','Walk','Incline treadmill','Cycling','Spin','Swimming','Rowing','Elliptical','Boxing'];
   const name=String(session?.title||'').toLowerCase();
-  const suggested=actual.activity||(name.includes('treadmill')?'Incline treadmill':opts.find(x=>name.includes(x.toLowerCase()))||(/cycl|bike/.test(name)?'Cycling':/swim/.test(name)?'Swimming':/row/.test(name)?'Rowing':''));
+  const suggested=actual.activity||(name.includes('treadmill')?'Incline treadmill':opts.find(x=>name.includes(x.toLowerCase()))||(/cycl|bike|peloton/.test(name)?'Cycling':/swim/.test(name)?'Swimming':/row/.test(name)?'Rowing':''));
   const list='cardio-activities-'+(session?.id||'extra');
   let date;try{date=window.CheckinStatus.localDate(new Date(),state.client?.timezone||'Europe/Dublin');}catch{date=iso(new Date());}
   return `<form class="cardio-entry-form" data-cardio-id="${session?.id||''}">
@@ -1571,7 +1571,7 @@ function cardioLogForm(session) {
 function cardioLogCard(session,open=false) {
  const a=session.source_metadata?.cardio_log,manual=session.source_system==='client_manual_cardio',complete=session.status==='completed';
  return `<article class="activity-session cardio-simple"><div class="panel-head"><h3>${esc(session.title)}</h3><span class="pill">${complete?'Completed':'To do'}</span></div>
- ${!manual?`<p class="activity-rx"><strong>Coach’s plan:</strong> ${session.duration_minutes?esc(session.duration_minutes)+' min · ':''}${session.distance_km?esc(session.distance_km)+' km · ':''}${esc(session.zone||'')}${session.heart_rate_target?' · '+esc(session.heart_rate_target):''}</p><p class="muted">Complete when it suits you. Record what you actually did.</p>`:''}
+ ${!manual?`<p class="activity-rx"><strong>Coach’s plan:</strong> ${session.duration_minutes?esc(session.duration_minutes)+' min · ':''}${session.distance_km?esc(session.distance_km)+' km · ':''}${esc(session.zone||'')}${session.heart_rate_target?' · '+esc(session.heart_rate_target):''}</p>${session.notes?'<p>'+esc(session.notes)+'</p>':''}<p class="muted">Complete when it suits you. Record what you actually did.</p>`:''}
  ${a?`<p class="cardio-saved-result"><strong>Saved:</strong> ${esc(a.activity)} · ${esc(a.duration_minutes)} min${a.distance_km!=null?' · '+esc(a.distance_km)+' km':''}</p>`:complete?'<p>Marked complete. No cardio time has been recorded yet.</p>':''}
  ${manual?'<p class="muted">'+esc(fmt(session.session_date))+' · Extra session</p>':''}
  <details class="cardio-log-toggle" ${open?'open':''}><summary>${a?'Edit saved cardio':complete?'Add completed time':'Log this session'}</summary>${cardioLogForm(session)}</details></article>`;
@@ -1586,8 +1586,8 @@ function bindCardioLogForms() {
    const id=form.dataset.cardioId;
    const session=state.data.sessions.find(x=>x.id===id);
    if(id&&!session)return toast('Session unavailable. Reload Training.', 'error');
-   const week=currentWeek();
-   if (!week?.published) return toast('Your current week must be published first.', 'error');
+   const week=session?clientTrainingWeek():currentWeek();
+   if (!week?.published||(session&&session.week_id!==week.id)) return toast('Open a published training session to log cardio.', 'error');
    const duration=Number(fd.get('duration'));
    if (!Number.isFinite(duration)||duration<1||duration>1440) return toast('Enter a valid duration.', 'error');
    const distanceText=String(fd.get('distance')||'');
@@ -1639,7 +1639,7 @@ function clientTrainingWeek() {
 function clientTraining() {
   const week = clientTrainingWeek();
   const upcoming = week && week.id !== currentWeek()?.id;
-  const startNote=upcoming?`<p class="training-start-note">Week starting ${esc(fmt(state.client.start_date,{weekday:'long',day:'numeric',month:'long'}))}. You can look through it now and log workouts when the week starts.</p>`:'';
+  const startNote=upcoming?`<p class="training-start-note">Week starting ${esc(fmt(state.client.start_date,{weekday:'long',day:'numeric',month:'long'}))}. You can log a workout as soon as you do it.</p>`:'';
 
   const allSessions = state.data.sessions.filter((session) => week?.published && session.week_id === week.id);
   const categories = [
@@ -1649,15 +1649,10 @@ function clientTraining() {
   ];
   const categoryTabs = `<div class="training-category-tabs">${categories.map(([key, label, count]) => `<button type="button" data-training-category="${key}" class="${state.trainingCategory === key ? 'active' : ''}"><b>${label}</b><span>${count}</span></button>`).join('')}</div>`;
   if (state.trainingCategory === 'steps') state.trainingCategory = 'weights';
-  if (upcoming&&state.trainingCategory === 'cardio') {
-    const assigned=allSessions.filter(s=>s.training_type==='cardio');
-    $('#clientMain').innerHTML=clientHeader('','Training & activity','')+startNote+categoryTabs+`<section class="panel"><h2>Cardio</h2>${assigned.map(s=>`<article class="activity-session"><h3>${esc(s.title)}</h3><p>${esc(fmt(s.session_date,{weekday:'long'}))}${s.duration_minutes?' · '+esc(s.duration_minutes)+' minutes':''}</p><p>${esc(s.notes||'')}</p></article>`).join('')||'<p>No cardio assigned for this week.</p>'}</section>`;
-    return bindTrainingCategoryTabs();
-  }
   if (state.trainingCategory === 'cardio') {
     const sessions=allSessions.filter(session=>session.training_type==='cardio').sort((a,b)=>a.session_date.localeCompare(b.session_date));
     const pending=sessions.filter(s=>s.status!=='completed'),completed=sessions.filter(s=>s.status==='completed');
-    $('#clientMain').innerHTML=clientHeader('','Training & activity','Choose a session, enter your minutes and save.')+categoryTabs+`<p id="cardioSaveStatus" role="status" aria-live="polite"></p><section class="panel"><h2>Your cardio sessions</h2><p class="muted">Work through these whenever you can. Saving your time completes the session.</p><div class="activity-list">${pending.map((s,i)=>cardioLogCard(s,i===0||s.id===state.selectedSessionId)).join('')||'<p>No assigned cardio left to log.</p>'}</div></section><details class="panel cardio-own"><summary>+ Log extra cardio</summary><p>For an additional session you did yourself.</p>${cardioLogForm(null)}</details>${completed.length?`<details class="panel cardio-history"><summary>Saved cardio (${completed.length})</summary>${completed.map(s=>cardioLogCard(s)).join('')}</details>`:''}`;
+    $('#clientMain').innerHTML=clientHeader('','Training & activity','Choose a session, enter your minutes and save.')+startNote+categoryTabs+`<p id="cardioSaveStatus" role="status" aria-live="polite"></p><section class="panel"><h2>Your cardio sessions</h2><p class="muted">Work through these whenever you can. Saving your time completes the session.</p><div class="activity-list">${pending.map((s,i)=>cardioLogCard(s,i===0||s.id===state.selectedSessionId)).join('')||'<p>No assigned cardio left to log.</p>'}</div></section>${currentWeek()?.published?`<details class="panel cardio-own"><summary>+ Log extra cardio</summary><p>For an additional session you did yourself.</p>${cardioLogForm(null)}</details>`:''}${completed.length?`<details class="panel cardio-history"><summary>Saved cardio (${completed.length})</summary>${completed.map(s=>cardioLogCard(s)).join('')}</details>`:''}`;
     bindTrainingCategoryTabs();
     bindCardioLogForms();
     return;
@@ -1673,7 +1668,7 @@ function clientTraining() {
     $('#clientMain').innerHTML = clientHeader('', 'Training & activity', 'Your workouts, cardio and mobility. Daily step goals are in Schedule.') + startNote + categoryTabs + `<div class="session-picker">${sessions.map((session) => `<button class="session-tile" data-open-session="${session.id}"><span>${fmt(session.session_date, { weekday: 'short', day: 'numeric', month: 'short' })}</span><strong>${esc(session.title)}</strong><small>${exercisesForSession(session).length} exercises · ${session.status === 'completed' ? 'Completed' : 'Planned'}</small></button>`).join('') || '<div class="empty">No weights or resistance session is scheduled this week.</div>'}</div>`;
     bindTrainingCategoryTabs(); return bindOpenSessions();
   }
-  $('#clientMain').innerHTML = `<button class="text-btn back-to-sessions" id="backToSessions">← All sessions</button>` + clientHeader('', selected.title, 'Complete when ready. Session numbers show programme order, not fixed weekdays.') + startNote + categoryTabs + `<section class="panel workout"><div class="panel-head"><div><h2>Workout prescription</h2><span class="sub">${exercisesForSession(selected).length} exercises</span></div>${upcoming?'':taskMarkup(selected)}</div>${exercisesForSession(selected).map((exercise) => exerciseCard(exercise, !upcoming)).join('') || '<div class="empty">No exercise prescription is attached to this workout.</div>'}</section>`;
+  $('#clientMain').innerHTML = `<button class="text-btn back-to-sessions" id="backToSessions">← All sessions</button>` + clientHeader('', selected.title, 'Complete when ready. Session numbers show programme order, not fixed weekdays.') + startNote + categoryTabs + `<section class="panel workout"><div class="panel-head"><div><h2>Log your workout</h2><span class="sub">${exercisesForSession(selected).length} exercises</span></div>${taskMarkup(selected)}</div>${exercisesForSession(selected).map((exercise) => exerciseCard(exercise, true)).join('') || '<div class="empty">No exercise prescription is attached to this workout.</div>'}</section>`;
   $('#backToSessions').onclick = () => { state.selectedSessionId = null; clientTraining(); };
   bindTrainingCategoryTabs();
   bindCompletionActions();
