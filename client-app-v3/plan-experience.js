@@ -23,9 +23,15 @@ function mealsForNutritionPlan(plan) {
   if (!plan) return [];
   const assignments = assignedMealsForPlan(plan);
   if (assignments.length) return assignments.map(item => item.meal);
-  return (plan.meals || []).map(meal => ({ ...meal, meal_type: meal.timing,
+  return (plan.meals || []).map(meal => {
+    const portion = meal.items?.length === 1 && meal.items[0].unit === 'meal' && meal.items[0].description ? meal.items[0] : null;
+    if (portion) return {...meal, name:portion.name, meal_type:meal.name,
+      calories:portion.calories, protein_g:portion.protein_g, carbs_g:portion.carbs_g, fat_g:portion.fat_g,
+      preparation:portion.description, source_system:'coach_portion_menu', ingredients:[]};
+    return { ...meal, meal_type: meal.timing,
     ingredients: (meal.items || []).map(item => ({name:item.name,quantity:item.quantity,unit:item.unit})),
-    cooking_instructions: meal.cooking_instructions || null }));
+    cooking_instructions: meal.cooking_instructions || null };
+  });
 }
 function weeklyNutritionSelection() {
   const week = currentWeek();

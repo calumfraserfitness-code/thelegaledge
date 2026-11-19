@@ -116,7 +116,12 @@ clientCheckin=function(){originalCoachingCheckin();const form=$('#checkinForm');
 };
 async function submitAtomicCoachingCheckin(event){
  event.preventDefault();const fd=new FormData(event.target),answers={},clientId=state.client.id,userId=state.user?.id;const active=()=>state.client?.id===clientId&&state.user?.id===userId;const audioContext={clientId,userId,preview:state.preview,file:typeof checkinAudioFile==='undefined'?null:checkinAudioFile};
- for(const[key,value]of fd){if(key.startsWith('photo_')||key==='weight_display')continue;answers[key]=value===''?null:value;}
+ for(const[key,value]of fd){if(key.startsWith('photo_')||key.startsWith('session_outcome_')||key==='weight_display'||key==='food_summary')continue;answers[key]=value===''?null:value;}
+ if(event.target.weeklyTrainingReview){
+  const {result,details}=event.target.weeklyTrainingReview();
+  answers.training_adherence=result;
+  answers.original_answers={...details,'What changed or got in the way':answers.challenges,'Food this week':fd.get('food_summary'),'Help from Calum':answers.support_needed,'Win this week':answers.wins,'Average sleep hours':answers.sleep_hours,'Workload':answers.workload};
+ }
  if(fd.get('weight_display'))answers.weight_kg=Number(fd.get('weight_display'))/(state.client.weight_unit==='lbs'?2.2046226218:1);
  const period=answers.period_start;if(!period||new Date(period+'T12:00:00').getDay()!==1)return toast('Choose the Monday for this check-in','error');
  const photos=['front','side','back'].map(view=>({view,file:fd.get('photo_'+view)})).filter(x=>x.file instanceof File&&x.file.size);

@@ -44,6 +44,13 @@ const completionCheckin=clientCheckin;
 clientCheckin=function(){
  const owner=checkinSelectionOwner();if(completionCheckinOwner!==owner){state.checkinWeek=null;completionCheckinOwner=owner;}
  const host=$('#clientMain'),weeks=checkinWeekChoices(),now=checkinClientWeek(),selected=weeks.includes(state.checkinWeek)?state.checkinWeek:now;
+ const start=state.client.start_date,localToday=window.CheckinStatus?.localDate?.(new Date(),state.client.timezone||'Europe/Dublin');
+ if(localToday&&start>localToday){
+  const firstWeek=window.CheckinStatus.week({timezone:'UTC'},new Date(start+'T12:00:00Z'));
+  const due=window.CheckinStatus.due(state.client,firstWeek);
+  host.innerHTML='<section class="panel"><h1>Your first check-in</h1><p>'+esc(checkinWeekLabel(firstWeek))+'</p>'+(due?'<p>Due '+esc(window.CheckinStatus.stamp(due,state.client.timezone||'Europe/Dublin'))+'.</p>':'')+'<p>Once your plan starts, come back here to confirm the sessions you completed or missed, how food went and what you need from Calum.</p></section>';
+  return;
+ }
  const active=()=>checkinSelectionOwner()===owner,record=state.data.checkins.find(c=>c.period_start===selected&&(!c.client_id||c.client_id===state.client.id));
  if(selected===now)completionCheckin();
  else if(record)host.innerHTML='<section class="panel"><h2>'+esc(checkinWeekLabel(selected))+'</h2><p>This check-in is already submitted. Your saved answers are below.</p>'+checkinCard(record)+'</section>';

@@ -18,7 +18,8 @@
    const details=exercises.length?'<ul>'+exercises.map(e=>'<li>'+esc(e.name)+(e.sets&&e.reps?' · '+esc(e.sets)+' × '+esc(e.reps):'')+'</li>').join('')+'</ul>':session.notes?'<p>'+esc(session.notes)+'</p>':'';
    return '<details class="panel"><summary><strong>'+esc(session.title)+'</strong>'+(session.duration_minutes?' · '+esc(session.duration_minutes)+' min':'')+'</summary>'+details+'</details>';
   }).join('');
-  return '<header class="pch-heading"><h1>Your first week</h1><p>Starts '+esc(date)+'</p></header><section class="panel pch-goal"><h2>Week one priorities</h2>'+(plan.week.coach_note?'<p class="pch-focus-text">'+esc(plan.week.coach_note)+'</p>':'')+'<div class="head-actions">'+(plan.hasMeals?'<button type="button" class="btn ghost" data-pch-start-meals>View meal plan</button>':'')+'<button type="button" class="btn ghost" data-pch-start-coach>Open Coach</button></div></section><section class="panel pch-focus"><h2>Your sessions</h2>'+workouts+'</section>';
+  const due=client.weekly_checkin_enabled!==false?M.due(client,plan.week.week_start):null;
+  return '<header class="pch-heading"><h1>Your first week</h1><p>Starts '+esc(date)+'</p></header><section class="panel pch-goal"><h2>Week one priorities</h2>'+(plan.week.coach_note?'<p class="pch-focus-text">'+esc(plan.week.coach_note)+'</p>':'')+'<div class="head-actions">'+(plan.hasMeals?'<button type="button" class="btn primary" data-pch-start-meals>View meal plan</button>':'')+(due?'<button type="button" class="btn ghost" data-pch-start-checkin>Weekly check-in</button>':'')+'<button type="button" class="btn ghost" data-pch-start-coach>Open Coach</button></div>'+(due?'<p>First check-in due '+esc(M.stamp(due,client.timezone||'Europe/Dublin'))+'.</p>':'')+'</section><section class="panel pch-focus"><h2>Your sessions</h2>'+workouts+'</section>';
  }
  function model(client,data,now=new Date()){
   const date=M.localDate(now,client.timezone||'Europe/Dublin'),period=M.week(client,now);
@@ -96,7 +97,8 @@
    root.innerHTML=startingMarkup(start,state.client,state.data)+'<div data-pch-video hidden></div><details class="pch-secondary" data-pch-secondary><summary><span>More coaching tools</span></summary><div data-pch-secondary-content></div></details>';
    host.prepend(root);
    const active=()=>root.isConnected&&eligible()&&state.user?.id===user&&state.client?.id===client;
-   root.querySelector('[data-pch-start-meals]')?.addEventListener('click',()=>{if(active())route('nutrition');});
+   root.querySelector('[data-pch-start-meals]')?.addEventListener('click',()=>{if(!active())return;state.clientView='nutrition';if(typeof window.openDailyNutritionDate==='function')window.openDailyNutritionDate(state.client.start_date);else route('nutrition');});
+   root.querySelector('[data-pch-start-checkin]')?.addEventListener('click',()=>{if(active())route('checkin');});
    root.querySelector('[data-pch-start-coach]').onclick=()=>{if(active())route('support');};
    arrange();watch();return;
   }
