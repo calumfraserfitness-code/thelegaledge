@@ -3,6 +3,23 @@
  'use strict';
  const M=window.CheckinStatus,cache=new Map();let observer=null,scheduled=false;
  const owned=(rows,c)=>(rows||[]).filter(r=>r.client_id===c.id||state.preview&&!r.client_id);
+ function startingPlan(client,data,date){
+  if(!client.start_date||client.start_date<=date)return null;
+  const week=owned(data.weeks,client).find(w=>w.published&&w.week_start<=client.start_date&&+new Date(client.start_date+'T12:00:00Z')- +new Date(w.week_start+'T12:00:00Z')<7*864e5);
+  if(!week)return null;
+  const sessions=(data.sessions||[]).filter(s=>s.week_id===week.id&&(!s.client_id||s.client_id===client.id)).sort((a,b)=>Number(a.sort_order||0)-Number(b.sort_order||0)||String(a.session_date).localeCompare(String(b.session_date)));
+  const menuDays=(data.nutritionDays||[]).filter(d=>d.week_id===week.id);
+  return {week,sessions,hasMeals:menuDays.some(d=>d.nutrition_plan_id)};
+ }
+ function startingMarkup(plan,client,data){
+  const date=new Intl.DateTimeFormat('en-GB',{weekday:'long',day:'numeric',month:'long',timeZone:'UTC'}).format(new Date(client.start_date+'T12:00:00Z'));
+  const workouts=plan.sessions.map(session=>{
+   const exercises=(data.exercises||[]).filter(e=>e.session_id===session.id).sort((a,b)=>Number(a.sort_order||0)-Number(b.sort_order||0));
+   const details=exercises.length?'<ul>'+exercises.map(e=>'<li>'+esc(e.name)+(e.sets&&e.reps?' · '+esc(e.sets)+' × '+esc(e.reps):'')+'</li>').join('')+'</ul>':session.notes?'<p>'+esc(session.notes)+'</p>':'';
+   return '<details class="panel"><summary><strong>'+esc(session.title)+'</strong>'+(session.duration_minutes?' · '+esc(session.duration_minutes)+' min':'')+'</summary>'+details+'</details>';
+  }).join('');
+  return '<header class="pch-heading"><h1>Your first week</h1><p>Starts '+esc(date)+'</p></header><section class="panel pch-goal"><h2>Week one priorities</h2>'+(plan.week.coach_note?'<p class="pch-focus-text">'+esc(plan.week.coach_note)+'</p>':'')+'<div class="head-actions">'+(plan.hasMeals?'<button type="button" class="btn ghost" data-pch-start-meals>View meal plan</button>':'')+'<button type="button" class="btn ghost" data-pch-start-coach>Open Coach</button></div></section><section class="panel pch-focus"><h2>Your sessions</h2>'+workouts+'</section>';
+ }
  function model(client,data,now=new Date()){
   const date=M.localDate(now,client.timezone||'Europe/Dublin'),period=M.week(client,now);
   const week=owned(data.weeks,client).filter(w=>w.published&&w.week_start<=date&&date<=new Date(+new Date(w.week_start+'T12:00:00Z')+6*864e5).toISOString().slice(0,10)).sort((a,b)=>b.week_start.localeCompare(a.week_start))[0];
@@ -48,6 +65,7 @@
   // Preserve loaded cards, handlers and async save/retry states when reducing the page.
   const secondary=root.querySelector('[data-pch-secondary-content]');
   Array.from(host.children).filter(node=>node!==root&&node.id!=='coachingConnectionStatus').forEach(node=>{if(node.id==='cvLatest'){if(node.parentElement!==slot)slot.append(node);}else if(!node.matches('.page-head,.client-page-head,.client-heading,.client-header'))secondary.append(node);else node.remove();});
+  if(root.dataset.startingPlan)root.querySelectorAll(':scope > #homeQuickLog, :scope > #clientWeeklyRecap, :scope > [data-weighin-routine]').forEach(node=>secondary.append(node));
  }
  function watch(){observer?.disconnect();observer=null;if(!eligible())return;const host=$('#clientMain');if(!host)return;
   observer=new MutationObserver(rows=>{if(rows.some(r=>r.addedNodes.length||r.removedNodes.length)&&!scheduled){scheduled=true;queueMicrotask(arrange);}});observer.observe(host,{childList:true,subtree:true});
@@ -72,6 +90,16 @@
   observer?.disconnect();observer=null;if(!eligible())return;const host=$('#clientMain');if(!host||!host.querySelector('.priority-grid'))return;if(host.querySelector('#personalCoachingHome')){arrange();watch();return;}
   let m;try{m=model(state.client,state.data);}catch{return;}
   const client=state.client.id,user=state.user?.id,root=document.createElement('div');root.id='personalCoachingHome';root.className='pch-home';
+  const start=startingPlan(state.client,state.data,m.date);
+  if(start){
+   root.dataset.startingPlan='true';
+   root.innerHTML=startingMarkup(start,state.client,state.data)+'<div data-pch-video hidden></div><details class="pch-secondary" data-pch-secondary><summary><span>More coaching tools</span></summary><div data-pch-secondary-content></div></details>';
+   host.prepend(root);
+   const active=()=>root.isConnected&&eligible()&&state.user?.id===user&&state.client?.id===client;
+   root.querySelector('[data-pch-start-meals]')?.addEventListener('click',()=>{if(active())route('nutrition');});
+   root.querySelector('[data-pch-start-coach]').onclick=()=>{if(active())route('support');};
+   arrange();watch();return;
+  }
   const name=String(state.client.display_name||'').trim().split(/\s+/)[0];
   root.innerHTML='<header class="pch-heading"><span class="eyebrow">YOUR PERSONAL COACHING</span><h1>'+esc(name?name+', here’s your focus.':'Your coaching, made clear.')+'</h1><p>One clear next step. Calum’s guidance, around your week.</p></header><section class="panel pch-goal"><span class="eyebrow">YOUR CURRENT GOAL</span><h2>'+esc(m.goal||'Your goals, agreed with Calum.')+'</h2>'+(m.goal?'':'<p>Open Coach to review your saved goals and agree your next target.</p>')+'</section><div data-pch-video hidden></div><section class="panel pch-focus" data-pch-focus></section><section class="panel pch-next"><span class="eyebrow">YOUR NEXT STEP</span><h2>'+esc(m.action.title)+'</h2><p>'+esc(m.action.detail)+'</p><button type="button" class="btn primary" data-pch-next>'+esc(m.action.label)+'</button></section>'+checkinMarkup(m,state.client)+milestoneMarkup(m,state.client)+'<details class="pch-secondary" data-pch-secondary><summary><span>Your plan & progress</span><small>Meals, check-in, training and saved activity</small></summary><div data-pch-secondary-content></div></details>';
   host.prepend(root);const active=()=>root.isConnected&&eligible()&&state.user?.id===user&&state.client?.id===client;
@@ -83,5 +111,5 @@
  const today=clientToday;clientToday=function(){const result=today();mount();return result;};
  // Later render wrappers sometimes rebuild Today in a microtask. Mount only the final gated view.
  const render=renderClient;renderClient=function(){observer?.disconnect();const result=render(),user=state.user?.id,client=state.client?.id;Promise.resolve(result).then(()=>{if(state.user?.id!==user||state.client?.id!==client||!eligible())return;if(!$('#personalCoachingHome'))mount();else{arrange();watch();}}).catch(()=>{});return result;};
- window.PersonalCoachingHome={model,mount,arrange};
+ window.PersonalCoachingHome={model,mount,arrange,startingPlan};
 })();
