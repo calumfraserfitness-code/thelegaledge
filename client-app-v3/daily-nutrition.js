@@ -75,6 +75,12 @@
   return {name:meal.name||'Meal',ingredients,description:ingredients.slice(0,4).map(i=>i.name||i.food).filter(Boolean).join(' · ')||'Open the recipe for ingredients and preparation.'};
  }
  function openRoute(route){state.clientView=route;renderClient();}
+ function foodBriefMarkup(plan){
+  const brief=plan?.source_json?.food_brief;if(!brief?.routine)return '';
+  const fields=[['What you told Calum','routine'],['Where the week gets hard','friction'],['Food preferences','preferences'],['How we’ll track','tracking']];
+  return '<section class="panel food-plan-brief"><h2>Food and tracking</h2><div class="food-plan-brief-grid">'+fields.filter(([,key])=>brief[key]).map(([label,key])=>'<div><h3>'+esc(label)+'</h3><p>'+esc(brief[key])+'</p></div>').join('')+'</div>'+(brief.baseline?'<p class="food-plan-baseline">'+esc(brief.baseline)+'</p>':'')+'</section>';
+ }
+ window.FoodPlanBrief={markup:foodBriefMarkup};
  function paint(){
   if(owner!==ownerKey())reset();
   const m=current(),today=localCoachingDate(),consumed=loaded?M.totals(m.rows,true):Object.fromEntries(M.fields.map(k=>[k,null])),planned=M.totals(m.rows),eaten=m.rows.filter(r=>r.eaten).length;
@@ -83,6 +89,7 @@
   const menuPicker=portionMenu&&menuDays.length?'<nav class="dn-subnav" aria-label="Meal plan days">'+menuDays.map(d=>'<button type="button" class="btn small '+(d.nutrition_date===m.date?'primary':'ghost')+'" data-dn-date="'+esc(d.nutrition_date)+'"'+(d.nutrition_date===m.date?' aria-current="date"':'')+'>'+esc(fmt(d.nutrition_date,{weekday:'short',day:'numeric'}))+'</button>').join('')+'</nav>':'';
   state.foodUnits=state.foodUnits||(state.client?.weight_unit==='kg'?'metric':'us');
   host().innerHTML=`<div class="dn-page"><header class="dn-heading"><div><span class="eyebrow">YOUR NUTRITION</span><h1>Food that fits your day.</h1><p>Choose your meals. Keep it simple.</p></div><button class="btn ghost small" id="dnLibrary">Recipe library</button></header>
+   ${foodBriefMarkup(m.plan)}
    ${menuPicker}
    ${portionControls('dnPageUnits')}
    <div class="dn-date-row"><div><span class="dn-dot"></span><strong>${m.date===today?'Today':fmt(m.date,{weekday:'long'})}</strong><span>${fmt(m.date,{day:'numeric',month:'long'})}</span></div><details class="dn-history"><summary>Past logs & another date</summary><label class="dn-date-label">View date<input id="dnDate" type="date" value="${m.date}"></label></details>${m.date!==today?'<button class="text-btn" id="dnToday">Back to today</button>':''}</div>
@@ -93,7 +100,7 @@
    <div class="dn-meals">${m.rows.map((r,i)=>{const shown=recipePresentation(r.meal);return `<article class="dn-meal ${r.eaten?'dn-eaten':''}"><div class="dn-meal-number" aria-hidden="true">${String(i+1).padStart(2,'0')}</div><div class="dn-meal-body"><div class="dn-meal-label"><span class="eyebrow">${esc(r.group)}</span>${r.eaten?'<span class="dn-status">'+(['household','visual'].includes(r.meal.portion?.method)?'Logged · estimated portion':'Logged')+'</span>':''}</div><h3>${esc(shown.name)}</h3><p class="muted">${esc(shown.description)}</p><p>${esc(summary(r.meal,r.servings))}${r.servings!==1?` · ${r.servings} servings`:''}</p><div class="dn-meal-actions"><button class="text-btn" data-dn-recipe="${esc(r.key)}">Recipe & portions</button><button class="text-btn" data-dn-swap="${esc(r.key)}" ${r.eaten?'disabled title="Undo this log before changing the meal"':''}>Swap meal</button><button class="btn ${r.eaten?'ghost':'primary'} small" data-dn-log="${esc(r.key)}" ${!loaded||busy?'disabled':''}>${r.eaten?'Undo log':'Log eaten'}</button></div></div></article>`;}).join('')||`<div class="dn-empty"><h3>${m.day?'No recipes assigned for this day yet.':'No published meal schedule for this date.'}</h3><p>Your coach’s daily targets are above. Browse your assigned recipes or log food you’ve eaten.</p><button class="btn ghost" id="dnEmptyLibrary">Choose a recipe</button></div>`}</div>
    <div class="dn-daily-actions"><button class="btn primary" id="dnIdeas" ${!loaded?'disabled':''}>What could I eat?</button><button class="btn ghost" id="dnAnywhere" ${!loaded?'disabled':''}>Food Anywhere</button><button class="btn ghost" id="dnQuickLog" ${!loaded?'disabled':''}>+ Quick food log</button><span>Only logged food counts towards your intake.</span></div>
    <details class="dn-details"><summary>Chosen meal totals</summary><p>${value(planned.calories,' kcal')} · ${value(planned.protein_g,'g protein')} · ${value(planned.carbs_g,'g carbs')} · ${value(planned.fat_g,'g fat')}</p><p>Estimates from your saved recipes. Choosing a meal does not mark it eaten. Missing nutrients keep the relevant total unknown.</p></details>
-   ${m.plan?.coach_notes?`<aside class="dn-coach-note"><span class="eyebrow">FROM YOUR COACH</span><p>${esc(m.plan.coach_notes)}</p></aside>`:''}
+   ${m.plan?.coach_notes&&!m.plan?.source_json?.food_brief?`<aside class="dn-coach-note"><span class="eyebrow">FROM YOUR COACH</span><p>${esc(m.plan.coach_notes)}</p></aside>`:''}
    <details class="dn-details dn-week"><summary>Shopping list</summary>${shoppingListMarkup(weeklyNutritionSelection().days)}</details>
 
    <div id="dnSheetHost"></div></div>`;

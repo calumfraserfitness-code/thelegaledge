@@ -1,13 +1,14 @@
 /* Distinct saved weigh-in dates in the client's local Monday–Sunday week. */
 (function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else root.WeighInRoutineModel=api;})(typeof globalThis!=='undefined'?globalThis:this,function(){
  'use strict';
- const target=3,dayMs=86400000;
+ const dayMs=86400000;
  function day(value){const s=String(value||'');return /^\d{4}-\d{2}-\d{2}$/.test(s)&&Number.isFinite(Date.parse(s+'T12:00:00Z'))&&new Date(s+'T12:00:00Z').toISOString().slice(0,10)===s?s:null;}
  function localDate(value,zone){try{const date=value instanceof Date?value:new Date(value);if(!Number.isFinite(+date))return null;const parts=new Intl.DateTimeFormat('en-CA',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(date),get=type=>parts.find(p=>p.type===type)?.value;return day(get('year')+'-'+get('month')+'-'+get('day'));}catch{return null;}}
  const add=(date,n)=>new Date(Date.parse(date+'T12:00:00Z')+n*dayMs).toISOString().slice(0,10);
  const weekday=date=>new Date(date+'T12:00:00Z').getUTCDay();
  function plan(client,data={},options={}){
   if(!client?.id||client.track_weight===false)return null;
+  const target=Number(client.weekly_weigh_in_minimum)===2?2:3;
   const zone=client.timezone||'Europe/Dublin',today=localDate(options.now||new Date(),zone);if(!today)return null;
   const weekStart=add(today,-((weekday(today)+6)%7)),weekEnd=add(weekStart,6),dates=new Set(),own=row=>row.client_id===client.id||options.preview&&!row.client_id;
   const valid=row=>own(row)&&row.weight_kg!==null&&row.weight_kg!==undefined&&row.weight_kg!==''&&typeof row.weight_kg!=='boolean'&&Number.isFinite(Number(row.weight_kg))&&Number(row.weight_kg)>0;
@@ -20,7 +21,8 @@
    const chosen=[recordedDays[a],recordedDays[b],recordedDays[c]];
    if((Date.parse(chosen[1])-Date.parse(chosen[0]))/dayMs>=2&&(Date.parse(chosen[2])-Date.parse(chosen[1]))/dayMs>=2&&chosen.some(date=>[0,6].includes(weekday(date)))){spreadDone=true;break;}
   }
-  return {weekStart,weekEnd,today,recordedDays,count:recordedDays.length,target,weekendDone,spreadDone,complete:recordedDays.length>=target&&weekendDone&&spreadDone,latestDate:recordedDays.at(-1)||null,daysRemaining:Math.round((Date.parse(weekEnd)-Date.parse(today))/dayMs),example:'Tuesday, Thursday and Saturday'};
+  if(target===2)spreadDone=recordedDays.length>=2&&Date.parse(recordedDays.at(-1))-Date.parse(recordedDays[0])>=2*dayMs;
+  return {weekStart,weekEnd,today,recordedDays,count:recordedDays.length,target,weekendDone,spreadDone,complete:recordedDays.length>=target&&(target===2||weekendDone&&spreadDone),latestDate:recordedDays.at(-1)||null,daysRemaining:Math.round((Date.parse(weekEnd)-Date.parse(today))/dayMs),example:target===2?'Tuesday, Friday and Sunday':'Tuesday, Thursday and Saturday'};
  }
  return {plan,localDate};
 });

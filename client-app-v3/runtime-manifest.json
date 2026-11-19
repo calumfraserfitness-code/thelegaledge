@@ -90,7 +90,8 @@
     "coach-roadmaps.js",
     "recovery-trends.js",
     "coach-change-log.js",
-    "checkin-quick-view.js"
+    "checkin-quick-view.js",
+    "gym-plan.js"
   ],
   "styles": [
     "app.css",

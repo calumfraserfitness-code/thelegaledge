@@ -1,7 +1,7 @@
 /* Short default check-in; move the existing controls, draft and submit handlers intact. */
 (function(){
  'use strict';
- const outcomes={completed:'Completed',modified:'Completed with changes',missed:'Missed'};
+ const outcomes={completed:'Completed',modified:'Completed with changes',missed:'Missed',planned:'Still to do'};
  function sessionReview(form,period){
   const week=(state.data.weeks||[]).find(w=>w.published&&w.week_start===period&&(!w.client_id||w.client_id===state.client.id));
   const sessions=(state.data.sessions||[]).filter(s=>week&&s.week_id===week.id&&(!s.client_id||s.client_id===state.client.id)&&['weights','resistance','cardio'].includes(s.training_type)).sort((a,b)=>Number(a.sort_order||0)-Number(b.sort_order||0)||String(a.session_date).localeCompare(String(b.session_date)));
@@ -14,6 +14,7 @@
    select.required=s.source_metadata?.optional!==true;
    select.innerHTML='<option value="">'+(select.required?'Choose outcome':'Leave unanswered')+'</option>'+Object.entries(outcomes).map(([key,value])=>'<option value="'+key+'">'+value+'</option>').join('');
    if(s.status==='completed')select.value='completed';
+   else if(s.session_date>window.CheckinStatus?.localDate?.(new Date(),state.client.timezone||'Europe/Dublin'))select.value='planned';
    label.append(select);section.append(label);
    return {session:s,select};
   });
@@ -22,7 +23,7 @@
   function update(){
    changes.required=!tracked.length||tracked.some(({select})=>['missed','modified'].includes(select.value));
    const selected=tracked.filter(({select})=>select.required);
-   const result=selected.length&&selected.every(({select})=>select.value)?Math.round(100*selected.filter(({select})=>select.value!=='missed').length/selected.length):null;
+   const result=selected.length&&selected.every(({select})=>select.value&&select.value!=='planned')?Math.round(100*selected.filter(({select})=>select.value!=='missed').length/selected.length):null;
    return {result,details:Object.fromEntries(tracked.filter(({select})=>select.value).map(({session,select},i)=>['Session '+(i+1),session.title+' — '+outcomes[select.value]]))};
   }
   update();section.addEventListener('change',update);

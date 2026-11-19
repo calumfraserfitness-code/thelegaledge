@@ -13,13 +13,17 @@
  }
  function startingMarkup(plan,client,data){
   const date=new Intl.DateTimeFormat('en-GB',{weekday:'long',day:'numeric',month:'long',timeZone:'UTC'}).format(new Date(client.start_date+'T12:00:00Z'));
-  const workouts=plan.sessions.map(session=>{
+  const gymPlan=window.GymPlans?.markup(plan.week,plan.sessions)||'';
+  const workouts=plan.sessions.filter(session=>!gymPlan||!session.source_metadata?.gym_days).map(session=>{
    const exercises=(data.exercises||[]).filter(e=>e.session_id===session.id).sort((a,b)=>Number(a.sort_order||0)-Number(b.sort_order||0));
    const details=exercises.length?'<ul>'+exercises.map(e=>'<li>'+esc(e.name)+(e.sets&&e.reps?' · '+esc(e.sets)+' × '+esc(e.reps):'')+'</li>').join('')+'</ul>':session.notes?'<p>'+esc(session.notes)+'</p>':'';
    return '<details class="panel"><summary><strong>'+esc(session.title)+'</strong>'+(session.duration_minutes?' · '+esc(session.duration_minutes)+' min':'')+'</summary>'+details+'</details>';
   }).join('');
+  const mealPlan=(data.nutritionPlans||[]).find(p=>p.is_active&&(!p.client_id||p.client_id===client.id)&&p.source_json?.food_brief);
+  const foodBrief=window.FoodPlanBrief?.markup(mealPlan)||'';
   const due=client.weekly_checkin_enabled!==false?M.due(client,plan.week.week_start):null;
-  return '<header class="pch-heading"><h1>Your first week</h1><p>Starts '+esc(date)+'</p></header><section class="panel pch-goal"><h2>Week one priorities</h2>'+(plan.week.coach_note?'<p class="pch-focus-text">'+esc(plan.week.coach_note)+'</p>':'')+'<div class="head-actions">'+(plan.hasMeals?'<button type="button" class="btn primary" data-pch-start-meals>View meal plan</button>':'')+(due?'<button type="button" class="btn ghost" data-pch-start-checkin>Weekly check-in</button>':'')+'<button type="button" class="btn ghost" data-pch-start-coach>Open Coach</button></div>'+(due?'<p>First check-in due '+esc(M.stamp(due,client.timezone||'Europe/Dublin'))+'.</p>':'')+'</section><section class="panel pch-focus"><h2>Your sessions</h2>'+workouts+'</section>';
+  const rhythm=gymPlan?'<ul class="pch-start-rhythm"><li><strong>Daily steps</strong> '+esc(Number(client.daily_steps_goal||8000).toLocaleString())+'</li><li><strong>Morning weigh-ins</strong> Aim for 2–3 · Tue, Fri, Sun</li></ul>':'';
+  return '<header class="pch-heading"><h1>Your first week</h1><p>Starts '+esc(date)+'</p></header><section class="panel pch-goal"><h2>Week one priorities</h2>'+(plan.week.coach_note?'<p class="pch-focus-text">'+esc(plan.week.coach_note)+'</p>':'')+rhythm+'<div class="head-actions">'+(plan.hasMeals?'<button type="button" class="btn primary" data-pch-start-meals>View meal plan</button>':'')+(due?'<button type="button" class="btn ghost" data-pch-start-checkin>Weekly check-in</button>':'')+'<button type="button" class="btn ghost" data-pch-start-coach>Open Coach</button></div>'+(due?'<p>First check-in due '+esc(M.stamp(due,client.timezone||'Europe/Dublin'))+'.</p>':'')+'</section>'+gymPlan+'<section class="panel pch-focus"><h2>'+(gymPlan?'Cardio':'Your sessions')+'</h2>'+workouts+'</section>'+foodBrief;
  }
  function model(client,data,now=new Date()){
   const date=M.localDate(now,client.timezone||'Europe/Dublin'),period=M.week(client,now);
@@ -100,6 +104,7 @@
    root.querySelector('[data-pch-start-meals]')?.addEventListener('click',()=>{if(!active())return;state.clientView='nutrition';if(typeof window.openDailyNutritionDate==='function')window.openDailyNutritionDate(state.client.start_date);else route('nutrition');});
    root.querySelector('[data-pch-start-checkin]')?.addEventListener('click',()=>{if(active())route('checkin');});
    root.querySelector('[data-pch-start-coach]').onclick=()=>{if(active())route('support');};
+   window.GymPlans?.bind(root,start.week,start.sessions);
    arrange();watch();return;
   }
   const name=String(state.client.display_name||'').trim().split(/\s+/)[0];

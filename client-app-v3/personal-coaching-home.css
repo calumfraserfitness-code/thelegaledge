@@ -2,3 +2,23 @@
 /* Direct weekly action cards stay visible above secondary detail. */
 .pch-checkin small,.pch-milestone small{display:block;color:var(--muted);line-height:1.5;margin-top:12px}.pch-milestone progress{width:100%;height:12px;accent-color:var(--gold,#bd964a)}.pch-checkin h2,.pch-milestone h3{margin:8px 0;overflow-wrap:anywhere}.pch-checkin .btn{min-height:44px}.checkin-extra{border:1px solid var(--line,#ded8cd);border-radius:12px;padding:14px;margin:18px 0}.checkin-extra>summary{cursor:pointer;font-weight:700;min-height:44px;display:flex;align-items:center}.checkin-extra>section{margin-top:16px}.checkin-extra .refresh-score{margin:14px 0}.refresh-checkin [hidden]{display:none!important}
 @media(min-width:900px){.pch-home{grid-template-columns:repeat(2,minmax(0,1fr))}.pch-heading,.pch-goal,.pch-home>[data-pch-video],.pch-focus,.pch-milestone,.pch-secondary{grid-column:1/-1}}
+
+.gym-plan,.food-plan-brief{grid-column:1/-1}
+.gym-plan-heading{display:flex;justify-content:space-between;gap:12px}
+.gym-plan p{color:var(--muted);line-height:1.5}
+.gym-plan [aria-pressed=true]{background:var(--navy,#111b29);border-color:var(--navy,#111b29);color:#fff}
+.gym-plan [data-gym-workouts]>h3{margin:20px 0 10px}
+.gym-workout{margin-top:10px;padding:14px;border:1px solid var(--line,#ded8cd);border-radius:12px}
+.gym-workout summary{cursor:pointer;font-weight:700}
+.gym-workout summary small{font-weight:500;color:var(--muted)}
+.gym-workout ul{padding:0;list-style:none}
+.gym-workout li{display:flex;justify-content:space-between;gap:16px;padding:8px 0;border-bottom:1px solid var(--line,#ded8cd)}
+.gym-workout strong{white-space:nowrap}
+.food-plan-brief h2{margin-top:0}
+.food-plan-brief-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,235px),1fr));gap:12px}
+.food-plan-brief-grid>div{padding:12px 14px;border:1px solid var(--line,#ded8cd);border-radius:10px}
+.food-plan-brief h3{font-size:1rem;margin:0 0 5px}
+.food-plan-brief p{margin:0;line-height:1.5}
+.food-plan-brief .food-plan-baseline{margin-top:14px;font-weight:700}
+
+.pch-start-rhythm{display:flex;flex-wrap:wrap;gap:10px;padding:0;list-style:none;margin:14px 0 18px}.pch-start-rhythm li{padding:9px 12px;border:1px solid var(--line,#ded8cd);border-radius:10px}.pch-start-rhythm strong{display:block}
