@@ -22,3 +22,17 @@
 .food-plan-brief .food-plan-baseline{margin-top:14px;font-weight:700}
 
 .pch-start-rhythm{display:flex;flex-wrap:wrap;gap:10px;padding:0;list-style:none;margin:14px 0 18px}.pch-start-rhythm li{padding:9px 12px;border:1px solid var(--line,#ded8cd);border-radius:10px}.pch-start-rhythm strong{display:block}
+
+.pch-start-hero{grid-column:1/-1;min-height:142px;padding:25px 28px;border:1px solid #e9dfcb;border-radius:18px;background:linear-gradient(90deg,#f6f2e7 12%,#f6f2e7d9 48%,#f6f2e700 76%),url('./assets/welcome-progress-20261008.webp') center right/cover}
+.pch-start-hero h1{max-width:70%}
+.pch-week-strip{grid-column:1/-1}
+.pch-week-strip h2{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin:0 0 14px}
+.pch-week-strip h2 small{font-size:.82rem;color:var(--muted);font-weight:500}
+.pch-week-strip ol{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:7px;padding:0;margin:0;list-style:none}
+.pch-week-strip li{padding:8px;border:1px solid #e6ddcb;border-radius:10px;min-width:0;min-height:64px;font-size:.83rem}
+.pch-week-strip li[aria-current=date]{border-color:#a67b33;background:#fcf8ef}
+.week-activity{display:block;width:100%;border:0;border-radius:7px;padding:7px;margin-top:6px;background:#edf1f6;color:#14243a;text-align:left;cursor:pointer;overflow-wrap:anywhere;font:inherit;font-weight:650}
+.week-activity small{display:block;margin-top:2px;font-weight:500}
+.week-checkin{background:#f3e7ce}.week-weigh-in{display:block;margin-top:7px;color:#695b47}
+.training-start-note{padding:12px 16px;max-width:720px;border-left:3px solid #b48b45;background:#faf6ec}
+@media(max-width:650px){.pch-start-hero{padding:22px 16px;min-height:110px}.pch-week-strip ol{grid-template-columns:repeat(4,minmax(0,1fr))}.pch-week-strip li{padding:6px}}

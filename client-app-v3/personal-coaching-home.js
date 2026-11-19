@@ -1,7 +1,7 @@
 /* A personal home built from published coaching and saved records. No inferred prescriptions. */
 (function(){
  'use strict';
- const M=window.CheckinStatus,cache=new Map();let observer=null,scheduled=false;
+ const M=window.CheckinStatus,cache=new Map();let observer=null,scheduled=false,scheduleLoading=false;
  const owned=(rows,c)=>(rows||[]).filter(r=>r.client_id===c.id||state.preview&&!r.client_id);
  function startingPlan(client,data,date){
   if(!client.start_date||client.start_date<=date)return null;
@@ -11,6 +11,35 @@
   const menuDays=(data.nutritionDays||[]).filter(d=>d.week_id===week.id);
   return {week,sessions,hasMeals:menuDays.some(d=>d.nutrition_plan_id)};
  }
+ function weekSchedule(week,sessions,client){
+  if(!week||!sessions.some(s=>s.source_metadata?.gym_days))return '';
+  const zone=client.timezone||'Europe/Dublin',today=M.localDate(new Date(),zone);
+  const label=new Intl.DateTimeFormat('en-GB',{day:'numeric',month:'short',timeZone:'UTC'});
+  const dayLabel=new Intl.DateTimeFormat('en-GB',{weekday:'short',day:'numeric',timeZone:'UTC'});
+  const dates=Array.from({length:7},(_,i)=>new Date(Date.parse(week.week_start+'T12:00:00Z')+864e5*i));
+  const due=client.weekly_checkin_enabled!==false?M.due(client,week.week_start):null,dueDate=due&&M.localDate(due,zone);
+  const checkinTime=due&&new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric',minute:'2-digit'}).format(due);
+  const rows=dates.map(date=>{
+   const key=date.toISOString().slice(0,10);
+   const assigned=sessions.filter(s=>s.session_date===key).map(s=>'<button class="week-activity" type="button" data-week-session="'+esc(s.id)+'"><span>'+esc(s.title.split(' · ')[0])+'</span><small>'+esc(s.title.split(' · ').slice(1).join(' · '))+(s.status==='completed'?' ✓':'')+'</small></button>').join('');
+   return '<li '+(key===today?'aria-current="date"':'')+'><strong>'+esc(dayLabel.format(date))+'</strong>'+assigned+(key===dueDate?'<button class="week-activity week-checkin" type="button" data-week-checkin>Check-in <small>'+esc(checkinTime)+'</small></button>':'')+([0,2,5].includes(date.getUTCDay())?'<small class="week-weigh-in">Weigh-in</small>':'')+'</li>';
+  }).join('');
+  return '<section class="panel pch-week-strip"><h2>Your week <small>'+esc(label.format(dates[0])+' – '+label.format(dates[6]))+'</small></h2><ol>'+rows+'</ol></section>';
+ }
+ function bindWeekSchedule(root){
+  const id=state.client.id,user=state.user?.id;
+  const active=()=>root.isConnected&&eligible()&&state.client?.id===id&&state.user?.id===user;
+  root.querySelectorAll('[data-week-session]').forEach(button=>button.onclick=()=>{
+   if(!active())return;
+   const session=state.data.sessions.find(s=>s.id===button.dataset.weekSession);if(!session)return;
+   state.selectedSessionId=session.id;state.trainingCategory=session.training_type==='cardio'?'cardio':'weights';
+   route('training');
+  });
+  root.querySelector('[data-week-checkin]')?.addEventListener('click',()=>{if(active())route('checkin');});
+ }
+ function goalMarkup(goal){
+  return goal?'<section class="panel pch-goal"><h2>Your goals</h2><p class="pch-focus-text">'+esc(goal)+'</p></section>':'';
+ }
  function startingMarkup(plan,client,data){
   const date=new Intl.DateTimeFormat('en-GB',{weekday:'long',day:'numeric',month:'long',timeZone:'UTC'}).format(new Date(client.start_date+'T12:00:00Z'));
   const gymPlan=window.GymPlans?.markup(plan.week,plan.sessions)||'';
@@ -19,11 +48,9 @@
    const details=exercises.length?'<ul>'+exercises.map(e=>'<li>'+esc(e.name)+(e.sets&&e.reps?' · '+esc(e.sets)+' × '+esc(e.reps):'')+'</li>').join('')+'</ul>':session.notes?'<p>'+esc(session.notes)+'</p>':'';
    return '<details class="panel"><summary><strong>'+esc(session.title)+'</strong>'+(session.duration_minutes?' · '+esc(session.duration_minutes)+' min':'')+'</summary>'+details+'</details>';
   }).join('');
-  const mealPlan=(data.nutritionPlans||[]).find(p=>p.is_active&&(!p.client_id||p.client_id===client.id)&&p.source_json?.food_brief);
-  const foodBrief=window.FoodPlanBrief?.markup(mealPlan)||'';
   const due=client.weekly_checkin_enabled!==false?M.due(client,plan.week.week_start):null;
   const rhythm=gymPlan?'<ul class="pch-start-rhythm"><li><strong>Daily steps</strong> '+esc(Number(client.daily_steps_goal||8000).toLocaleString())+'</li><li><strong>Morning weigh-ins</strong> Aim for 2–3 · Tue, Fri, Sun</li></ul>':'';
-  return '<header class="pch-heading"><h1>Your first week</h1><p>Starts '+esc(date)+'</p></header><section class="panel pch-goal"><h2>Week one priorities</h2>'+(plan.week.coach_note?'<p class="pch-focus-text">'+esc(plan.week.coach_note)+'</p>':'')+rhythm+'<div class="head-actions">'+(plan.hasMeals?'<button type="button" class="btn primary" data-pch-start-meals>View meal plan</button>':'')+(due?'<button type="button" class="btn ghost" data-pch-start-checkin>Weekly check-in</button>':'')+'<button type="button" class="btn ghost" data-pch-start-coach>Open Coach</button></div>'+(due?'<p>First check-in due '+esc(M.stamp(due,client.timezone||'Europe/Dublin'))+'.</p>':'')+'</section>'+gymPlan+'<section class="panel pch-focus"><h2>'+(gymPlan?'Cardio':'Your sessions')+'</h2>'+workouts+'</section>'+foodBrief;
+  return '<header class="pch-heading pch-start-hero"><h1>Your first week</h1><p>Starts '+esc(date)+'</p></header>'+weekSchedule(plan.week,plan.sessions,client)+goalMarkup(client.goal_summary)+'<section class="panel pch-goal"><h2>Week one priorities</h2>'+(plan.week.coach_note?'<p class="pch-focus-text">'+esc(plan.week.coach_note)+'</p>':'')+rhythm+'<div class="head-actions">'+(plan.hasMeals?'<button type="button" class="btn primary" data-pch-start-meals>View meal plan</button>':'')+(due?'<button type="button" class="btn ghost" data-pch-start-checkin>Weekly check-in</button>':'')+'<button type="button" class="btn ghost" data-pch-start-coach>Open Coach</button></div>'+(due?'<p>First check-in due '+esc(M.stamp(due,client.timezone||'Europe/Dublin'))+'.</p>':'')+'</section>'+gymPlan+'<section class="panel pch-focus"><h2>'+(gymPlan?'Cardio':'Your sessions')+'</h2>'+workouts+'</section>';
  }
  function model(client,data,now=new Date()){
   const date=M.localDate(now,client.timezone||'Europe/Dublin'),period=M.week(client,now);
@@ -38,11 +65,11 @@
   const goals=owned(data.coachingGoals,client).filter(g=>g.status==='active');
   const goal=String(client.goal_summary||goals[0]?.title||'').trim();
   const checkinDue=!saved&&due&&+due<=+now;
-  const action=checkinDue?{route:'checkin',label:'Complete your check-in',title:'Let Calum know how your week went.',detail:'Your saved check-in helps shape your next coaching review.'}:next?{route:'training',session:next.id,category:daily(next)?'mobility':next.training_type==='cardio'?'cardio':'weights',label:'Open session',title:next.title||'Your next session',detail:daily(next)?'Tick each practice when you finish. Earlier days stay saved.':'Complete when ready. Your session order is a guide, not a fixed day.'}:week&&sessions.length?{route:'progress',label:'View your progress',title:'Your recorded progress, in one place.',detail:'Your assigned sessions are complete. Review your progress or open Training for practice and extra activity.'}:{route:'support',label:'Open Coach',title:'Your coaching hub is here.',detail:week?'Your current week has no assigned sessions yet. Open Coach for your saved guidance.':'The current week has not been published yet. Your saved feedback and previous work remain available.'};
+  const action=checkinDue?{route:'checkin',label:'Complete your check-in',title:'How did your week go?',detail:'Let me know what you got done and where you need a hand.'}:next?{route:'training',session:next.id,category:daily(next)?'mobility':next.training_type==='cardio'?'cardio':'weights',label:'Open session',title:next.title||'Your next session',detail:daily(next)?'Tick each practice when you finish. Earlier days stay saved.':'Complete when ready. Your session order is a guide, not a fixed day.'}:week&&sessions.length?{route:'progress',label:'View your progress',title:'Your recorded progress, in one place.',detail:'Your assigned sessions are complete. Review your progress or open Training for practice and extra activity.'}:{route:'support',label:'Open Coach',title:'Your coaching hub is here.',detail:week?'Your current week has no assigned sessions yet. Open Coach for your saved guidance.':'The current week has not been published yet. Your saved feedback and previous work remain available.'};
   return {date,week,goal,action,next,savedDue:due,focus:String(week?.coach_note||'').trim(),saved,goals};
  }
  function checkinMarkup(m,c){
-  const label=c.weekly_checkin_enabled===false?'Not scheduled':m.saved?m.saved.reviewed_at?'Reviewed':'Submitted to Calum':m.savedDue&&+m.savedDue<=Date.now()?'Ready to send':'Your weekly check-in';
+  const label=c.weekly_checkin_enabled===false?'Not scheduled':m.saved?m.saved.reviewed_at?'Reviewed':'Submitted':m.savedDue&&+m.savedDue<=Date.now()?'Ready to send':'Your weekly check-in';
   const detail=m.saved?'Saved '+M.stamp(m.saved.submitted_at,c.timezone||'Europe/Dublin'):m.savedDue?'Due '+M.stamp(m.savedDue,c.timezone||'Europe/Dublin'):c.weekly_checkin_enabled===false?'Use Coach for your agreed support.':'Calum needs to confirm your check-in deadline.';
   return '<section class="panel pch-checkin"><span class="eyebrow">YOUR CHECK-IN</span><h2>'+esc(label)+'</h2><p>'+esc(detail)+'</p><button type="button" class="btn ghost" data-pch-checkin>'+(m.saved?'View saved check-in':'Open check-in')+'</button><small>Quick scores and a message. Add more detail when it helps.</small></section>';
  }
@@ -94,7 +121,7 @@
  function mount(){
   observer?.disconnect();observer=null;if(!eligible())return;const host=$('#clientMain');if(!host||!host.querySelector('.priority-grid'))return;if(host.querySelector('#personalCoachingHome')){arrange();watch();return;}
   let m;try{m=model(state.client,state.data);}catch{return;}
-  const client=state.client.id,user=state.user?.id,root=document.createElement('div');root.id='personalCoachingHome';root.className='pch-home';
+  const client=state.client.id,user=state.user?.id,root=document.createElement('div');root.id='personalCoachingHome';root.className='pch-home';root.dataset.localDate=m.date;
   const start=startingPlan(state.client,state.data,m.date);
   if(start){
    root.dataset.startingPlan='true';
@@ -104,19 +131,49 @@
    root.querySelector('[data-pch-start-meals]')?.addEventListener('click',()=>{if(!active())return;state.clientView='nutrition';if(typeof window.openDailyNutritionDate==='function')window.openDailyNutritionDate(state.client.start_date);else route('nutrition');});
    root.querySelector('[data-pch-start-checkin]')?.addEventListener('click',()=>{if(active())route('checkin');});
    root.querySelector('[data-pch-start-coach]').onclick=()=>{if(active())route('support');};
-   window.GymPlans?.bind(root,start.week,start.sessions);
+   window.GymPlans?.bind(root,start.week,start.sessions);bindWeekSchedule(root);
    arrange();watch();return;
   }
   const name=String(state.client.display_name||'').trim().split(/\s+/)[0];
-  root.innerHTML='<header class="pch-heading"><span class="eyebrow">YOUR PERSONAL COACHING</span><h1>'+esc(name?name+', here’s your focus.':'Your coaching, made clear.')+'</h1><p>One clear next step. Calum’s guidance, around your week.</p></header><section class="panel pch-goal"><span class="eyebrow">YOUR CURRENT GOAL</span><h2>'+esc(m.goal||'Your goals, agreed with Calum.')+'</h2>'+(m.goal?'':'<p>Open Coach to review your saved goals and agree your next target.</p>')+'</section><div data-pch-video hidden></div><section class="panel pch-focus" data-pch-focus></section><section class="panel pch-next"><span class="eyebrow">YOUR NEXT STEP</span><h2>'+esc(m.action.title)+'</h2><p>'+esc(m.action.detail)+'</p><button type="button" class="btn primary" data-pch-next>'+esc(m.action.label)+'</button></section>'+checkinMarkup(m,state.client)+milestoneMarkup(m,state.client)+'<details class="pch-secondary" data-pch-secondary><summary><span>Your plan & progress</span><small>Meals, check-in, training and saved activity</small></summary><div data-pch-secondary-content></div></details>';
+  const schedule=weekSchedule(m.week,(state.data.sessions||[]).filter(s=>s.week_id===m.week?.id&&(!s.client_id||s.client_id===client)),state.client);
+  root.innerHTML='<header class="pch-heading'+(schedule?' pch-start-hero':'')+'"><span class="eyebrow">YOUR PERSONAL COACHING</span><h1>'+esc(name?name+', here’s your focus.':'Your coaching, made clear.')+'</h1>'+(schedule?'':'<p>One clear next step. Calum’s guidance, around your week.</p>')+'</header>'+schedule+goalMarkup(m.goal)+'<div data-pch-video hidden></div><section class="panel pch-focus" data-pch-focus></section><section class="panel pch-next"><span class="eyebrow">YOUR NEXT STEP</span><h2>'+esc(m.action.title)+'</h2><p>'+esc(m.action.detail)+'</p><button type="button" class="btn primary" data-pch-next>'+esc(m.action.label)+'</button></section>'+checkinMarkup(m,state.client)+(schedule&&!m.goals.length?'':milestoneMarkup(m,state.client))+'<details class="pch-secondary" data-pch-secondary><summary><span>Your plan & progress</span><small>Meals, check-in, training and saved activity</small></summary><div data-pch-secondary-content></div></details>';
   host.prepend(root);const active=()=>root.isConnected&&eligible()&&state.user?.id===user&&state.client?.id===client;
   root.querySelector('[data-pch-next]').onclick=()=>{if(!active())return;if(m.action.session){state.selectedSessionId=m.action.session;state.trainingCategory=m.action.category;}route(m.action.route);};
   root.querySelector('[data-pch-checkin]').onclick=()=>{if(active())route('checkin');};
-  root.querySelector('[data-pch-progress]').onclick=()=>{if(active())route('progress');};
-  arrange();watch();focus(root,m);
+  root.querySelector('[data-pch-progress]')?.addEventListener('click',()=>{if(active())route('progress');});
+  bindWeekSchedule(root);arrange();watch();focus(root,m);
  }
  const today=clientToday;clientToday=function(){const result=today();mount();return result;};
  // Later render wrappers sometimes rebuild Today in a microtask. Mount only the final gated view.
  const render=renderClient;renderClient=function(){observer?.disconnect();const result=render(),user=state.user?.id,client=state.client?.id;Promise.resolve(result).then(()=>{if(state.user?.id!==user||state.client?.id!==client||!eligible())return;if(!$('#personalCoachingHome'))mount();else{arrange();watch();}}).catch(()=>{});return result;};
+ async function refreshWeek(){
+  if(scheduleLoading||document.hidden||state.role!=='client'||state.preview||!eligible()||!state.data.sessions.some(s=>s.source_metadata?.gym_days))return;
+  const root=$('#personalCoachingHome');if(!root)return;
+  const client=state.client,user=state.user?.id,data=state.data,loadSequence=clientDataLoadSequence;
+  const active=()=>root.isConnected&&eligible()&&state.role==='client'&&state.client===client&&state.user?.id===user;
+  scheduleLoading=true;
+  try{
+   const today=M.localDate(new Date(),client.timezone||'Europe/Dublin');
+   const anchor=client.start_date>today?client.start_date:today;
+   const earliest=new Date(Date.parse(anchor+'T12:00:00Z')-6*864e5).toISOString().slice(0,10);
+   const weeks=await query('This week',db.from('program_weeks').select('*').eq('client_id',client.id).eq('published',true).gte('week_start',earliest).lte('week_start',anchor).order('week_start',{ascending:false}));
+   const ids=weeks.map(w=>w.id);
+   const sessions=ids.length?await query('This week’s sessions',db.from('training_sessions').select('*').in('week_id',ids)):[];
+   if(!active()||data!==state.data||loadSequence!==clientDataLoadSequence)return;
+   const current=data.weeks.filter(w=>w.published&&w.week_start>=earliest&&w.week_start<=anchor);
+   const currentIds=new Set(current.map(w=>w.id));
+   const snapshot=rows=>JSON.stringify([...rows].sort((a,b)=>a.id.localeCompare(b.id)));
+   const changed=snapshot(weeks)!==snapshot(current)||snapshot(sessions)!==snapshot(data.sessions.filter(s=>currentIds.has(s.week_id)));
+   if(changed){
+    if(!(await loadClientData(client.id)))return;
+    root.dataset.refreshWeek='true';
+   }
+   const inputFocused=root.contains(document.activeElement)&&document.activeElement.matches('input, textarea, select');
+   if(active()&&!inputFocused&&(root.dataset.refreshWeek||root.dataset.localDate!==today))renderClient();
+  }catch(error){console.warn('Could not refresh the weekly schedule.',error);}
+  finally{scheduleLoading=false;}
+ }
+ document.addEventListener('visibilitychange',refreshWeek);
+ window.setInterval(refreshWeek,60000);
  window.PersonalCoachingHome={model,mount,arrange,startingPlan};
 })();

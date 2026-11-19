@@ -48,7 +48,7 @@ clientCheckin=function(){
  if(localToday&&start>localToday){
   const firstWeek=window.CheckinStatus.week({timezone:'UTC'},new Date(start+'T12:00:00Z'));
   const due=window.CheckinStatus.due(state.client,firstWeek);
-  host.innerHTML='<section class="panel"><h1>Your first check-in</h1><p>'+esc(checkinWeekLabel(firstWeek))+'</p>'+(due?'<p>Due '+esc(window.CheckinStatus.stamp(due,state.client.timezone||'Europe/Dublin'))+'.</p>':'')+'<p>Once your plan starts, come back here to confirm the sessions you completed or missed, how food went and what you need from Calum.</p></section>';
+  host.innerHTML='<section class="panel"><h1>Your first check-in</h1><p>'+esc(checkinWeekLabel(firstWeek))+'</p>'+(due?'<p>Due '+esc(window.CheckinStatus.stamp(due,state.client.timezone||'Europe/Dublin'))+'.</p>':'')+'<p>Once your plan starts, come back here to confirm the sessions you completed or missed, how food went and where I can help.</p></section>';
   return;
  }
  const active=()=>checkinSelectionOwner()===owner,record=state.data.checkins.find(c=>c.period_start===selected&&(!c.client_id||c.client_id===state.client.id));

@@ -18,7 +18,7 @@
    label.append(select);section.append(label);
    return {session:s,select};
   });
-  section.insertAdjacentHTML('beforeend','<label>'+ (tracked.length?'What got in the way or changed?':'What training did you do or miss?')+'<textarea name="challenges" rows="2" maxlength="1200" placeholder="'+(tracked.length?'Tell Calum why you changed or missed a workout.':'Include workouts planned and completed, or write “No training this week”.')+'"></textarea></label>');
+  section.insertAdjacentHTML('beforeend','<label>'+ (tracked.length?'What got in the way or changed?':'What training did you do or miss?')+'<textarea name="challenges" rows="2" maxlength="1200" placeholder="'+(tracked.length?'What got in the way?':'Include workouts planned and completed, or write “No training this week”.')+'"></textarea></label>');
   const changes=section.querySelector('textarea');
   function update(){
    changes.required=!tracked.length||tracked.some(({select})=>['missed','modified'].includes(select.value));
@@ -39,12 +39,12 @@
   const summary=document.createElement('summary');summary.textContent='Add measurements, wins or a voice note';details.append(summary);
   const period=form.elements.period_start.value,client=state.client,zone=client.timezone||'Europe/Dublin';
   const due=window.CheckinStatus?.due?.(client,period);
-  const intro=document.createElement('p');intro.className='muted';intro.textContent=due?'Submit by '+window.CheckinStatus.stamp(due,zone)+'. Review your training, food and what you need from Calum.':'Review your training, food and what you need from Calum.';stages[0].before(intro);
+  const intro=document.createElement('p');intro.className='muted';intro.textContent=due?'Submit by '+window.CheckinStatus.stamp(due,zone)+'. Review your training, food and where I can help.':'Review your training, food and where I can help.';stages[0].before(intro);
   const training=sessionReview(form,period);intro.after(training);
   const next=document.createElement('section');next.innerHTML='<h2>Food and next week</h2><label>How did your food plan go?<textarea name="food_summary" rows="2" maxlength="1200" required placeholder="What worked? What slipped? Think lunch, snacks and late nights."></textarea></label>';
   training.after(next);
   const support=form.querySelector('[name="support_needed"]');
-  if(support){support.required=true;support.maxLength=1200;support.placeholder='A change, question or upcoming deadline. Write “All good” if you need no help.';support.closest('label').firstChild.textContent='What can Calum help you with?';next.append(support.closest('label'));}
+  if(support){support.required=true;support.maxLength=1200;support.placeholder='A change, question or upcoming deadline. Write “All good” if you need no help.';support.closest('label').firstChild.textContent='What can I help you with?';next.append(support.closest('label'));}
   form.querySelector('[name="training_adherence"]')?.closest('fieldset')?.remove();
   form.querySelector('[name="nutrition_adherence"]')?.closest('fieldset')?.remove();
   const workload=form.querySelector('[name="workload"]')?.closest('fieldset');if(workload)details.append(workload);

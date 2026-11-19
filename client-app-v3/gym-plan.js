@@ -54,7 +54,7 @@
  }
  const training=clientTraining;
  clientTraining=function(){
-  const result=training(),host=$('#clientMain'),week=currentWeek();
+  const result=training(),host=$('#clientMain'),week=typeof clientTrainingWeek==='function'?clientTrainingWeek():currentWeek();
   if(!host||!week?.published||state.trainingCategory!=='weights')return result;
   const sessions=(state.data.sessions||[]).filter(s=>s.week_id===week.id),selected=state.selectedSessionId;
   if(!host.querySelector('[data-gym-plan]')){
@@ -66,7 +66,7 @@
  coachNutrition=function(){
   const result=coachMeals(),host=$('#clientWorkspaceBody');
   const plan=(state.data.nutritionPlans||[]).find(p=>p.is_active&&p.client_id===state.client?.id&&p.source_json?.food_brief);
-  const brief=window.FoodPlanBrief?.markup(plan);
+  const brief=window.FoodPlanBrief?.markup(plan,{coach:true});
   if(host&&brief&&!host.querySelector('.food-plan-brief'))host.insertAdjacentHTML('afterbegin',brief);
   return result;
  };

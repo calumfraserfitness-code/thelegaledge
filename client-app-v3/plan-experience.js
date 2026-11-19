@@ -27,7 +27,7 @@ function mealsForNutritionPlan(plan) {
     const portion = meal.items?.length === 1 && meal.items[0].unit === 'meal' && meal.items[0].description ? meal.items[0] : null;
     if (portion) return {...meal, name:portion.name, meal_type:meal.name,
       calories:portion.calories, protein_g:portion.protein_g, carbs_g:portion.carbs_g, fat_g:portion.fat_g,
-      preparation:portion.description, source_system:'coach_portion_menu', ingredients:[]};
+      preparation:portion.description, source_system:'coach_portion_menu', ingredients:plan.source_json?.portion_ingredients?.[portion.id]||[]};
     return { ...meal, meal_type: meal.timing,
     ingredients: (meal.items || []).map(item => ({name:item.name,quantity:item.quantity,unit:item.unit})),
     cooking_instructions: meal.cooking_instructions || null };
