@@ -3,7 +3,15 @@
  'use strict';
  const statuses={agreed:'Agreed',proposed:'Needs confirmation',paused:'Paused',historical:'Historical—not current',complete:'Complete'};
  const fields={phase:'Current phase',destination:'Long-term direction & original agreements',evidence:'Latest dated evidence',scorecard:'Weekly scorecard',coach:'Your coaching actions',next_call:'Questions for the next call',review:'Next review / unresolved decisions'};
- const safeSource=value=>{try{const u=new URL(value);return u.protocol==='https:'&&['fathom.video','www.loom.com','loom.com'].includes(u.hostname)?u.href:null;}catch{return null;}};
+ function safeSource(value){
+  try{
+   const url=new URL(value);
+   if(url.protocol!=='https:'||url.port||url.username||url.password)return null;
+   if(['fathom.video','www.loom.com','loom.com'].includes(url.hostname))return url.href;
+   if(url.hostname==='mail.google.com'&&/^\/mail\/(?:u\/\d+\/)?$/.test(url.pathname)&&!url.search&&/^#(?:all|inbox)\/[A-Za-z0-9]+$/.test(url.hash))return url.href;
+  }catch{}
+  return null;
+ }
  function realClient(c){return c&&c.coach_id===state.user?.id&&!c.deleted_at&&['active','ending'].includes(c.status)&&!c.archived_at&&c.profile_id!==state.user?.id&&c.source_system!=='coach_health_test'&&!/demo|test data/i.test(c.display_name||'');}
  function eligible(){return state.role==='coach'&&!state.preview&&state.user?.id&&realClient(state.client);}
  function validate(p){
@@ -12,7 +20,7 @@
   if(!p.phase.trim())throw Error('Add the current phase.');
   for(const g of p.goals)if(!g||typeof g.title!=='string'||!g.title.trim()||g.title.length>200||typeof g.detail!=='string'||g.detail.length>4000||!Object.hasOwn(statuses,g.status))throw Error('Each goal needs a title, details and agreement status.');
   for(const t of p.trajectory)if(!t||typeof t.label!=='string'||!t.label.trim()||t.label.length>200||typeof t.detail!=='string'||t.detail.length>5000)throw Error('Each review horizon needs a label and details.');
-  for(const s of p.sources)if(!s||typeof s.label!=='string'||s.label.length>200||typeof s.url!=='string'||s.url.length>1500||(s.url&&!safeSource(s.url)))throw Error('A source link needs review.');
+  for(const s of p.sources)if(!s||typeof s.label!=='string'||s.label.length>200||typeof s.url!=='string'||s.url.length>1500)throw Error('Saved references need review.');
   return window.CoachingPhasePlan?window.CoachingPhasePlan.validate(p):p;
  }
  const blank=()=>({version:1,phase:'Set the current priority',destination:'',evidence:'',goals:[{id:'goal-'+Date.now().toString(36),title:'Agree the next useful goal',status:'proposed',detail:''}],trajectory:[{label:'Next two weeks',detail:''},{label:'Following two weeks',detail:''},{label:'Next review',detail:''}],scorecard:'',coach:'',next_call:'',review:'',sources:[]});
@@ -22,7 +30,7 @@
  function dateLabel(value){return value?new Date(value+'T12:00:00Z').toLocaleDateString('en-IE',{timeZone:'Europe/Dublin',day:'numeric',month:'short',year:'numeric'}):'Date to agree';}
  function quickView(p){
   const goals=focusGoals(p),date=reviewDate(p),proposed=goals.some(g=>g.target_status!=='agreed');
-  return '<div class="cr-quick-plan"><article class="cr-quick-goal"><span class="cr-step">01 · MAIN GOAL</span><h2>What we’re working towards</h2><p class="cr-lead">'+esc(brief(p.destination||'Agree the main outcome with this client.',320))+'</p></article><article class="cr-current cr-quick-phase"><span class="cr-step">02 · CURRENT PHASE</span><h3>'+esc(p.phase)+'</h3><p class="muted">The focus now. The full phased plan is in View details.</p></article><article class="cr-quick-week"><span class="cr-step">03 · THIS WEEK</span><h3>Keep the next steps clear</h3><div class="cr-week-columns"><div><h4>Client focus</h4>'+(goals.length?'<ul>'+goals.slice(0,3).map(g=>'<li><strong>'+esc(g.title)+'</strong><p>'+esc(brief(g.target||'Specific next step still needs agreeing.',180))+'</p></li>').join('')+'</ul>'+(goals.length>3?'<p class="muted">'+(goals.length-3)+' more current goals in View details.</p>':''):'<p>No current goal is agreed or proposed. Review the paused or historical goals before restarting them.</p>')+'</div><div class="cr-coach-next"><h4>Your next step</h4><p>'+esc(brief(p.coach||'Agree one useful next step with the client.',320))+'</p></div></div>'+(proposed?'<p class="cr-confirm-note">Confirm the proposed target details with the client before treating them as agreed.</p>':'')+'</article><article class="cr-quick-review"><span class="cr-step">04 · NEXT REVIEW</span><h3>'+esc(dateLabel(date))+'</h3><p class="cr-date-note">'+(date?'Saved review target—not a booked call.':'No review date has been recorded.')+'</p><h4>What to check</h4><p>'+esc(brief(p.scorecard||'Agree how progress will be measured before changing the plan.',280))+'</p><details class="cr-review-note"><summary>Review notes</summary><p>'+esc(p.review||'No further review notes saved.')+'</p></details></article></div>';
+  return '<div class="cr-quick-plan"><article class="cr-quick-goal"><span class="cr-step">MAIN GOAL</span><h2>Long-term goal</h2><p class="cr-lead">'+esc(brief(p.destination||'Agree the main outcome with this client.',320))+'</p></article><article class="cr-current cr-quick-phase"><span class="cr-step">CURRENT PHASE</span><h3>'+esc(p.phase)+'</h3></article><article class="cr-quick-week"><span class="cr-step">THIS WEEK</span><h3>Next steps</h3><div class="cr-week-columns"><div><h4>Client focus</h4>'+(goals.length?'<ul>'+goals.slice(0,3).map(g=>'<li><strong>'+esc(g.title)+'</strong><p>'+esc(brief(g.target||'Specific next step still needs agreeing.',180))+'</p></li>').join('')+'</ul>'+(goals.length>3?'<p class="muted">'+(goals.length-3)+' more current goals in View details.</p>':''):'<p>No current goal is agreed or proposed. Review the paused or historical goals before restarting them.</p>')+'</div><div class="cr-coach-next"><h4>Your next step</h4><p>'+esc(brief(p.coach||'Agree one useful next step with the client.',320))+'</p></div></div>'+(proposed?'<p class="cr-confirm-note">Confirm the proposed target details with the client before treating them as agreed.</p>':'')+'</article><article class="cr-quick-review"><span class="cr-step">NEXT REVIEW</span><h3>'+esc(dateLabel(date))+'</h3><p class="cr-date-note">'+(date?'Saved review target—not a booked call.':'No review date has been recorded.')+'</p><h4>What to check</h4><p>'+esc(brief(p.scorecard||'Agree how progress will be measured before changing the plan.',280))+'</p><details class="cr-review-note"><summary>Review notes</summary><p>'+esc(p.review||'No further review notes saved.')+'</p></details></article></div>';
  }
  function detailedMarkup(p,compact){
   const goal=g=>'<article class="cr-goal"><span class="cr-badge cr-'+g.status+'">'+esc(statuses[g.status])+'</span><h3>'+esc(g.title)+'</h3><p>'+esc(g.detail)+'</p>'+(window.CoachingPhasePlan?.goal(g,esc,compact)||'')+'</article>';
@@ -42,7 +50,7 @@
   host.querySelector('#coachRoadmap')?.remove();const box=document.createElement('section');box.id='coachRoadmap';box.className='panel cr-roadmap';host.prepend(box);
   const id=state.client.id,owner=state.user.id,tab=state.clientTab,published=host.querySelector('.cr-published');let serial=0,revision=0,payload=null,dirty=false,busy=false,detailsOpen=false;
   const active=()=>box.isConnected&&eligible()&&state.user.id===owner&&state.client.id===id&&state.clientTab===tab;
-  const header=()=>'<div class="panel-head"><div><span class="eyebrow">YOUR CLIENT PLAN</span><p class="muted">Goal. Focus. Next steps. Review. Private to you.</p></div><button type="button" class="btn ghost small" data-cr-refresh>Refresh plan</button></div>';
+  const header=()=>'<div class="panel-head"><div><h2>Coaching roadmap</h2><small class="muted">Coach only</small></div><button type="button" class="btn ghost small" data-cr-refresh>Refresh</button></div>';
   function bind(){
    box.querySelector('[data-cr-refresh]')?.addEventListener('click',()=>{if(!active()||busy)return;if((dirty||window.RoadmapCallReview?.hasDraft(box))&&!window.confirm('Discard unsaved edits and reload the saved roadmap?'))return;window.RoadmapCallReview?.clearDraft(box);load();});
    box.querySelector('[data-cr-open]')?.addEventListener('click',()=>{if(!active())return;state.clientTab='goals';renderClientWorkspace();});

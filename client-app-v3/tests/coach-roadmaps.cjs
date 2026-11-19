@@ -16,6 +16,18 @@ function setup(){
  d.querySelector('[data-cr-add-goal]').click();assert.equal(d.querySelectorAll('[data-cr-goals] fieldset').length,2);assert.equal(d.querySelector('[name=phase]').value,'Unsaved');
  let finish;h.rpc(new Promise(r=>finish=r));form=d.querySelector('form[data-cr-form]');form.dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));await tick();form.elements.phase.value='Newer typing';form.dispatchEvent(new w.Event('input',{bubbles:true}));const sent=h.calls.filter(x=>x?.p_payload).at(-1);finish({client_id:'a',coach_id:'coach',revision:3,payload:sent.p_payload});await tick();assert.equal(form.elements.phase.value,'Newer typing');assert(form.textContent.includes('newer edits are still unsaved'));
  h.rpc(new Error('Roadmap changed elsewhere'));form.dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));await tick();assert(form.textContent.includes('changed elsewhere'));assert.equal(form.elements.phase.value,'Newer typing');
+ const sources=fixture();
+ const gmail='https://mail.google.com/mail/#all/FAKE123';
+ sources.sources.push({label:'Signed agreement',url:gmail},{label:'Legacy reference',url:'https://example.com/old'});
+ h.set([{client_id:'a',coach_id:'coach',revision:4,payload:sources}]);
+ w.renderClientWorkspace();await tick();
+ const saved=d.querySelector('#coachRoadmap');
+ assert(saved.textContent.includes('Routine first'),'Optional references do not hide the roadmap');
+ assert.equal(saved.querySelector('.cr-sources a[href^="https://mail.google.com"]').href,gmail);
+ assert(saved.querySelector('.cr-sources').textContent.includes('Legacy reference'));
+ assert(!saved.querySelector('.cr-sources a[href^="https://example.com"]'),'Unsupported links display as plain labels');
+ assert.equal(w.CoachRoadmaps.safeSource('https://mail.google.com/mail/?next=elsewhere#all/FAKE123'),null);
+ assert.equal(w.CoachRoadmaps.safeSource('https://mail.google.com.evil.test/mail/#all/FAKE123'),null);
  const evil=fixture();evil.phase='<img src=x onerror=alert(1)>';evil.goals[0].title='<script>bad()</script>';assert(!w.CoachRoadmaps.markup(evil,false).includes('<script>'));assert.equal(w.CoachRoadmaps.safeSource('javascript:alert(1)'),null);assert.equal(w.CoachRoadmaps.safeSource('https://fathom.video.evil.test/a'),null);assert.equal(w.CoachRoadmaps.safeSource('https://example.com/'),null);
  assert.throws(()=>w.CoachRoadmaps.validate({...fixture(),goals:[]}));assert.throws(()=>w.CoachRoadmaps.validate({...fixture(),goals:[{title:'bad',detail:'',status:'invented'}]}));
  h.set(new Error('Read failed'));w.renderClientWorkspace();await tick();assert(d.querySelector('#coachRoadmap').textContent.includes('unavailable'));assert(!d.querySelector('[data-cr-form]'),'failed reads are not empty writable plans');
