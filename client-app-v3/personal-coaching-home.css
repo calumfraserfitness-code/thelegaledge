@@ -21,7 +21,19 @@
 .food-plan-brief p{margin:0;line-height:1.5}
 .food-plan-brief .food-plan-baseline{margin-top:14px;font-weight:700}
 
-.pch-start-rhythm{display:flex;flex-wrap:wrap;gap:10px;padding:0;list-style:none;margin:14px 0 18px}.pch-start-rhythm li{padding:9px 12px;border:1px solid var(--line,#ded8cd);border-radius:10px}.pch-start-rhythm strong{display:block}
+.pch-priorities{grid-column:1/-1;border-top:3px solid var(--gold,#bd964a)}
+.pch-priorities h2{font-size:clamp(20px,3vw,25px);margin:0 0 12px}
+.pch-priorities ul{list-style:none;padding:0;margin:0 0 16px}
+.pch-priorities li{display:grid;grid-template-columns:minmax(80px,1fr) minmax(0,2fr);gap:12px;padding:9px 0;border-top:1px solid var(--line,#ded8cd);align-items:baseline}
+.pch-priorities li>span{color:var(--muted);font-size:.9rem}
+.pch-priorities li>strong{font-size:.95rem;overflow-wrap:anywhere}
+.pch-priorities li small{font-weight:500;color:var(--muted);margin-left:5px;white-space:nowrap}
+.pch-priority-actions{display:flex;flex-wrap:wrap;gap:8px}
+.pch-priority-actions .btn{min-height:44px}
+.pch-week-notes{margin-top:12px;border-top:1px solid var(--line,#ded8cd)}
+.pch-week-notes summary{width:fit-content;min-height:44px;padding:12px 0;cursor:pointer;font-size:.9rem;font-weight:650}
+.pch-week-notes p{margin:0;max-width:70ch;line-height:1.6}
+.pch-home [data-pch-focus-compact][hidden]{display:none}
 
 .pch-start-hero{grid-column:1/-1;min-height:142px;padding:25px 28px;border:1px solid #e9dfcb;border-radius:18px;background:linear-gradient(90deg,#f6f2e7 12%,#f6f2e7d9 48%,#f6f2e700 76%),url('./assets/welcome-progress-20261008.webp') center right/cover}
 .pch-start-hero h1{max-width:70%}
