@@ -25,7 +25,7 @@
    .map(call=>({...call,instant:new Date(call.scheduled_at),day:M.localDate(new Date(call.scheduled_at),zone)}))
    .sort((a,b)=>a.instant-b.instant);
   const outside=scheduled.find(call=>call.day<start||call.day>end);
-  const weighIns=sessions.some(s=>s.source_metadata?.gym_days);
+  const weighIns=client.track_weight!==false&&Number(client.weekly_weigh_in_minimum)===2&&sessions.some(s=>s.source_metadata?.gym_days);
   const rows=dates.map(date=>{
    const key=date.toISOString().slice(0,10);
    const assigned=sessions.filter(s=>s.session_date===key).map(s=>'<button class="week-activity" type="button" data-week-session="'+esc(s.id)+'"><span>'+esc(s.title.split(' · ')[0])+'</span><small>'+esc(s.title.split(' · ').slice(1).join(' · '))+(s.status==='completed'?' ✓':'')+'</small></button>').join('');
@@ -59,6 +59,45 @@
  function goalMarkup(goal){
   return goal?'<section class="panel pch-goal"><h2>Your goals</h2><p class="pch-focus-text">'+esc(goal)+'</p></section>':'';
  }
+ function prioritiesMarkup(week,sessions,client,{starting=false,hasMeals=false,checkin=null}={}){
+  const lifts=sessions.filter(s=>['weights','resistance'].includes(s.training_type));
+  const rides=sessions.filter(s=>s.training_type==='cardio'&&/\bPeloton\b/i.test(s.title));
+  const cardio=sessions.filter(s=>s.training_type==='cardio').length-rides.length;
+  const liftType=lifts.every(s=>/\bfull[ -]body\b/i.test(s.title))?' full-body ':' ';
+  const training=[lifts.length&&lifts.length+liftType+(lifts.length===1?'lift':'lifts'),
+   rides.length&&rides.length+' Peloton '+(rides.length===1?'ride':'rides'),
+   cardio&&cardio+' cardio '+(cardio===1?'session':'sessions')].filter(Boolean).join(' · ');
+  const due=client.weekly_checkin_enabled!==false?M.due(client,week.week_start):null;
+  const dateFormat=new Intl.DateTimeFormat('en-US',{weekday:'short',month:'short',day:'numeric',timeZone:client.timezone||'Europe/Dublin'});
+  const timeFormat=new Intl.DateTimeFormat('en-US',{hour:'numeric',minute:'2-digit',timeZoneName:'short',timeZone:client.timezone||'Europe/Dublin'});
+  const dueLabel=due?dateFormat.format(due)+' · '+timeFormat.format(due):'';
+  const steps=Number(client.daily_steps_goal);
+  const weigh=client.track_weight!==false&&Number(client.weekly_weigh_in_minimum)===2;
+  return '<section class="panel pch-priorities" aria-labelledby="pchPrioritiesTitle"><div class="pch-priorities-heading"><h2 id="pchPrioritiesTitle">'+(starting?'Week one priorities':'This week’s priorities')+'</h2></div><ul>'+
+   (training?'<li><span>Training</span><strong>'+esc(training)+'</strong></li>':'')+
+   (steps>0?'<li><span>Daily steps</span><strong>'+esc(steps.toLocaleString())+'</strong></li>':'')+
+   (weigh?'<li><span>Weigh-ins</span><strong>Tue, Fri, Sun <small>At least twice</small></strong></li>':'')+
+   (checkin||dueLabel?'<li><span>Check-in</span><strong>'+esc(checkin?(checkin.reviewed_at?'Reviewed':'Submitted'):dueLabel)+'</strong></li>':'')+
+   '</ul><div class="pch-priority-actions"><button type="button" class="btn primary small" data-pch-priority-training>Open training</button>'+
+   (hasMeals?'<button type="button" class="btn ghost small" data-pch-start-meals>Meal plan</button>':'')+
+   (!starting&&(checkin||dueLabel)?'<button type="button" class="btn ghost small" data-pch-checkin>'+(checkin?'View check-in':'Open check-in')+'</button>':'')+
+   '</div>'+(week.coach_note?'<details class="pch-week-notes"><summary>Week notes</summary><p>'+esc(week.coach_note)+'</p></details>':'')+'</section>';
+ }
+ function bindPriorities(root,active,startDate){
+  root.querySelector('[data-pch-priority-training]')?.addEventListener('click',()=>{
+   if(!active())return;
+   state.selectedSessionId=null;
+   state.trainingCategory='weights';
+   route('training');
+  });
+  root.querySelector('[data-pch-start-meals]')?.addEventListener('click',()=>{
+   if(!active())return;
+   if(startDate&&typeof window.openDailyNutritionDate==='function'){
+    state.clientView='nutrition';window.openDailyNutritionDate(startDate);
+   }else route('nutrition');
+  });
+  root.querySelector('[data-pch-checkin]')?.addEventListener('click',()=>{if(active()){state.checkinWeek=null;route('checkin');}});
+ }
  function startingMarkup(plan,client,data){
   const date=new Intl.DateTimeFormat('en-GB',{weekday:'long',day:'numeric',month:'long',timeZone:'UTC'}).format(new Date(client.start_date+'T12:00:00Z'));
   const gymPlan=plan.sessions.some(s=>s.source_metadata?.gym_days);
@@ -68,8 +107,11 @@
    return '<details class="panel"><summary><strong>'+esc(session.title)+'</strong>'+(session.duration_minutes?' · '+esc(session.duration_minutes)+' min':'')+'</summary>'+details+'</details>';
   }).join('');
   const due=client.weekly_checkin_enabled!==false?M.due(client,plan.week.week_start):null;
-  const rhythm=gymPlan?'<ul class="pch-start-rhythm"><li><strong>Daily steps</strong> '+esc(Number(client.daily_steps_goal||8000).toLocaleString())+'</li><li><strong>Morning weigh-ins</strong> Aim for 2–3 · Tue, Fri, Sun</li></ul>':'';
-  return '<header class="pch-heading pch-start-hero"><h1>Your first week</h1><p>Starts '+esc(date)+'</p></header>'+weekSchedule(plan.week,plan.sessions,client,data.coachingCalls)+goalMarkup(client.goal_summary)+'<section class="panel pch-goal"><h2>Week one priorities</h2>'+(plan.week.coach_note?'<p class="pch-focus-text">'+esc(plan.week.coach_note)+'</p>':'')+rhythm+'<div class="head-actions">'+(plan.hasMeals?'<button type="button" class="btn primary" data-pch-start-meals>View meal plan</button>':'')+'<button type="button" class="btn ghost" data-pch-start-coach>Open Coach</button></div>'+(due?'<p>First check-in due '+esc(M.stamp(due,client.timezone||'Europe/Dublin'))+'.</p>':'')+'</section>'+(workouts?'<section class="panel pch-focus"><h2>Your sessions</h2>'+workouts+'</section>':'');
+  const priorities=gymPlan?prioritiesMarkup(plan.week,plan.sessions,client,{starting:true,hasMeals:plan.hasMeals}):
+   '<section class="panel pch-goal"><h2>Week one priorities</h2>'+(plan.week.coach_note?'<p class="pch-focus-text">'+esc(plan.week.coach_note)+'</p>':'')+
+   '<div class="head-actions">'+(plan.hasMeals?'<button type="button" class="btn primary" data-pch-start-meals>View meal plan</button>':'')+
+   '<button type="button" class="btn ghost" data-pch-start-coach>Open Coach</button></div>'+(due?'<p>First check-in due '+esc(M.stamp(due,client.timezone||'Europe/Dublin'))+'.</p>':'')+'</section>';
+  return '<header class="pch-heading pch-start-hero"><h1>Your first week</h1><p>Starts '+esc(date)+'</p></header>'+priorities+weekSchedule(plan.week,plan.sessions,client,data.coachingCalls)+goalMarkup(client.goal_summary)+(workouts?'<section class="panel pch-focus"><h2>Your sessions</h2>'+workouts+'</section>':'');
  }
  function model(client,data,now=new Date()){
   const date=M.localDate(now,client.timezone||'Europe/Dublin'),period=M.week(client,now);
@@ -125,6 +167,7 @@
   const box=root.querySelector('[data-pch-focus]');if(!box)return;
   const current=(rows||[]).filter(r=>r.client_id===state.client.id&&r.approved_at&&!r.archived_at&&r.starts_on<=m.date&&r.expires_on>=m.date),open=current.filter(r=>!r.completed_at);
   const text=m.focus||open[0]?.description;
+  if(box.hasAttribute('data-pch-focus-compact'))box.hidden=!text;
   box.innerHTML='<span class="eyebrow">THIS WEEK’S FOCUS</span>'+(text?'<p class="pch-focus-text">'+esc(text)+'</p>':current.length?'<p>Your current agreed actions are marked complete. Keep following your published programme.</p>':status==='loading'?'<p role="status">Reading your agreed focus…</p>':status==='unavailable'?'<p role="status">Your agreed actions could not load. Open Coach to retry.</p>':'<p>'+(m.week?'Follow your published programme. Your current coaching feedback and agreed actions are in Coach.':'Your current focus will appear here when it is published. Your saved feedback remains in Coach.')+'</p>')+'<button type="button" class="text-btn" data-pch-coach>View coaching & agreed actions</button>';
   const user=state.user?.id,id=state.client.id;box.querySelector('button').onclick=()=>{if(box.isConnected&&eligible()&&state.user?.id===user&&state.client?.id===id)route('support');};
  }
@@ -147,20 +190,26 @@
    root.innerHTML=startingMarkup(start,state.client,state.data)+'<div data-pch-video hidden></div><details class="pch-secondary" data-pch-secondary><summary><span>More coaching tools</span></summary><div data-pch-secondary-content></div></details>';
    host.prepend(root);
    const active=()=>root.isConnected&&eligible()&&state.user?.id===user&&state.client?.id===client;
-   root.querySelector('[data-pch-start-meals]')?.addEventListener('click',()=>{if(!active())return;state.clientView='nutrition';if(typeof window.openDailyNutritionDate==='function')window.openDailyNutritionDate(state.client.start_date);else route('nutrition');});
-   root.querySelector('[data-pch-start-coach]').onclick=()=>{if(active())route('support');};
+   bindPriorities(root,active,state.client.start_date);
+   root.querySelector('[data-pch-start-coach]')?.addEventListener('click',()=>{if(active())route('support');});
    bindWeekSchedule(root);
    arrange();watch();return;
   }
   const name=String(state.client.display_name||'').trim().split(/\s+/)[0];
   const weekSessions=(state.data.sessions||[]).filter(s=>s.week_id===m.week?.id&&(!s.client_id||s.client_id===client));
   const schedule=weekSchedule(m.week,weekSessions,state.client,state.data.coachingCalls);
-  root.innerHTML='<header class="pch-heading pch-start-hero"><span class="eyebrow">YOUR PERSONAL COACHING</span><h1>'+esc(name?name+', here’s your focus.':'Your coaching, made clear.')+'</h1>'+'</header>'+schedule+goalMarkup(m.goal)+'<div data-pch-video hidden></div><section class="panel pch-focus" data-pch-focus></section><section class="panel pch-next"><span class="eyebrow">YOUR NEXT STEP</span><h2>'+esc(m.action.title)+'</h2><p>'+esc(m.action.detail)+'</p><button type="button" class="btn primary" data-pch-next>'+esc(m.action.label)+'</button></section>'+checkinMarkup(m,state.client)+(weekSessions.some(s=>s.source_metadata?.gym_days)&&!m.goals.length?'':milestoneMarkup(m,state.client))+'<details class="pch-secondary" data-pch-secondary><summary><span>Your plan & progress</span><small>Meals, check-in, training and saved activity</small></summary><div data-pch-secondary-content></div></details>';
+  const compact=!!m.week&&weekSessions.some(s=>s.source_metadata?.gym_days);
+  const priorities=compact?prioritiesMarkup(m.week,weekSessions,state.client,{checkin:m.saved,hasMeals:(state.data.nutritionDays||[]).some(d=>d.week_id===m.week.id&&d.nutrition_plan_id)}):'';
+  const focusPanel='<section class="panel pch-focus" data-pch-focus'+(compact?' data-pch-focus-compact hidden':'')+'></section>';
+  const actions=compact?'':'<section class="panel pch-next"><span class="eyebrow">YOUR NEXT STEP</span><h2>'+esc(m.action.title)+'</h2><p>'+esc(m.action.detail)+'</p><button type="button" class="btn primary" data-pch-next>'+esc(m.action.label)+'</button></section>'+checkinMarkup(m,state.client);
+  root.innerHTML='<header class="pch-heading pch-start-hero"><span class="eyebrow">YOUR PERSONAL COACHING</span><h1>'+esc(name?name+', here’s your focus.':'Your coaching, made clear.')+'</h1></header>'+
+   priorities+schedule+goalMarkup(m.goal)+'<div data-pch-video hidden></div>'+focusPanel+actions+
+   (compact&&!m.goals.length?'':milestoneMarkup(m,state.client))+'<details class="pch-secondary" data-pch-secondary><summary><span>Your plan & progress</span><small>Meals, check-in, training and saved activity</small></summary><div data-pch-secondary-content></div></details>';
   host.prepend(root);const active=()=>root.isConnected&&eligible()&&state.user?.id===user&&state.client?.id===client;
-  root.querySelector('[data-pch-next]').onclick=()=>{if(!active())return;if(m.action.session){state.selectedSessionId=m.action.session;state.trainingCategory=m.action.category;}route(m.action.route);};
-  root.querySelector('[data-pch-checkin]').onclick=()=>{if(active())route('checkin');};
+  bindPriorities(root,active);
+  root.querySelector('[data-pch-next]')?.addEventListener('click',()=>{if(!active())return;if(m.action.session){state.selectedSessionId=m.action.session;state.trainingCategory=m.action.category;}route(m.action.route);});
   root.querySelector('[data-pch-progress]')?.addEventListener('click',()=>{if(active())route('progress');});
-  bindWeekSchedule(root);arrange();watch();focus(root,m);
+  bindWeekSchedule(root);arrange();watch();focus(root,compact?{...m,focus:''}:m);
  }
  const today=clientToday;clientToday=function(){const result=today();mount();return result;};
  // Later render wrappers sometimes rebuild Today in a microtask. Mount only the final gated view.
