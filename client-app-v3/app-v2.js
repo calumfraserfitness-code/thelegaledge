@@ -301,13 +301,14 @@ function clientHeader(kicker, heading, copy) {
   return `<div class="client-page-head"><span class="eyebrow">${esc(kicker)}</span><h1>${esc(heading)}</h1><p class="muted">${esc(copy)}</p></div>`;
 }
 
-function clientRows(clients) {
+function clientRows(clients, compact = false) {
   if (!clients.length) return '<div class="empty">No clients in this view.</div>';
   return clients.map((client) => `<button class="client-row" data-client-id="${client.id}">
     <span class="avatar">${esc(client.display_name.split(' ').map((part) => part[0]).slice(0, 2).join(''))}</span>
-    <span><span class="name">${esc(client.display_name)}</span><span class="sub">${esc(title(client.status || 'active'))} · ${client.weight_unit === 'lbs' ? 'US / lb' : 'Ireland / kg'}</span></span>
+    <span><span class="name">${esc(client.display_name)}</span>${compact ? '' : `<span class="sub">${esc(title(client.status || 'active'))} · ${client.weight_unit === 'lbs' ? 'US / lb' : 'Ireland / kg'}</span>`}</span>
+    ${compact ? '' : `
     <span class="hide-mobile"><span class="sub">Daily steps</span>${safeStepGoal(client).toLocaleString()}</span>
-    <span class="hide-mobile"><span class="sub">Goal</span>${client.track_weight === false ? 'Performance / health' : (client.goal_weight_kg ? `${Math.round(Number(client.goal_weight_kg) * (client.weight_unit === 'lbs' ? 2.20462 : 1))} ${client.weight_unit === 'lbs' ? 'lb' : 'kg'}` : 'Not set')}</span>
+    <span class="hide-mobile"><span class="sub">Goal</span>${client.track_weight === false ? 'Performance / health' : (client.goal_weight_kg ? `${Math.round(Number(client.goal_weight_kg) * (client.weight_unit === 'lbs' ? 2.20462 : 1))} ${client.weight_unit === 'lbs' ? 'lb' : 'kg'}` : 'Not set')}</span>`}
     <span class="status">Open</span>
   </button>`).join('');
 }
@@ -321,7 +322,7 @@ function bindClientRows() {
     const active=()=>request===clientWorkspaceOpenSequence&&state.user?.id===account&&state.role===role&&state.client?.id===client.id;
     const host=$('#coachMain');delete host.dataset.workspaceOwner;delete host.dataset.workspaceClient;
     host.innerHTML=pageHead('CLIENT WORKSPACE',client.display_name,'<button type="button" class="btn ghost small" id="openingClientBack">Back to clients</button>')+'<section class="panel workspace-opening" role="status"><h2>Opening your client’s workspace</h2><p>Reading their saved plans and history…</p></section>';
-    $('#openingClientBack').onclick=()=>{if(!active())return;state.client=null;state.coachView='clients';renderCoach();};
+    $('#openingClientBack').onclick=()=>{if(!active())return;state.client=null;if(state.coachView!=='dashboard')state.coachView='clients';renderCoach();};
     try{if(!state.preview){if(await loadClientData(client.id)===false||!active())return;}else state.data=state.sampleClientData?.get(client.id)||demoData();if(active())renderCoach();}
     catch(error){if(active())renderError(host,error,()=>row.click());}
   });
@@ -336,12 +337,15 @@ function renderCoach() {
 }
 
 function renderDashboard() {
-  const active = state.clients.filter((client) => client.status === 'active');
-  const archived = state.clients.length - active.length;
-  $('#coachMain').innerHTML = pageHead('COACH WORKSPACE', 'Client overview', '<button class="btn ghost" data-coach-view-link="clients">View all clients</button><button class="btn primary" data-add-client>+ Add client</button>') + `
-    <div class="stats"><div class="stat"><span>ACTIVE CLIENTS</span><strong>${active.length}</strong></div><div class="stat"><span>PAST / ARCHIVED</span><strong>${archived}</strong></div><div class="stat"><span>CHECK-INS</span><strong>Weekly</strong></div><div class="stat"><span>GOALS</span><strong>Individual</strong></div></div>
-    <section class="panel"><div class="panel-head"><div><h3>Active clients</h3><span class="sub">Open a client to manage their current week.</span></div></div>${clientRows(active)}</section>${qaDashboard(active)}`;
-  $('[data-coach-view-link]')?.addEventListener('click', () => { state.coachView = 'clients'; renderCoach(); });
+  const active = directCoachingClients().filter(client =>
+    ['active', 'ending'].includes(client.status) && !client.deleted_at && !client.archived_at &&
+    !/\b(?:demo|test|qa)\b/i.test(client.display_name || '')
+  ).sort((a, b) => a.display_name.localeCompare(b.display_name));
+  $('#coachMain').innerHTML = pageHead('COACH WORKSPACE', 'Client overview') + `
+    <section class="panel home-client-directory" id="homeClientDirectory" aria-labelledby="homeClientHeading">
+      <h2 id="homeClientHeading">Clients</h2>
+      ${clientRows(active, true)}
+    </section>${qaDashboard(active)}`;
   bindAddClient();
   bindClientRows();
 }

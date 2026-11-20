@@ -1,14 +1,15 @@
-/* Coach Home is an action inbox. Secondary tools remain intact behind disclosure. */
+/* Coach Home keeps check-ins and the client directory in view. */
 (function(){
  'use strict';
  let observer=null,scheduled=false;
- const sections=[['activity','Client activity','Sign-ins and saved training/check-ins'],['setup','Onboarding & setup','Submitted profiles, busy-week setups and plan checks'],['watch','Watch connections','Received readings and connection status'],['directory','All clients & tools','Client directory and other coach tools']];
+ const sections=[['activity','Client activity','Sign-ins and saved training/check-ins'],['setup','Onboarding & setup','Submitted profiles, busy-week setups and plan checks'],['watch','Watch connections','Received readings and connection status'],['health','Health reports & app status','Saved reports, phone alerts and backups'],['other','Other tools','Additional coaching controls']];
  function eligible(){return state.role==='coach'&&!state.client&&state.coachView==='dashboard';}
  function groupFor(node){
-  if(node.id==='coachActivity')return 'activity';
+  if(['coachActivity','coachCompletionFeed'].includes(node.id))return 'activity';
+  if(['coachHealthReportInbox','coachReliability'].includes(node.id))return 'health';
   if(node.id==='psWatchFeed')return 'watch';
   if(['psInbox','bwCoachQueue'].includes(node.id)||node.querySelector('.qa-table')||/^(Client plan QA|Plan completeness)$/.test(node.querySelector('h3')?.textContent||''))return 'setup';
-  return 'directory';
+  return 'other';
  }
  function compactWatch(panel){
   const grid=panel.querySelector('.ps-watch-grid');if(!grid)return;
@@ -19,22 +20,39 @@
   note.hidden=empty===0;
  }
  function checkinInbox(shell,attention){
-  let box=shell.querySelector('[data-home-checkins]');if(!box){box=document.createElement('section');box.className='panel home-checkin-inbox';box.dataset.homeCheckins='';box.setAttribute('aria-live','polite');shell.querySelector('[data-home-primary]').before(box);}
+  const box=shell.querySelector('[data-home-checkins]'),coverage=shell.querySelector('[data-home-coverage]');
   let data;try{data=JSON.parse(attention?.dataset.homeCheckins||'null');}catch{}
-  const user=state.user?.id,rows=data?.available?(data.rows||[]).filter(r=>state.clients?.some(c=>c.id===r.client_id)).sort((a,b)=>Number(!!a.reviewed_at)-Number(!!b.reviewed_at)||String(b.submitted_at).localeCompare(String(a.submitted_at))):[],pending=rows.filter(r=>!r.reviewed_at&&(!r.source_system||/^client_weekly_v[23]$/.test(r.source_system))).length;
+  const user=state.user?.id;
+  const rows=(data?.available||data?.pending_available)?(data.rows||[])
+   .filter(r=>!r.reviewed_at&&(!r.source_system||/^client_weekly_v[23]$/.test(r.source_system))&&state.clients?.some(c=>c.id===r.client_id))
+   .sort((a,b)=>String(b.submitted_at).localeCompare(String(a.submitted_at))):[];
   const signature=JSON.stringify({user,data,rows});if(box.dataset.signature===signature)return;box.dataset.signature=signature;
-  const title=!data?'Checking check-ins…':!data.available?'Check-in status unavailable':data.pending_available===false?'Outstanding reviews unavailable':!rows.some(r=>!r.reviewed_at)?'All check-ins reviewed':pending+' check-in'+(pending===1?'':'s')+' ready for review';
-  box.replaceChildren();const eyebrow=document.createElement('span');eyebrow.className='eyebrow';eyebrow.textContent='YOUR COACHING ACTION LIST';const heading=document.createElement('h2');heading.textContent=title;box.append(eyebrow,heading);
-  const note=document.createElement('p');note.textContent=!data?'Reading saved submissions.':!data.available?'Use Refresh to retry. Missing evidence is not zero check-ins.':'This inbox shows this week’s submissions and all outstanding reviews. Reviewed check-ins stay in All clients → open client → Check-ins. Dates below use Irish time.';box.append(note);if(data?.available){const imported=rows.filter(r=>!r.reviewed_at&&r.source_system&&!/^client_weekly_v[23]$/.test(r.source_system)).length;if(imported){const history=document.createElement('p');history.textContent=imported+' imported check-ins also have no recorded review. Their original submission times are unverified.';box.append(history);}}
-  if(data?.available&&data.statuses){const totals=document.createElement('div');totals.className='home-checkin-totals';totals.setAttribute('aria-label','Current week check-in status');for(const [label,caption] of [['Submitted','Awaiting review this week'],['Reviewed','Reviewed this week'],['Overdue','Overdue this week'],['Due','Still due this week']]){const item=document.createElement('div'),number=document.createElement('strong'),text=document.createElement('span');number.textContent=data.statuses.filter(r=>r.label===label).length;text.textContent=caption;item.append(number,text);totals.append(item);}box.append(totals);const unset=data.statuses.filter(r=>['Deadline not configured','Timezone needs setup'].includes(r.label)).length;if(unset){const warning=document.createElement('p');warning.textContent=unset+' client deadlines need setup. They are not counted as overdue.';box.append(warning);}}
-  const older=document.createElement('details');older.className='home-checkin-older';const summary=document.createElement('summary');summary.textContent='More submissions ('+Math.max(0,rows.length-5)+')';older.append(summary);
-  for(const [index,row] of rows.entries()){ const article=document.createElement('article'),client=state.clients.find(c=>c.id===row.client_id),name=document.createElement('strong'),stamp=document.createElement('small'),badge=document.createElement('span'),button=document.createElement('button');article.className='home-checkin-row';name.textContent=client.display_name;stamp.textContent=(row.source_system&&!/^client_weekly_v[23]$/.test(row.source_system)?'Imported time unverified · ':'Submitted ')+window.CheckinStatus.stamp(row.submitted_at,'Europe/Dublin')+(row.period_start?' · Week '+row.period_start:'');badge.className='home-checkin-badge';badge.textContent=row.reviewed_at?'Reviewed':'NEW · Awaiting your review';button.className='btn ghost small';button.type='button';button.textContent=row.reviewed_at?'View check-in':'Review check-in';button.dataset.homeCheckinClient=row.client_id;button.dataset.checkinId=row.id;button.onclick=async()=>{if(!eligible()||state.user?.id!==user||!button.isConnected)return;state.client=client;state.clientTab='check-ins';try{if(await loadClientData(client.id)===false)return;if(state.role==='coach'&&state.user?.id===user&&state.client?.id===client.id){renderCoach();const form=Array.from(document.querySelectorAll('[data-coach-review]')).find(f=>f.dataset.coachReview===row.id);if(form){const details=form.closest('details');if(details)details.open=true;form.scrollIntoView?.({block:'center'});}}}catch(e){if(state.user?.id===user)toast(e.message,'error');}};const text=document.createElement('div');text.append(name,stamp,badge);article.append(text,button);(index<5?box:older).append(article);}
-  if(rows.length>5)box.append(older);
+  const loaded=data?.available&&data.pending_available!==false;
+  const status=box.querySelector('[data-home-checkin-status]');
+  status.textContent=rows.length?rows.length+' to review'+(loaded?'':' · list may be incomplete')
+   :data?(loaded?'All caught up':'Check-ins unavailable'):state.preview?'':'Checking…';
+  const list=box.querySelector('[data-home-review-list]');list.replaceChildren();coverage.replaceChildren();
+  coverage.hidden=!rows.length;
+  if(rows.length){const title=document.createElement('h3');title.textContent='Check-in call coverage';coverage.append(title);}
+  for(const [index,row] of rows.entries()){
+   const client=state.clients.find(c=>c.id===row.client_id);
+   const article=document.createElement('article'),name=document.createElement('strong'),button=document.createElement('button');
+   article.className='home-checkin-row';name.textContent=client.display_name;
+   button.className='btn ghost small';button.type='button';button.textContent='Review';
+   button.setAttribute('aria-label','Review check-in for '+client.display_name);
+   button.dataset.homeCheckinClient=row.client_id;button.dataset.checkinId=row.id;
+   button.onclick=async()=>{if(!eligible()||state.user?.id!==user||!button.isConnected)return;state.client=client;state.clientTab='check-ins';try{if(await loadClientData(client.id)===false)return;if(state.role==='coach'&&state.user?.id===user&&state.client?.id===client.id){renderCoach();const form=Array.from(document.querySelectorAll('[data-coach-review]')).find(f=>f.dataset.coachReview===row.id);if(form){const details=form.closest('details');if(details)details.open=true;form.scrollIntoView?.({block:'center'});}}}catch(e){if(state.user?.id===user)toast(e.message,'error');}};
+   article.append(name,button);if(index<3)list.append(article);
+   const record=document.createElement('article'),label=document.createElement('p');
+   label.textContent=client.display_name+' · Submitted '+window.CheckinStatus.stamp(row.submitted_at,'Europe/Dublin');
+   record.className='home-checkin-row';record.append(label);coverage.append(record);
+  }
+  const refresh=box.querySelector('[data-home-checkin-refresh]');
+  refresh.hidden=!data||loaded;refresh.disabled=false;
+  refresh.onclick=()=>{if(!eligible()||state.user?.id!==user||!refresh.isConnected)return;const retry=attention?.querySelector('.panel-head button');if(retry&&!retry.disabled){refresh.disabled=true;retry.click();}else if(!retry){window.LegalEdgePriorities?.refreshAttention?.();}};
   // Only an explicit tap reads matched call metadata. It never marks the check-in reviewed.
-  box.querySelectorAll('[data-home-checkin-client]').forEach(review=>{
-   const row=rows.find(r=>r.client_id===review.dataset.homeCheckinClient&&r.id===review.dataset.checkinId);
-   if(!row||row.reviewed_at||row.source_system&&!/^client_weekly_v[23]$/.test(row.source_system))return;
-   const article=review.closest('article'),button=document.createElement('button'),note=document.createElement('p');button.type='button';button.className='text-btn';button.textContent='Check whether a later call covered this';note.className='home-call-coverage';note.setAttribute('role','status');article.append(button,note);
+  coverage.querySelectorAll('article').forEach((article,index)=>{
+   const row=rows[index],button=document.createElement('button'),note=document.createElement('p');button.type='button';button.className='text-btn';button.textContent='Check whether a later call covered this';note.className='home-call-coverage';note.setAttribute('role','status');article.append(button,note);
    button.onclick=async()=>{
     if(!eligible()||state.user?.id!==user||!button.isConnected)return;button.disabled=true;note.textContent='Checking matched call records…';
     try{const calls=await query('Check-in call coverage',db.from('coaching_recording_events').select('id,client_id,coach_id,occurred_at').eq('coach_id',user).eq('client_id',row.client_id).eq('matching_status','matched').gte('occurred_at',row.submitted_at).lte('occurred_at',new Date().toISOString()).order('occurred_at',{ascending:false}).limit(1));
@@ -46,14 +64,6 @@
     finally{if(button.isConnected)button.disabled=false;}
    };
   });
-  if(data?.available&&!rows.length){const empty=document.createElement('p');empty.textContent='No current-week submissions or outstanding reviews found in the loaded records. Open Check-ins for history.';box.append(empty);}
-  const actions=(data?.actions||[]).filter(r=>state.clients?.some(c=>c.id===r.client_id&&c.portal_enabled!==false));
-  if(actions.length){const section=document.createElement('section'),heading=document.createElement('h3');heading.textContent='Other actions needing you';section.className='home-next-actions';section.append(heading);
-   for(const item of actions){const c=state.clients.find(c=>c.id===item.client_id),row=document.createElement('article'),text=document.createElement('p'),button=document.createElement('button');text.textContent=c.display_name+' · '+item.notes.join(' · ');button.type='button';button.className='btn ghost small';button.textContent='Open client';button.onclick=async()=>{if(!eligible()||state.user?.id!==user||!button.isConnected)return;state.client=c;state.clientTab='overview';try{if(await loadClientData(c.id)===false)return;if(state.role==='coach'&&state.user?.id===user&&state.client?.id===c.id)renderCoach();}catch(e){if(state.user?.id===user)toast(e.message,'error');}};row.append(text,button);section.append(row);}box.append(section);
-  }
-  if(data?.checked_at){const checked=document.createElement('small');checked.textContent='Checked '+window.CheckinStatus.stamp(data.checked_at,'Europe/Dublin');box.append(checked);}
-  const refresh=document.createElement('button');refresh.type='button';refresh.className='btn ghost small';refresh.textContent='Refresh check-ins';refresh.dataset.homeCheckinRefresh='';refresh.onclick=()=>{if(!eligible()||state.user?.id!==user||!refresh.isConnected)return;const retry=attention?.querySelector('.panel-head button');if(retry&&!retry.disabled){refresh.disabled=true;refresh.textContent='Checking…';retry.click();}else if(!retry){window.LegalEdgePriorities?.refreshAttention?.();}};box.append(refresh);
-  const alerts=document.createElement('button');alerts.type='button';alerts.className='btn ghost small';alerts.textContent='Set up phone alerts';alerts.onclick=()=>{if(eligible()&&state.user?.id===user&&alerts.isConnected)document.getElementById('csPhoneAlerts')?.click();};box.append(alerts);
  }
  function dataAvailable(panel){try{const data=JSON.parse(panel.dataset.homeCheckins);return data.available&&data.pending_available!==false;}catch{return false;}}
  function arrange(){
@@ -61,8 +71,7 @@
   let shell=host.querySelector('#coachHomeFocus');
   if(!shell){
    shell=document.createElement('div');shell.id='coachHomeFocus';
-   shell.innerHTML='<header class="home-focus-heading"><span class="eyebrow">YOUR COACHING DESK</span><h1>What needs you today?</h1><p>Check-ins, call context and client plan gaps. Start with the actions below.</p><div><button type="button" class="btn primary" data-home-route="reviews">Review check-ins</button><button type="button" class="btn ghost" data-home-route="clients">All clients</button></div></header><div data-home-primary></div><div class="home-focus-tools">'+sections.map(([key,title,sub])=>'<details data-home-group="'+key+'"><summary><span><strong>'+title+'</strong><small>'+sub+'</small></span><span aria-hidden="true">+</span></summary><div data-home-content="'+key+'"></div></details>').join('')+'</div>';
-   if(!state.preview)shell.querySelector('.home-focus-heading > div').insertAdjacentHTML('beforeend','<button type="button" class="btn ghost cr-hub-entry" data-home-route="roadmaps" data-cr-hub>Goals & long-term plans</button>');
+   shell.innerHTML='<section class="panel home-checkin-inbox" data-home-checkins aria-labelledby="homeReviewHeading"><div class="home-review-heading"><div><h1 id="homeReviewHeading">Check-ins</h1><span data-home-checkin-status role="status"></span></div><button type="button" class="btn primary small" data-home-route="reviews">Review check-ins</button></div><div data-home-review-list></div><button type="button" class="btn ghost small" data-home-checkin-refresh hidden>Retry</button></section><div data-home-directory></div><details class="home-focus-tools"><summary>Coach tools</summary><div class="home-tool-links"><button type="button" class="btn ghost small" data-home-route="clients">All clients</button>'+(!state.preview?'<button type="button" class="btn ghost small" data-home-route="roadmaps" data-cr-hub>Goals & plans</button>':'')+'</div>'+sections.map(([key,title,sub])=>'<details data-home-group="'+key+'"><summary><span><strong>'+title+'</strong><small>'+sub+'</small></span></summary><div data-home-content="'+key+'">'+(key==='health'?'<div data-home-primary></div>':key==='activity'?'<section class="panel" data-home-coverage hidden></section>':'')+'</div></details>').join('')+'</details>';
    host.prepend(shell);const user=state.user?.id;
    shell.querySelectorAll('[data-home-route]').forEach(button=>button.onclick=()=>{if(!button.isConnected||!eligible()||state.user?.id!==user)return;state.coachView=button.dataset.homeRoute;renderCoach();});
   }
@@ -80,10 +89,13 @@
     const first=Array.from(status.querySelectorAll(':scope > .priority-issue')).find(row=>!review.includes(row));review.forEach(row=>{if(first&&Array.from(status.children).indexOf(row)>Array.from(status.children).indexOf(first))first.before(row);});
    }
   }
-  // Move, never reconstruct, original tools: their handlers, receipts and retry states survive.
-  Array.from(host.children).filter(node=>node!==shell&&node.id!=='priorityAttention'&&node.id!=='coachCompletionFeed'&&node.id!=='coachHealthReportInbox').forEach(node=>{shell.querySelector('[data-home-content="'+groupFor(node)+'"]').append(node);});
-  const reports=host.querySelector('#coachHealthReportInbox'),primary=shell.querySelector('[data-home-primary]');if(reports&&reports.parentElement!==primary)primary.prepend(reports);
-  const feed=host.querySelector('#coachCompletionFeed');if(feed&&feed.parentElement!==shell.querySelector('[data-home-primary]'))shell.querySelector('[data-home-primary]').append(feed);
+  const directory=host.querySelector('#homeClientDirectory');
+  if(directory&&directory.parentElement!==shell.querySelector('[data-home-directory]'))shell.querySelector('[data-home-directory]').append(directory);
+  // Move the original tools so their handlers and receipt status survive.
+  Array.from(host.children).filter(node=>node!==shell).forEach(node=>{
+   if(node.classList.contains('page-head')){node.hidden=true;return;}
+   shell.querySelector('[data-home-content="'+groupFor(node)+'"]'+(node.id==='coachHealthReportInbox'?' [data-home-primary]':'')).append(node);
+  });
   const watch=host.querySelector('#psWatchFeed');if(watch)compactWatch(watch);
   // Async modules replace these cards after initial rendering. Return them to the same group.
   ['coachActivity','psInbox','bwCoachQueue','psWatchFeed'].forEach(id=>{const node=host.querySelector('#'+id);if(!node)return;const target=shell.querySelector('[data-home-content="'+groupFor(node)+'"]');if(node.parentElement!==target)target.append(node);});
