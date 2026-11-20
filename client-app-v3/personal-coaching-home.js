@@ -206,6 +206,7 @@
    priorities+schedule+goalMarkup(m.goal)+'<div data-pch-video hidden></div>'+focusPanel+actions+
    (compact&&!m.goals.length?'':milestoneMarkup(m,state.client))+'<details class="pch-secondary" data-pch-secondary><summary><span>Your plan & progress</span><small>Meals, check-in, training and saved activity</small></summary><div data-pch-secondary-content></div></details>';
   host.prepend(root);const active=()=>root.isConnected&&eligible()&&state.user?.id===user&&state.client?.id===client;
+  window.DayType?.mount(root,m,weekSessions,active,route);
   bindPriorities(root,active);
   root.querySelector('[data-pch-next]')?.addEventListener('click',()=>{if(!active())return;if(m.action.session){state.selectedSessionId=m.action.session;state.trainingCategory=m.action.category;}route(m.action.route);});
   root.querySelector('[data-pch-progress]')?.addEventListener('click',()=>{if(active())route('progress');});
