@@ -63,7 +63,10 @@
   if(!c.loaded&&!c.error)load().then(()=>{if(c.key===key()&&state.role==='coach'&&state.clientTab==='overview')mountCoach();});
  }
  const priorLoad=loadClientData;loadClientData=async function(id){cache={key:'',loaded:false,record:null,settings:null,swaps:[],error:'',request:null};return priorLoad(id);};
- for(const name of ['clientToday','clientPlanner','clientTraining','renderWeeklyNutrition']){const before=window[name];window[name]=function(...args){const result=before(...args);mount(name==='clientPlanner');if(name==='clientTraining'&&own().loaded){const swap=own().swaps.find(s=>s.session_id===state.selectedSessionId),s=state.data.sessions.find(s=>s.id===state.selectedSessionId);if(swap&&s?.status!=='completed'){const host=$('#bwClient');host.insertAdjacentHTML('beforeend',`<button class="btn ghost" data-bw-restore="${esc(s.id)}">Restore original workout</button>`);bind(host);}}return result;};}
+ for(const name of ['clientToday','clientPlanner','clientTraining','renderWeeklyNutrition']){const before=window[name];window[name]=function(...args){const result=before(...args);
+  const selectedWeek=name==='clientTraining'&&typeof clientTrainingWeek==='function'?clientTrainingWeek():null;
+  if(selectedWeek&&(state.data.sessions||[]).some(s=>s.week_id===selectedWeek.id&&s.source_metadata?.gym_days))return result;
+  mount(name==='clientPlanner');if(name==='clientTraining'&&own().loaded){const swap=own().swaps.find(s=>s.session_id===state.selectedSessionId),s=state.data.sessions.find(s=>s.id===state.selectedSessionId);if(swap&&s?.status!=='completed'){const host=$('#bwClient');host.insertAdjacentHTML('beforeend',`<button class="btn ghost" data-bw-restore="${esc(s.id)}">Restore original workout</button>`);bind(host);}}return result;};}
  const priorOverview=coachOverview;coachOverview=function(){const r=priorOverview();mountCoach();return r;};
  if(typeof window.renderDashboard==='function'){
   const beforeDashboard=renderDashboard;renderDashboard=function(){const result=beforeDashboard(),host=$('#coachMain'),account=state.user?.id;

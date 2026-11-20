@@ -123,6 +123,11 @@ async function tick(){await new Promise(r=>setTimeout(r,0));}
  assert(liftForm,'The published first workout can be logged early');liftForm.elements.reps_1.value='10';liftForm.elements.load_1.value='90';
  liftForm.querySelector('button').click();await tick();assert.equal(run("state.data.exerciseLogs.find(l=>l.training_session_id==='lift').reps"),10);
  doc.querySelector('[data-training-category=cardio]').click();assert(doc.querySelector('#clientMain').textContent.includes('Peloton easy ride'));const bikeForm=doc.querySelector('[data-cardio-id=bike]');assert.equal(bikeForm.elements.activity.value,'Cycling');assert(!doc.querySelector('[data-cardio-id=""]'),'Extra cardio remains limited to the current week');bikeForm.elements.duration.value='18';bikeForm.querySelector('button[type=submit]').click();await tick();assert.equal(run("state.data.sessions.find(s=>s.id==='bike').source_metadata.cardio_log.duration_minutes"),18);
+ run("state.clientView='planner';renderClient();");await tick();
+ assert(doc.querySelector('#clientMain').textContent.includes('Weekly planner'));
+ assert(doc.querySelector('#clientMain').textContent.includes('Next week'));
+ assert(doc.querySelector('#clientMain').textContent.includes('Full body A'));
+ assert(!doc.querySelector('#clientMain').textContent.includes('preparing this week'));
  console.log('PASS: full deferred modules, six destinations including Check-in, collapsed recipes/week, favourites, log/undo, swaps preserve assignments, quick logging, progress subnav, client reset, failed saves, backend reload and consent gates. DOM/backend mocks, not production browser evidence.');
  dom.window.close();
 })().catch(e=>{console.error(e);dom.window.close();process.exitCode=1;});

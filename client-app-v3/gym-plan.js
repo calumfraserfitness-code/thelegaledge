@@ -31,7 +31,7 @@
    output.innerHTML='<h3>'+esc(gyms[gym])+'</h3>'+(canChoose&&canUseBoth?'<button class="btn primary small" type="button" data-gym-select>Use this gym for both workouts</button>':'')+workouts.map((o,i)=>{
     const d=o[gym],s=o.session,isAssigned=d.id===s.programme_day_id;
     const button=canChoose&&!isAssigned&&!logged(s)?'<button class="btn ghost small" type="button" data-gym-select="'+esc(s.id)+'">Use this gym for workout '+String.fromCharCode(65+i)+'</button>':'';
-    return '<details class="gym-workout" '+(selected===s.id?'open':'')+'><summary>'+esc(d.title)+(isAssigned?' <small>Selected</small>':'')+'</summary><ul>'+programDayExercises(d).map(ex=>'<li><span>'+esc(ex.name)+'</span><strong>'+esc(ex.sets)+' × '+esc(ex.reps)+'</strong></li>').join('')+'</ul>'+((isAssigned&&s.id!==selected)?'<button class="btn primary small" type="button" data-open-session="'+esc(s.id)+'">Open workout</button>':'')+button+'</details>';
+    return '<details class="gym-workout" '+(selected===s.id?'open':'')+'><summary>'+esc(d.title)+(isAssigned?' <small>Selected</small>':'')+'</summary><ul>'+programDayExercises(d).map(ex=>'<li><span>'+esc(ex.name)+'</span><strong>'+esc(ex.sets)+' × '+esc(ex.reps)+'</strong></li>').join('')+'</ul>'+((isAssigned&&s.id!==selected&&!box.closest('.gym-picker'))?'<button class="btn primary small" type="button" data-open-session="'+esc(s.id)+'">Open workout</button>':'')+button+'</details>';
    }).join('');
    output.querySelectorAll('[data-open-session]').forEach(button=>button.onclick=()=>{
     if(!active())return;
@@ -60,9 +60,14 @@
  clientTraining=function(){
   const result=training(),host=$('#clientMain'),week=typeof clientTrainingWeek==='function'?clientTrainingWeek():currentWeek();
   if(!host||!week?.published||state.trainingCategory!=='weights')return result;
-  const sessions=(state.data.sessions||[]).filter(s=>s.week_id===week.id),selected=state.selectedSessionId;
+  const sessions=(state.data.sessions||[]).filter(s=>s.week_id===week.id);
+  if(sessions.some(s=>s.id===state.selectedSessionId&&['weights','resistance'].includes(s.training_type)))return result;
   if(!host.querySelector('[data-gym-plan]')){
-   const html=markup(week,sessions,selected);if(html){host.insertAdjacentHTML(selected?'beforeend':'afterbegin',html);bind(host,week,sessions,selected);}
+   const html=markup(week,sessions);
+   if(html){
+    host.insertAdjacentHTML('beforeend','<details class="gym-picker"><summary>Change gym</summary>'+html+'</details>');
+    bind(host,week,sessions);
+   }
   }
   return result;
  };

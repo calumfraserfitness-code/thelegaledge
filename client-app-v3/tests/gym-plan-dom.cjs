@@ -8,7 +8,7 @@ let call,rendered=0;
 Object.assign(w,{$:s=>doc.querySelector(s),state,clientTraining(){},coachNutrition(){},currentWeek:()=>week,esc:String,programDayExercises:d=>d.exercises,db:{rpc:(name,args)=>{call={name,args};return sessions.map(s=>({...s,programme_day_id:s.source_metadata.gym_days.edge}));}},query:async(_,p)=>p,toast(){},renderClient(){rendered++;}});
 vm.runInContext(fs.readFileSync(__dirname+'/../gym-plan.js','utf8'),dom.getInternalVMContext());
 (async()=>{
- w.clientTraining();assert.equal(host.querySelectorAll('.gym-workout').length,2);
+ w.clientTraining();assert.equal(host.querySelectorAll('.gym-workout').length,2);assert.equal(host.querySelector('.gym-picker').open,false);assert(!host.querySelector('[data-open-session]'),'Gym comparisons do not duplicate the workout entry points');
  host.querySelector('[data-gym-tab=edge]').click();assert(host.textContent.includes('Edge eA')&&host.textContent.includes('Edge eB'));
  await host.querySelector('[data-gym-select=""]').onclick();
  assert.deepEqual(JSON.parse(JSON.stringify(call.args)),{p_week:'w',p_gym:'edge',p_session:null});

@@ -31,6 +31,9 @@
   return section;
  }
  function mount(){
+  if(state.client?.onboarding_status==='complete'){
+   document.querySelector('#clientMain .client-page-head')?.classList.add('pch-checkin-hero','pch-start-hero');
+  }
   const form=document.querySelector('#checkinForm');
   if(!form||form.dataset.quickView||!state.client||!['client','coach'].includes(state.role))return;
   const stages=[...form.querySelectorAll('[data-checkin-stage]')];if(stages.length!==3)return;

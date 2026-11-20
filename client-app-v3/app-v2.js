@@ -587,9 +587,8 @@ async function saveClientControls(event) {
   finally { setBusy(button, false); }
 }
 
-function weekDays() {
-  const week = currentWeek();
-  const start = monday();
+function weekDays(week = currentWeek()) {
+  const start = new Date((week?.week_start || iso(monday())) + "T12:00:00Z");
   return Array.from({ length: 7 }, (_, index) => {
     const dateObject = new Date(+start + index * 864e5);
     const date = iso(dateObject);
@@ -603,10 +602,10 @@ function weekDays() {
   });
 }
 
-function plannerCards({ interactive = false, coachEdit = false } = {}) {
-  const days = weekDays();
+function plannerCards({ interactive = false, coachEdit = false, week = currentWeek() } = {}) {
+  const days = weekDays(week);
   return `<div class="week-grid">${days.map((day) => `<article class="day-card ${day.date === iso(new Date()) ? 'today' : ''}">
-    <div class="day-head"><strong>${DAYS[day.dateObject.getDay()]}</strong><span>${day.dateObject.getDate()}</span></div>
+    <div class="day-head"><strong>${DAYS[day.dateObject.getUTCDay()]}</strong><span>${day.dateObject.getUTCDate()}</span></div>
     ${day.sessions.map((session) => `<div class="task-row ${session.status === 'completed' ? 'done' : ''}"><label class="task"><input type="checkbox" data-session-complete="${session.id}" ${session.status === 'completed' ? 'checked' : ''} ${interactive ? '' : 'disabled'}><span><b>${esc(session.title)}</b><small>${title(session.training_type)}${session.moved_from_date ? ` · Moved from ${fmt(session.moved_from_date, { weekday: 'long' })}` : ''}</small></span></label>${interactive ? `<button class="open-session" data-open-session="${session.id}" type="button">Open</button>` : ''}</div>`).join('')}
     <label class="task ${Number(day.step?.actual_steps || day.step?.steps || 0) >= safeStepGoal() ? 'done' : ''}"><input type="checkbox" data-step-date="${day.date}" ${Number(day.step?.actual_steps || day.step?.steps || 0) >= safeStepGoal() ? 'checked' : ''} ${interactive ? '' : 'disabled'}><span><b>${safeStepGoal().toLocaleString()} steps</b><small>Daily movement</small></span></label>
     ${coachEdit ? `<label class="planner-nutrition">Nutrition<select data-nutrition-date="${day.date}"><option value="">Not assigned</option>${state.data.nutritionPlans.filter(plan=>plan.is_active!==false).map(plan=>`<option value="${plan.id}" ${day.nutrition?.nutrition_plan_id===plan.id?'selected':''}>${esc(nutritionDayLabel(plan))}</option>`).join('')}</select></label>` : (day.nutrition ? `<label class="task ${day.nutrition.adhered?'done':''}"><input type="checkbox" data-nutrition-complete="${day.date}" ${day.nutrition.adhered?'checked':''} ${interactive?'':'disabled'}><span><b>${esc(nutritionDayLabel(state.data.nutritionPlans.find(plan=>plan.id===day.nutrition.nutrition_plan_id)||{day_type:'Nutrition'}))}</b><small>${day.nutrition.calorie_target || state.client.calorie_goal ? (day.nutrition.calorie_target || state.client.calorie_goal)+' kcal' : 'Follow your assigned meals'}</small></span></label>` : '<div class="plan-item nutrition"><b>Nutrition</b><span>Not assigned</span></div>')}
@@ -1485,20 +1484,20 @@ function milestones() {
   return `<section class="milestone-strip">${cards.map(([name, value]) => `<div><span>${name}</span><strong>${value}</strong></div>`).join('')}</section>`;
 }
 
-function taskMarkup(session) {
-  return `<label class="task ${session.status === 'completed' ? 'done' : ''}"><input type="checkbox" data-session-complete="${session.id}" ${session.status === 'completed' ? 'checked' : ''}><span><b>${esc(session.title)}</b><small>${title(session.training_type)}${session.duration_minutes ? ` · ${session.duration_minutes} min` : ''}</small></span></label>`;
+function taskMarkup(session, label = session.title) {
+  return `<label class="task ${session.status === 'completed' ? 'done' : ''}"><input type="checkbox" data-session-complete="${session.id}" ${session.status === 'completed' ? 'checked' : ''}><span><b>${esc(label)}</b><small>${title(session.training_type)}${session.duration_minutes ? ` · ${session.duration_minutes} min` : ''}</small></span></label>`;
 }
 
 function clientPlanner() {
-  const week = currentWeek();
+  const week = clientTrainingWeek();
   if (!week?.published && !state.preview) {
-    $('#clientMain').innerHTML = clientHeader('YOUR WEEK', 'Weekly planner', 'Your coach is preparing this week.') + '<section class="panel empty">The current plan is being reviewed. Check back after your coach publishes it.</section>';
+    $('#clientMain').innerHTML = clientHeader('YOUR WEEK', 'Weekly planner', '') + '<section class="panel empty">No published sessions for this week.</section>';
     return;
   }
-  const days = weekDays();
+  const days = weekDays(week);
   const scheduled = days.reduce((count, day) => count + day.sessions.length + 1 + (day.nutrition ? 1 : 0), 0);
   const completed = days.reduce((count, day) => count + day.sessions.filter((session) => session.status === 'completed').length + (Number(day.step?.actual_steps || day.step?.steps || 0) >= safeStepGoal() ? 1 : 0) + (day.nutrition?.adhered ? 1 : 0), 0);
-  $('#clientMain').innerHTML = clientHeader('YOUR WEEK', 'Weekly planner', 'Training, steps, cardio, mobility and nutrition together.') + `<div class="planner-adherence"><strong>${completed}/${scheduled} completed</strong><span>${scheduled ? Math.round(completed / scheduled * 100) : 0}% adherence</span></div>${plannerCards({ interactive: true })}`;
+  $('#clientMain').innerHTML = clientHeader('YOUR WEEK', 'Weekly planner', 'Training, steps, cardio, mobility and nutrition together.') + `<div class="planner-adherence"><strong>${completed}/${scheduled} completed</strong><span>${scheduled ? Math.round(completed / scheduled * 100) : 0}% adherence</span></div>${plannerCards({ interactive: true, week })}`;
   bindCompletionActions();
   bindOpenSessions();
   bindMealPlanLinks();
@@ -1668,7 +1667,7 @@ function clientTraining() {
     $('#clientMain').innerHTML = clientHeader('', 'Training & activity', 'Your workouts, cardio and mobility. Daily step goals are in Schedule.') + startNote + categoryTabs + `<div class="session-picker">${sessions.map((session) => `<button class="session-tile" data-open-session="${session.id}"><span>${fmt(session.session_date, { weekday: 'short', day: 'numeric', month: 'short' })}</span><strong>${esc(session.title)}</strong><small>${exercisesForSession(session).length} exercises · ${session.status === 'completed' ? 'Completed' : 'Planned'}</small></button>`).join('') || '<div class="empty">No weights or resistance session is scheduled this week.</div>'}</div>`;
     bindTrainingCategoryTabs(); return bindOpenSessions();
   }
-  $('#clientMain').innerHTML = `<button class="text-btn back-to-sessions" id="backToSessions">← All sessions</button>` + clientHeader('', selected.title, 'Complete when ready. Session numbers show programme order, not fixed weekdays.') + startNote + categoryTabs + `<section class="panel workout"><div class="panel-head"><div><h2>Log your workout</h2><span class="sub">${exercisesForSession(selected).length} exercises</span></div>${taskMarkup(selected)}</div>${exercisesForSession(selected).map((exercise) => exerciseCard(exercise, true)).join('') || '<div class="empty">No exercise prescription is attached to this workout.</div>'}</section>`;
+  $('#clientMain').innerHTML = `<button class="text-btn back-to-sessions" id="backToSessions">← All sessions</button>` + clientHeader('', selected.title, 'Complete when ready. Session numbers show programme order, not fixed weekdays.') + startNote + categoryTabs + `<section class="panel workout"><div class="panel-head"><div><h2>Log your workout</h2><span class="sub">${exercisesForSession(selected).length} exercises</span></div>${taskMarkup(selected,'Mark workout complete')}</div>${exercisesForSession(selected).map((exercise) => exerciseCard(exercise, true)).join('') || '<div class="empty">No exercise prescription is attached to this workout.</div>'}</section>`;
   $('#backToSessions').onclick = () => { state.selectedSessionId = null; clientTraining(); };
   bindTrainingCategoryTabs();
   bindCompletionActions();
