@@ -49,7 +49,7 @@ function clearWorkspaceTabs(){
   if(extras[key]){b.textContent=extras[key];details.lastElementChild.append(b);if(state.clientTab===key)details.open=true;}
  }
  tabs.classList.add('clear-client-tabs');
- const host=$('#coachMain');if(!host.querySelector('#clearAllClients')){const b=document.createElement('button');b.id='clearAllClients';b.className='btn ghost clear-back';b.textContent='Back to clients';b.onclick=()=>{state.client=null;state.coachView='clients';renderCoach();};host.prepend(b);}
+ const host=$('#coachMain');if(!host.querySelector('#clearAllClients')){const b=document.createElement('button');b.id='clearAllClients';b.className='btn ghost clear-back';b.textContent='Back to clients';b.onclick=()=>{state.client=null;if(state.coachView!=='dashboard')state.coachView='clients';renderCoach();};host.prepend(b);}
 }
 const clearWorkspaceBefore=renderClientWorkspace;
 renderClientWorkspace=function(){const result=clearWorkspaceBefore();clearWorkspaceTabs();return result;};
