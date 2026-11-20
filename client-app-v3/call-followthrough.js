@@ -6,21 +6,25 @@
  function clientMount(){
   if(!state.client||!['client','coach'].includes(state.role)||!['today','support'].includes(state.clientView)||state.preview)return;
   const host=$('#clientMain');if(!host)return;const id=state.client.id,user=state.user?.id,role=state.role,view=state.clientView;
-  host.querySelector('#cfClient')?.remove();host.querySelector('#cuFocus')?.remove();const box=document.createElement('section');box.id='cfClient';box.className='panel cf-followup';box.innerHTML='<span class="eyebrow">FROM OUR LATEST CALL</span><h2>Your agreed next steps</h2><p role="status">Loading your saved actions…</p>';
+  host.querySelector('#cfClient')?.remove();host.querySelector('#cuFocus')?.remove();const box=document.createElement('section');box.id='cfClient';box.className='panel cf-followup';box.hidden=true;box.innerHTML='<span class="eyebrow">FROM OUR LATEST CALL</span><h2>Your agreed next steps</h2><p role="status">Loading your saved actions…</p>';
   const anchor=host.querySelector('.priority-grid');if(anchor)anchor.before(box);else if(view==='support'&&host.querySelector('#coachContact'))host.querySelector('#coachContact').after(box);else host.append(box);
   const active=()=>box.isConnected&&state.user?.id===user&&state.role===role&&state.client?.id===id&&state.clientView===view;
   const recap=(state.data.coachingGuidance||[]).filter(r=>r.client_id===id&&r.published&&/^Call recap · \d{4}-\d{2}-\d{2}$/.test(r.title)).sort((a,b)=>b.title.localeCompare(a.title))[0];
   async function load(){try{
    let date;try{date=window.CheckinStatus.localDate(new Date(),state.client.timezone||'Europe/Dublin');}catch{throw Error('Your timezone needs coach setup.');}
-   const rows=await query('Agreed call actions',db.from('client_weekly_focus').select('id,client_id,description,starts_on,expires_on,completed_at,approved_at').eq('client_id',id).is('archived_at',null).lte('starts_on',date).gte('expires_on',date).order('approved_at',{ascending:false}).limit(100));if(!active())return;
-   if(rows.some(r=>r.client_id!==id))throw Error('Action ownership could not be verified.');
+   const savedRows=await query('Agreed call actions',db.from('client_weekly_focus').select('id,client_id,description,starts_on,expires_on,completed_at,approved_at').eq('client_id',id).is('archived_at',null).not('approved_at','is',null).lte('starts_on',date).gte('expires_on',date).order('approved_at',{ascending:false}).limit(100));if(!active())return;
+   if(savedRows.some(r=>r.client_id!==id))throw Error('Action ownership could not be verified.');
+   const rows=savedRows.filter(r=>r.approved_at);
+   const next=rows.find(r=>!r.completed_at);
+   if(!recap&&(view==='today'?!next:!rows.length)){box.remove();return;}
+   box.hidden=false;
    const canComplete=state.role==='client'&&state.client.profile_id===user;
    if(view==='today'){
-    box.innerHTML='<span class="eyebrow">YOUR COACHING</span><h2>'+rows.filter(r=>!r.completed_at).length+' agreed actions open</h2><p>'+(recap?'Latest call · '+esc(recap.title.slice(13)):'See your saved feedback and next steps in Coach.')+'</p><button type="button" class="btn primary" data-cf-open-coach>Open Coach</button>';
+    box.innerHTML='<span class="eyebrow">YOUR COACHING</span><h2>'+(next?'Your next step':'Latest call recap')+'</h2><p>'+esc(next?.description||recap.title.slice(13))+'</p><button type="button" class="btn primary" data-cf-open-coach>'+(next?'View next steps':'Read recap')+'</button>';
     box.querySelector('[data-cf-open-coach]').onclick=()=>{if(!active())return;state.clientView='support';renderClient();};return;
    }
    host.querySelectorAll('.cw-guidance article').forEach(article=>{if(/^Call recap · /.test(article.querySelector('h3')?.textContent||''))article.remove();});
-   box.innerHTML='<div class="panel-head"><div><span class="eyebrow">FROM OUR LATEST CALL</span><h2>Your agreed next steps</h2></div><button type="button" class="btn ghost small" data-cf-refresh>Refresh</button></div>'+(recap?'<p class="cf-date">Call · '+esc(recap.title.slice(13))+'</p><p class="cw-lines">'+esc(recap.body)+'</p>':'')+(rows.length?'<div class="cf-actions">'+rows.map(r=>'<label><input type="checkbox" data-cf-action="'+esc(r.id)+'" '+(r.completed_at?'checked ':'')+(!canComplete?'disabled':'')+'><span>'+esc(r.description)+'<small>'+ (r.completed_at?'Marked complete':'Agreed action')+' · review period ends '+esc(r.expires_on)+'</small></span></label>').join('')+'</div>':'<p>No current actions have been published. This does not mean your call was missed or your plan changed.</p>')+(rows.length===100?'<p>Showing up to 100 actions. Ask your coach if anything appears missing.</p>':'')+'<p class="cf-status" role="status"></p><div class="cf-links"><button type="button" class="btn ghost" data-cf-route="training">Training</button><button type="button" class="btn ghost" data-cf-route="nutrition">Meals & food choices</button><button type="button" class="btn ghost" data-cf-route="progress">Progress</button></div>';
+   box.innerHTML='<div class="panel-head"><div><span class="eyebrow">FROM OUR LATEST CALL</span><h2>Your agreed next steps</h2></div><button type="button" class="btn ghost small" data-cf-refresh>Refresh</button></div>'+(recap?'<p class="cf-date">Call · '+esc(recap.title.slice(13))+'</p><p class="cw-lines">'+esc(recap.body)+'</p>':'')+(rows.length?'<div class="cf-actions">'+rows.map(r=>'<label><input type="checkbox" data-cf-action="'+esc(r.id)+'" '+(r.completed_at?'checked ':'')+(!canComplete?'disabled':'')+'><span>'+esc(r.description)+'<small>'+ (r.completed_at?'Marked complete':'Agreed action')+' · review period ends '+esc(r.expires_on)+'</small></span></label>').join('')+'</div>':'')+(rows.length===100?'<p>Showing up to 100 actions. Ask your coach if anything appears missing.</p>':'')+'<p class="cf-status" role="status"></p><div class="cf-links"><button type="button" class="btn ghost" data-cf-route="training">Training</button><button type="button" class="btn ghost" data-cf-route="nutrition">Meals & food choices</button><button type="button" class="btn ghost" data-cf-route="progress">Progress</button></div>';
    box.querySelector('[data-cf-refresh]').onclick=load;
    box.querySelectorAll('[data-cf-route]').forEach(b=>b.onclick=()=>{if(!active())return;state.clientView=b.dataset.cfRoute;renderClient();});
    box.querySelectorAll('[data-cf-action]').forEach(input=>input.onchange=async()=>{
@@ -28,7 +32,7 @@
     try{const r=await query('Save agreed action',db.rpc('complete_coaching_focus',{p_id:input.dataset.cfAction,p_complete:checked}));if(!active())return;if(r?.id!==input.dataset.cfAction||r.client_id!==id||Boolean(r.completed_at)!==checked)throw Error('The saved action was not confirmed. Refresh before retrying.');await load();}
     catch(e){if(active()){input.checked=!checked;status.textContent=e.message||'Could not save. Try again.';}}finally{if(active()&&input.isConnected)input.disabled=false;}
    });
-  }catch(e){if(active())box.innerHTML='<span class="eyebrow">AGREED NEXT STEPS</span><h2>Actions unavailable</h2><p role="status">'+esc(e.message||'Could not load your saved actions. Missing evidence is not an empty checklist.')+'</p><button type="button" class="btn ghost" data-cf-retry>Retry</button>';if(active())box.querySelector('[data-cf-retry]')?.addEventListener('click',load);}}
+  }catch(e){if(active())box.hidden=false;if(active())box.innerHTML='<span class="eyebrow">AGREED NEXT STEPS</span><h2>Actions unavailable</h2><p role="status">'+esc(e.message||'Could not load your saved actions. Missing evidence is not an empty checklist.')+'</p><button type="button" class="btn ghost" data-cf-retry>Retry</button>';if(active())box.querySelector('[data-cf-retry]')?.addEventListener('click',load);}}
   load();
  }
  async function coachMount(){
