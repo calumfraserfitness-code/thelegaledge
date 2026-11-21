@@ -961,6 +961,86 @@
         "vitamin_a_ug": 0.0,
         "sodium_mg": 1.0
       }
+    },
+    {
+      "fdc_id": 170457,
+      "description": "Tomatoes, red, ripe, raw, year round average",
+      "per_100g": {
+        "carbs_g": 3.89,
+        "calories": 18.0,
+        "fat_g": 0.2,
+        "protein_g": 0.88
+      }
+    },
+    {
+      "fdc_id": 171287,
+      "description": "Egg, whole, raw, fresh",
+      "per_100g": {
+        "calories": 143.0,
+        "protein_g": 12.56,
+        "fat_g": 9.51,
+        "carbs_g": 0.72
+      }
+    },
+    {
+      "fdc_id": 171477,
+      "description": "Chicken, broilers or fryers, breast, meat only, cooked, roasted",
+      "per_100g": {
+        "fat_g": 3.57,
+        "carbs_g": 0.0,
+        "calories": 165.0,
+        "protein_g": 31.02
+      }
+    },
+    {
+      "fdc_id": 171705,
+      "description": "Avocados, raw, all commercial varieties",
+      "per_100g": {
+        "protein_g": 2.0,
+        "fat_g": 14.66,
+        "carbs_g": 8.53,
+        "calories": 160.0
+      }
+    },
+    {
+      "fdc_id": 172183,
+      "description": "Egg, white, raw, fresh",
+      "per_100g": {
+        "protein_g": 10.9,
+        "fat_g": 0.17,
+        "calories": 52.0,
+        "carbs_g": 0.73
+      }
+    },
+    {
+      "fdc_id": 172470,
+      "description": "Peanut butter, smooth style, without salt",
+      "per_100g": {
+        "protein_g": 22.21,
+        "fat_g": 51.36,
+        "carbs_g": 22.31,
+        "calories": 598.0
+      }
+    },
+    {
+      "fdc_id": 172688,
+      "description": "Bread, whole-wheat, commercially prepared",
+      "per_100g": {
+        "fat_g": 3.5,
+        "carbs_g": 42.71,
+        "calories": 252.0,
+        "protein_g": 12.45
+      }
+    },
+    {
+      "fdc_id": 173910,
+      "description": "Cereals ready-to-eat, POST, Shredded Wheat, original big biscuit",
+      "per_100g": {
+        "calories": 337.0,
+        "protein_g": 11.37,
+        "fat_g": 2.01,
+        "carbs_g": 78.96
+      }
     }
   ]
 }

@@ -25,6 +25,7 @@ end$$;
 select set_config('request.jwt.claim.sub','91910000-0000-4000-8000-000000000003',true);
 do $$begin
  if (select count(*) from public.hevy_workouts)<>1 then raise exception 'Assigned coach cannot read training history';end if;
- if (select count(client_id) from public.hevy_connections)<>0 then raise exception 'Coach read client credentials/status';end if;
+ if (select count(client_id) from public.hevy_connections)<>1 then raise exception 'Assigned coach cannot read connection status';end if;
+ begin perform key_ciphertext from public.hevy_connections;raise exception 'Coach read encrypted credential';exception when insufficient_privilege then null;end;
 end$$;
 rollback;

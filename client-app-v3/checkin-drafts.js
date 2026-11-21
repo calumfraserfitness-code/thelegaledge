@@ -1,0 +1,43 @@
+/* Private server drafts: no photos, audio or health data in local storage. */
+(function(){
+ 'use strict';
+ const before=clientCheckin;let generation=0;
+ clientCheckin=function(){
+  before();const form=$('#checkinForm'),version=++generation;if(!form)return;
+  for(const name of ['energy','sleep','stress','workload']){const inputs=[...form.querySelectorAll(`[name="${name}"]`)];if(inputs.length===10){inputs.forEach(input=>{if(Number(input.value)%2)input.closest('label').remove();else{input.closest('label').querySelector('span').textContent=String(Number(input.value)/2);input.setAttribute('aria-label',`${name}: ${Number(input.value)/2} of 5`);}});const group=form.querySelector(`[name="${name}"]`)?.closest('div');if(group)group.style.gridTemplateColumns='repeat(5,minmax(0,1fr))';}}
+  const client=state.client.id,profile=state.user?.id,period=form.elements.period_start.value;
+  const active=()=>generation===version&&state.client?.id===client&&state.user?.id===profile&&form.isConnected;
+  const status=document.createElement('p');status.setAttribute('role','status');status.className='muted checkin-draft-status';const nav=form.querySelector('.refresh-checkin-navigation');if(nav)nav.after(status);else form.append(status);
+  let dirty=false,timer=null,chain=Promise.resolve(),submitted=false,submitting=false;
+  function answers(){const a={};for(const [k,v] of new FormData(form)){if(typeof v==='string'&&!['photo_front'].includes(k))a[k]=v.slice(0,8000);}return a;}
+  function persist(){if(state.preview||submitted||!active())return chain;const snapshot=answers();chain=chain.catch(()=>{}).then(async()=>{if(submitted||!active())return;let error;try{({error}=await db.from('client_checkin_drafts').upsert({client_id:client,period_start:period,answers:snapshot,updated_at:new Date().toISOString()},{onConflict:'client_id,period_start'}));}catch(e){error=e;}if(active())status.textContent=error?'Draft could not save. Keep this screen open and try again.':'Draft saved.';return !error;});return chain;}
+  form.flushCheckinDraft=async()=>{
+   clearTimeout(timer);if(!active())return false;if(state.preview||!dirty)return true;
+   const snapshot=JSON.stringify(answers()),saved=await persist();if(saved!==true||!active())return false;
+   if(JSON.stringify(answers())!==snapshot){status.textContent='Your answers changed while saving. They are still here; retry switching weeks when they have saved.';return false;}return true;
+  };
+  function changed(){dirty=true;if(!state.preview)status.textContent='Saving draft…';clearTimeout(timer);timer=setTimeout(persist,700);}
+  form.addEventListener('input',changed);form.addEventListener('change',changed);
+  const submit=form.onsubmit;
+  form.onsubmit=async function(e){e.preventDefault();if(submitting)return;submitting=true;try{clearTimeout(timer);await persist();if(!active())return;await submit.call(this,e);if(state.client?.id!==client||state.user?.id!==profile)return;const confirmed=state.data.checkins.some(c=>c.period_start===period);if(confirmed&&!state.preview){submitted=true;await chain;if(state.client?.id!==client||state.user?.id!==profile)return;await db.from('client_checkin_drafts').delete().eq('client_id',client).eq('period_start',period);}}finally{submitting=false;}};
+  // Suppress the browser's default submit before waiting for the server draft.
+  form.addEventListener('submit',e=>e.preventDefault());
+  if(!state.preview)db.from('client_checkin_drafts').select('answers').eq('client_id',client).eq('period_start',period).maybeSingle().then(({data,error})=>{
+   if(!active()||dirty)return;if(error){status.textContent='Draft unavailable. You can still submit your check-in.';return;}
+   if(data){
+    const answers={...data.answers};
+    if(form.dataset.quickView){
+     if(answers.support_needed)answers.next_week_availability=[answers.next_week_availability,answers.support_needed].filter(Boolean).join('\n').slice(0,1200);
+     if(answers.wins)answers.challenges=[answers.challenges,answers.wins].filter(Boolean).join('\n').slice(0,1200);
+    }
+    for(const node of form.querySelectorAll('[name]')){
+     const value=answers[node.name];
+     if(node.type==='file'||node.type==='hidden'||value==null)continue;
+     if(node.type==='radio'||node.type==='checkbox')node.checked=node.value===String(value);else node.value=String(value);
+    }
+    form.dispatchEvent(new Event('checkin-draft-restored'));
+    status.textContent='Draft restored.';
+   }
+  }).catch(()=>{if(active())status.textContent='Draft unavailable. You can still submit your check-in.';});
+ };
+})();

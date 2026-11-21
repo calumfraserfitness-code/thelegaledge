@@ -21,5 +21,7 @@ read("state.data.weeks[0].published=false");
 assert.equal(read("todayCoachingModel('2026-10-01').sessions.length"),0);
 assert.equal(read("todayCoachingModel('2026-10-01').mealPlan"),null);
 assert.equal(read("todayCoachingModel('2026-11-01').checkin"),null);
+read("state.client.id='own';state.data.checkins=[{id:'peer-checkin',client_id:'peer',period_start:'2026-09-28'},{id:'own-checkin',client_id:'own',period_start:'2026-09-28'}]");
+assert.equal(read("todayCoachingModel('2026-10-01').checkin.id"),'own-checkin','Today’s review source belongs to the current client');
 assert.equal(read("reviewFacts({energy:null,stress:0,workload:8,support_needed:'Call please'})"),'Stress 0/10 · Workload 8/10 · Support requested');
 console.log('PASS: client timezone dates, exact dated menus, own published activities, blank and zero step readings, normalized wearable data, unpublished-week suppression and factual review labels.');

@@ -1,0 +1,8 @@
+const assert=require('assert'),M=require('../checkin-status-model.js');
+const ny={timezone:'America/New_York',checkin_day:5,checkin_due_time:'23:59:00'},ie={timezone:'Europe/Dublin',checkin_day:5,checkin_due_time:'23:59:00'};
+assert.equal(M.due(ny,'2026-10-05').toISOString(),'2026-10-10T03:59:00.000Z');assert.equal(M.due(ie,'2026-10-05').toISOString(),'2026-10-09T22:59:00.000Z');assert.equal(M.due(ie,'2026-10-26').toISOString(),'2026-10-30T23:59:00.000Z');assert.equal(M.due(ny,'2026-11-02').toISOString(),'2026-11-07T04:59:00.000Z');
+assert.equal(M.week(ny,new Date('2026-10-12T00:30:00Z')),'2026-10-05');assert.equal(M.week(ie,new Date('2026-10-12T00:30:00Z')),'2026-10-12');
+const c={period_start:'2026-10-05',source_system:'client_weekly_v3'};
+assert.equal(M.timing({...c,submitted_at:'2026-10-08T14:00:00Z'},ny),'Early');assert.equal(M.timing({...c,submitted_at:'2026-10-10T03:59:00Z'},ny),'On time');assert.equal(M.timing({...c,submitted_at:'2026-10-10T04:00:00Z'},ny),'Late');assert.equal(M.timing({...c,source_system:'legacy_coach_ui',submitted_at:'2026-10-10T04:00:00Z'},ny),'Imported time unverified');
+assert.equal(M.due({...ny,checkin_day:null},c.period_start),null);assert.equal(M.due({...ny,checkin_due_time:'25:00:00'},c.period_start),null);assert.equal(M.delta({weight_kg:75},{weight_kg:null},'weight_kg'),null);assert.equal(M.delta({weight_kg:75},{weight_kg:76},'weight_kg'),-1);assert.equal(M.delta({training_adherence:0},{training_adherence:50},'training_adherence'),-50);
+console.log('PASS: actual local deadlines, DST offsets, differing client weeks, early/on-time/late boundaries, imported timestamps and unknown-safe comparisons.');

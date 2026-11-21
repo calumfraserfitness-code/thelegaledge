@@ -1,0 +1,2 @@
+create or replace function private.require_lesson_video() returns trigger language plpgsql security invoker set search_path='' as $$ begin if new.published and nullif(trim(new.video_script),'') is not null and nullif(trim(new.video_path),'') is null then raise exception 'Upload the finished lesson video before publishing';end if;return new;end $$;
+create trigger finished_lesson_video before insert or update on public.coaching_start_resources for each row execute function private.require_lesson_video();

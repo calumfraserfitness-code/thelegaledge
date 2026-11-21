@@ -1,0 +1,102 @@
+.pch-home{display:grid;gap:clamp(.85rem,3vw,1.35rem);max-width:46rem;margin:0 auto}
+.pch-heading h1{margin:.4rem 0;font-size:clamp(1.7rem,4vw,2.35rem);line-height:1.15;letter-spacing:-.035em}
+.pch-home>.pch-next{margin:0;padding:clamp(1.15rem,4vw,1.7rem);background:var(--navy,#111b29);color:#fff;border-radius:1rem}
+.pch-home .pch-next .eyebrow{margin:0;color:#e7cf9b}
+.pch-home .pch-next h2{margin:.4rem 0 1rem;line-height:1.25;overflow-wrap:anywhere}
+.pch-home .pch-next .btn.primary{min-height:46px;background:#e8cc91;color:#111b29;border-color:#e8cc91}
+.pch-shortcuts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.55rem}
+.pch-shortcuts .btn{min-height:46px;background:#fff;border-color:#cdd7e2}
+.pch-home button:focus-visible{outline-offset:4px}
+@media(max-width:480px){.pch-home .pch-next .btn{width:100%}}
+.checkin-extra{border:1px solid var(--line,#ded8cd);border-radius:12px;padding:14px;margin:18px 0}
+.checkin-extra>summary{cursor:pointer;font-weight:700;min-height:44px;display:flex;align-items:center}
+.checkin-extra>section{margin-top:16px}
+.checkin-extra .refresh-score{margin:14px 0}
+.refresh-checkin [hidden]{display:none!important}
+
+.gym-plan,.food-plan-brief{grid-column:1/-1}
+.gym-plan-heading{display:flex;justify-content:space-between;gap:12px}
+.gym-plan p{color:var(--muted);line-height:1.5}
+.gym-plan [aria-pressed=true]{background:var(--navy,#111b29);border-color:var(--navy,#111b29);color:#fff}
+.gym-plan [data-gym-workouts]>h3{margin:20px 0 10px}
+.gym-workout{margin-top:10px;padding:14px;border:1px solid var(--line,#ded8cd);border-radius:12px}
+.gym-workout summary{cursor:pointer;font-weight:700}
+.gym-workout summary small{font-weight:500;color:var(--muted)}
+.gym-workout ul{padding:0;list-style:none}
+.gym-workout li{display:flex;justify-content:space-between;gap:16px;padding:8px 0;border-bottom:1px solid var(--line,#ded8cd)}
+.gym-workout strong{white-space:nowrap}
+.food-plan-brief h2{margin-top:0}
+.food-plan-brief-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,235px),1fr));gap:12px}
+.food-plan-brief-grid>div{padding:12px 14px;border:1px solid var(--line,#ded8cd);border-radius:10px}
+.food-plan-brief h3{font-size:1rem;margin:0 0 5px}
+.food-plan-brief p{margin:0;line-height:1.5}
+.food-plan-brief .food-plan-baseline{margin-top:14px;font-weight:700}
+
+.pch-start-hero{grid-column:1/-1;min-height:142px;padding:25px 28px;border:1px solid #e9dfcb;border-radius:18px;background:linear-gradient(90deg,#f6f2e7 12%,#f6f2e7d9 48%,#f6f2e700 76%),url('./assets/welcome-progress-20261008.webp') center right/cover}
+.pch-start-hero h1{max-width:70%}
+.training-start-note{padding:12px 16px;max-width:720px;border-left:3px solid #b48b45;background:#faf6ec}
+.gym-picker{margin:16px 0}
+.gym-picker>summary{width:fit-content;cursor:pointer;font-weight:650}
+.gym-picker>.gym-plan{margin-top:12px}
+@media(max-width:650px){.pch-start-hero{padding:22px 16px;min-height:110px}}
+
+.checkin-draft-status:empty{display:none}
+#checkinForm[data-quick-view]{
+ --checkin-ink:#16263d;--checkin-muted:#4a5a6c;--checkin-line:#d9e2ec;--checkin-accent:#8c651f;
+ max-width:46rem;margin-inline:auto;padding:clamp(.9rem,3vw,1.65rem);
+ color:var(--checkin-ink);background:#fff;
+}
+.checkin-week-picker{max-width:46rem;margin-inline:auto;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;padding-block:.55rem}
+.checkin-week-picker label{display:flex;align-items:center;flex-wrap:wrap;gap:.5rem;margin:0}
+.checkin-week-picker select{width:auto;max-width:100%;margin:0}
+.checkin-main{display:grid;gap:clamp(.85rem,2.8vw,1.25rem)}
+.checkin-main label{display:block;min-width:0;margin:0;font-weight:650;line-height:1.4}
+.checkin-main small{color:var(--checkin-muted);font-weight:400}
+.checkin-main label>small:first-of-type{margin-inline-start:.35rem}
+.checkin-main input[type="number"],.checkin-main textarea{
+ display:block;width:100%;box-sizing:border-box;margin-top:.4rem;
+ color:var(--checkin-ink);border:1px solid #aab9ca;border-radius:.6rem;
+ background:#fff;padding:.65rem .75rem;font-size:1rem;min-height:44px;
+}
+.checkin-main textarea{resize:vertical;min-height:5.25rem}
+.checkin-main input:focus-visible,.checkin-main textarea:focus-visible,
+#checkinForm[data-quick-view] summary:focus-visible{
+ outline:2px solid var(--checkin-accent);outline-offset:2px;
+}
+.checkin-weigh-in,.checkin-goals,.checkin-progress-metrics,.checkin-next-week,.checkin-recovery{
+ min-width:0;padding:clamp(.8rem,2.4vw,1.1rem);margin:0;border:1px solid var(--checkin-line);border-radius:.8rem;
+}
+.checkin-weigh-in{background:#f5f8fc}
+.checkin-weigh-in input[name="weight_display"]{width:min(100%,11rem);font-size:1.25rem;font-weight:650}
+.checkin-weigh-in p{margin:.5rem 0 0;color:var(--checkin-muted)}
+.checkin-goals{background:#faf6ed;border-color:#e7d8b9;border-inline-start:4px solid #aa8038}
+.checkin-main h2,.checkin-recovery>legend{margin:0 0 .5rem;font-size:1.08rem;line-height:1.4;font-weight:750}
+.checkin-goals p,.checkin-goals ul{margin:.35rem 0}
+.checkin-goals ul{padding-inline-start:1.2rem}
+.checkin-goals summary{cursor:pointer;font-weight:650;margin-top:.55rem}
+.checkin-counts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.8rem}
+.checkin-counts label>small:first-of-type,.checkin-progress-metrics>small{display:block;margin:.35rem 0 0}
+.checkin-reflection,.checkin-next-week{display:grid;gap:.85rem}
+.checkin-next-week{background:#f5f8fc}
+.checkin-next-week h2{margin:0}
+.checkin-recovery{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.75rem}
+.checkin-recovery>legend{padding-inline:.4rem}
+.checkin-recovery>.refresh-score{min-width:0;margin:0;padding:0}
+.checkin-recovery .refresh-score legend{margin-bottom:.35rem;font-size:.9rem}
+.checkin-recovery .refresh-score label span{min-height:44px;padding:0;display:grid;place-items:center;font-size:.95rem}
+.checkin-recovery .refresh-score>small span{color:inherit}
+#checkinForm[data-quick-view] .checkin-extra{margin:1rem 0;border-color:var(--checkin-line);background:#f8fafc}
+#checkinForm[data-quick-view] .checkin-extra label{display:block;margin-top:.65rem}
+#checkinForm[data-quick-view] .refresh-checkin-navigation{margin-top:1rem}
+#checkinSubmit{min-height:46px}
+@media(max-width:650px){
+ .checkin-recovery{grid-template-columns:1fr}
+ .checkin-recovery>.refresh-score+.refresh-score{border-top:1px solid var(--checkin-line);padding-top:.7rem}
+ #checkinForm[data-quick-view] #checkinSubmit{width:100%}
+}
+@media(max-width:460px){.checkin-counts{grid-template-columns:1fr}}
+
+.checkin-weigh-in .checkin-no-weight{display:flex;align-items:center;gap:.5rem;margin-top:.6rem;font-weight:500}
+.checkin-no-weight input[type="checkbox"]{width:1rem;height:1rem;margin:0;flex:none}
+.checkin-weigh-in input[name="weight_display"]:disabled{opacity:.55}
+#checkinForm[data-quick-view] .checkin-extra summary small{margin-inline-start:.45rem;color:var(--checkin-muted);font-weight:400}

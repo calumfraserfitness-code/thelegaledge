@@ -1,0 +1,13 @@
+const assert=require('assert'),fs=require('fs'),path=require('path'),vm=require('vm');const {JSDOM}=require('jsdom');
+const root=path.resolve(__dirname,'..'),dom=new JSDOM(fs.readFileSync(path.join(root,'index.html'),'utf8'),{url:'https://legal-edge-client-app.vercel.app/',runScripts:'outside-only'}),w=dom.window,ctx=dom.getInternalVMContext();
+let calls=0,locks=0,rejected=false;w.Response=Response;w.Headers=Headers;w.Request=Request;
+Object.defineProperty(w.navigator,'locks',{value:{request:()=>{locks++;return new Promise(()=>{});}}});
+w.fetch=async()=>{calls++;if(rejected)throw Error('Network fetch failed');return new Response(JSON.stringify({error:'invalid_grant',error_description:'Invalid login credentials'}),{status:400,headers:{'Content-Type':'application/json'}});};
+vm.runInContext(fs.readFileSync(path.join(root,'vendor/supabase-2.107.0.js'),'utf8'),ctx);
+vm.runInContext(fs.readFileSync(path.join(root,'app-v2.js'),'utf8'),ctx);
+const run=s=>vm.runInContext(s,ctx),tick=()=>new Promise(r=>setImmediate(r));
+(async()=>{await tick();const form=w.document.querySelector('#loginForm'),button=form.querySelector('button[type=submit]');w.document.querySelector('#email').value='TEST@example.invalid';w.document.querySelector('#password').value='fixture-not-real';
+await Promise.race([form.onsubmit({preventDefault(){},submitter:button}),new Promise((_,reject)=>setTimeout(()=>reject(Error('Auth deadlock')),2500))]);assert.equal(locks,0,'SDK must not wait for a suspended browser lock');assert(calls>0,'provider received login request');assert(!button.disabled,'failed login remains retryable');assert(w.document.querySelector('#authMsg').textContent.includes('Invalid login credentials'));
+rejected=true;await form.onsubmit({preventDefault(){},submitter:button});assert(w.document.querySelector('#authMsg').textContent.includes('timed out'));assert(!button.disabled);
+let userCalls=0,resolveUser;run("db.auth.getUser=()=>{window.userCalls++;return new Promise(r=>window.resolveUser=r);}");w.userCalls=0;const first=run('boot()'),second=run('boot()');assert.equal(first,second);assert.equal(w.userCalls,1);w.resolveUser({data:{user:null}});await first;
+assert(fs.readFileSync(path.join(root,'index.html'),'utf8').includes('./vendor/supabase-2.107.0.js'));console.log('PASS: actual pinned SDK under suspended browser lock, login request reaches provider mock, failures unlock retry, single account boot and local SDK.');await run('db.auth.dispose()');dom.window.close();})().catch(e=>{console.error(e);dom.window.close();process.exit(1)});
