@@ -1207,8 +1207,18 @@ function flattenCheckinAnswers(value, prefix = '') {
 function checkinCard(checkin, coach = false) {
   if(!coach&&checkin.client_id&&checkin.client_id!==state.client?.id)return '';
   const answers = answersFor(checkin), appFeedback = coach || Boolean(checkin.reviewed_at && checkin.review_channel !== 'whatsapp');
+  const prior=coach&&checkin.period_start?(state.data.checkins||[]).filter(row=>row.client_id===checkin.client_id&&row.period_start<checkin.period_start)
+    .sort((a,b)=>b.period_start.localeCompare(a.period_start))[0]:null;
+  const compare=prior?[
+    ['Strength sessions completed','Strength sessions'],['Days following the food plan','Days on the food plan']
+  ].flatMap(([key,label])=>{
+    const before=prior.original_answers?.[key],after=checkin.original_answers?.[key];
+    return typeof before==='number'&&typeof after==='number'?[label+' '+before+' → '+after]:[];
+  }):[];
+
   return `<details class="checkin-card rich-checkin" ${checkin === state.data.checkins[0] ? 'open' : ''}><summary><div><span class="eyebrow">WEEK ${checkin.week_number || '—'}</span><h3>${esc(checkin.original_date_text || fmt(checkin.submitted_at))}</h3></div><div class="score">${checkin.week_score ?? '—'}/10</div></summary>
     <div class="detail-list"><div class="detail"><label>Weight</label>${displayWeight(checkin.weight_kg)}</div><div class="detail"><label>Energy</label>${checkin.energy ?? '—'}/10</div><div class="detail"><label>Sleep</label>${checkin.sleep ?? '—'}/10</div><div class="detail"><label>Stress</label>${checkin.stress ?? '—'}/10</div><div class="detail"><label>Training · self-reported</label>${checkin.training_adherence == null ? '—' : checkin.training_adherence + '%'}</div><div class="detail"><label>Nutrition · self-reported</label>${checkin.nutrition_adherence == null ? '—' : checkin.nutrition_adherence + '%'}</div><div class="detail"><label>Average steps</label>${checkin.average_steps != null ? Number(checkin.average_steps).toLocaleString() : '—'}</div></div>
+    ${compare.length?'<p class="checkin-comparison"><strong>Since the previous check-in</strong> · '+esc(compare.join(' · '))+'</p>':''}
     <div class="original-answers">${answers.length ? answers.map(([question, answer]) => `<div class="answer-block"><h4>${esc(question)}</h4><p>${esc(answer)}</p></div>`).join('') : '<p class="source-gap">No written response was submitted for this week.</p>'}</div>
     ${!coach && checkin.reviewed_at && checkin.review_channel === 'whatsapp' ? '<div class="coach-note"><b>Reviewed via WhatsApp</b><p>Your coach replied in WhatsApp. Open that conversation for the response.</p></div>' : ''}
     ${appFeedback && safeMediaUrl(checkin.voice_note_url) ? `<a class="loom-card" href="${esc(safeMediaUrl(checkin.voice_note_url))}" target="_blank" rel="noopener"><span>▶</span><div><b>Weekly check-in video</b><small>Open coach review</small></div></a>` : ''}

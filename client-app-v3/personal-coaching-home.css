@@ -73,3 +73,12 @@
 .checkin-recovery .refresh-score label{min-width:0}
 .checkin-recovery .refresh-score label span{min-height:36px;padding:0;display:grid;place-items:center}
 .checkin-extra label{display:block;margin-top:.65rem}
+
+.checkin-goals,.checkin-progress-metrics{padding:.8rem;border:1px solid var(--line,#ded8cd);border-radius:.65rem}
+.checkin-goals h2,.checkin-progress-metrics h2{margin:0 0 .45rem;font-size:1.1rem}
+.checkin-goals p,.checkin-goals ul{margin:.35rem 0}
+.checkin-goals summary{cursor:pointer;font-weight:600;margin-top:.5rem}
+.checkin-counts{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,13rem),1fr));gap:.65rem}
+.checkin-counts label{margin:0;min-width:0}
+.checkin-counts input{max-width:100%;box-sizing:border-box}
+.checkin-counts small,.checkin-progress-metrics>small{display:block;margin:.35rem 0}

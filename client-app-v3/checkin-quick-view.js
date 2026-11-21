@@ -25,6 +25,47 @@
   form.weeklyTrainingReview=update;
   return section;
  }
+ function goalContext(client,data,period){
+  const current=period===window.CheckinStatus?.week?.(client);
+  if(!current)return {summary:'',targets:[],recap:null};
+  const targets=(data.coachingGoals||[]).filter(g=>g.client_id===client.id&&g.status==='active');
+  const recap=(data.coachingGuidance||[]).filter(g=>g.client_id===client.id&&g.published&&/^Call recap · \d{4}-\d{2}-\d{2}$/.test(g.title))
+   .sort((a,b)=>b.title.localeCompare(a.title)||String(b.created_at).localeCompare(String(a.created_at)))[0];
+  return {summary:String(client.goal_summary||'').trim(),targets,recap};
+ }
+ function targetText(goal,client){
+  if(!finiteRecorded(goal.target))return goal.title;
+  const pounds=goal.metric==='weight_kg'&&client.weight_unit==='lbs';
+  const value=Number(goal.target)*(pounds?2.2046226218:1);
+  const unit=pounds?'lb':goal.unit||'';
+  return goal.title+' · '+Number(value.toFixed(1)).toLocaleString()+(unit?' '+unit:'');
+ }
+ function goalPanel(goals,client){
+  if(!goals.summary&&!goals.targets.length&&!goals.recap)return null;
+  const box=document.createElement('section');box.className='checkin-goals';
+  box.innerHTML='<h2>Your agreed goals</h2>'+(goals.summary?'<p>'+esc(goals.summary)+'</p>':'')+
+   (goals.targets.length?'<ul>'+goals.targets.map(g=>'<li>'+esc(targetText(g,client))+'</li>').join('')+'</ul>':'')+
+   (goals.recap?'<details><summary>Latest agreed call recap · '+esc(fmt(goals.recap.title.slice(13)))+'</summary><p class="cw-lines">'+esc(goals.recap.body)+'</p></details>':'');
+  return box;
+ }
+ function progressPanel(period,client){
+  const section=document.createElement('section');section.className='checkin-progress-metrics';
+  const week=(state.data.weeks||[]).find(w=>w.published&&w.week_start===period&&(!w.client_id||w.client_id===client.id));
+  const lifts=(state.data.sessions||[]).filter(s=>week&&s.week_id===week.id&&(!s.client_id||s.client_id===client.id)&&
+   ['weights','resistance'].includes(s.training_type)&&s.source_metadata?.optional!==true);
+  const recorded=lifts.filter(s=>s.status==='completed').length;
+  section.innerHTML='<h2>Progress this week</h2><div class="checkin-counts">'+
+   '<label>Strength sessions completed<input name="strength_sessions_completed" type="number" min="0" max="28" step="1" inputmode="numeric">'+
+   (lifts.length?'<small>'+recorded+' logged · '+lifts.length+' assigned. Include any you did outside the app.</small>':'<small>Include any sessions you did outside the app.</small>')+'</label>'+
+   '<label>Days you followed your food plan<input name="nutrition_days_on_plan" type="number" min="0" max="7" step="1" inputmode="numeric"><small>Out of 7. Leave blank if you’re unsure.</small></label></div>';
+  const previous=(state.data.checkins||[]).filter(r=>r.client_id===client.id&&r.period_start<period)
+   .sort((a,b)=>b.period_start.localeCompare(a.period_start))[0];
+  const values=previous?.original_answers||{};
+  const last=[['Strength sessions completed','strength sessions'],['Days following the food plan','days on the food plan']]
+   .filter(([k])=>finiteRecorded(values[k])).map(([k,label])=>Number(values[k])+' '+label);
+  if(last.length)section.insertAdjacentHTML('beforeend','<small>Last check-in ('+esc(fmt(previous.period_start))+') · '+esc(last.join(' · '))+'</small>');
+  return section;
+ }
  function mount(){
   if(state.client?.onboarding_status==='complete'){
    document.querySelector('#clientMain .client-page-head')?.classList.add('pch-checkin-hero','pch-start-hero');
@@ -54,9 +95,14 @@
   main.className='checkin-main';
   main.append(weightLabel);
   if(weightHelp)main.append(weightHelp);
+  const goals=goalContext(client,state.data,period),agreed=goalPanel(goals,client);
+  if(agreed)main.append(agreed);
+  main.append(progressPanel(period,client));
+  form.checkinGoalSnapshot=[goals.summary,...goals.targets.map(g=>targetText(g,client))].filter(Boolean).join(' · ').slice(0,2000);
+
   main.insertAdjacentHTML('beforeend',
-   '<label>How did training go?<textarea name="challenges" rows="2" maxlength="1200" required placeholder="What did you get done? What changed or got in the way?"></textarea></label>'+
-   '<label>How did your food plan go?<textarea name="food_summary" rows="2" maxlength="1200" required placeholder="What worked well? Where did you struggle?"></textarea></label>');
+   '<label>What improved in training, and what held you back?<textarea name="challenges" rows="2" maxlength="1200" required placeholder="Name a lift, session or rep improvement, or tell me what stopped you training."></textarea></label>'+
+   '<label>What helped or got in the way with food?<textarea name="food_summary" rows="2" maxlength="1200" required placeholder="Tell me where meals went to plan or what made it difficult."></textarea></label>');
   const recovery=document.createElement('fieldset');
   recovery.className='checkin-recovery';
   recovery.innerHTML='<legend>Energy, sleep and stress <small>Optional</small></legend>';
@@ -65,6 +111,7 @@
    if(score)recovery.append(score);
   }
   main.append(recovery);
+  main.insertAdjacentHTML('beforeend','<label>What’s one action you’ll commit to next week?<textarea name="next_week_availability" rows="2" maxlength="1200" required placeholder="Pick one step toward your goal and, if useful, say when you’ll do it."></textarea></label>');
   const support=form.querySelector('[name="support_needed"]');
   if(support){
    support.rows=2;support.maxLength=1200;support.placeholder='A question, a change you need, or a busy week coming up';

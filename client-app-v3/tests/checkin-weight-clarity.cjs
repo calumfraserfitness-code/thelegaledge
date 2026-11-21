@@ -24,6 +24,17 @@ function event(){return {preventDefault(){},target:form(),submitter:w.$('#checki
  await w.submitAtomicCoachingCheckin(event());assert(!('weight_kg' in sent.at(-1).payload.answers),'Leaving weight blank must not re-submit the previous value');assert(toasts.at(-1).includes('Submitted to your coach · no weight supplied'));assert(w.$('[data-checkin-weight-receipt]').textContent.includes('No weight was supplied'));assert(w.document.body.textContent.includes('Saved for Calum to review'));
  w.state.data.checkins=[];w.clientCheckin();form().elements.weight_display.value='180';savedWeight=180/2.2046226218;await w.submitAtomicCoachingCheckin(event());assert(Math.abs(sent.at(-1).payload.answers.weight_kg-savedWeight)<0.000001,'lb entry is converted once');assert(toasts.at(-1).includes('weight included'));assert(w.$('[data-checkin-weight-receipt]').textContent.includes('180.0 lb'));
  w.state.data.checkins=[];w.clientCheckin();form().elements.weight_display.value='175';already=true;await w.submitAtomicCoachingCheckin(event());assert(toasts.at(-1).includes('no new answers saved'),'Duplicate submission cannot imply the new form answers replaced a saved check-in');
+ w.state.data.checkins=[];already=false;w.clientCheckin();
+ form().innerHTML+='<input name="strength_sessions_completed" value="0"><input name="nutrition_days_on_plan" value="5"><input name="next_week_availability" value="Train on Monday">';
+ form().weeklyTrainingReview=()=>({result:null,details:{}});
+ form().checkinGoalSnapshot='Two assigned sessions';
+ await w.submitAtomicCoachingCheckin(event());
+ const tracked=sent.at(-1).payload.answers;
+ assert.equal(tracked.original_answers['Strength sessions completed'],0);
+ assert.equal(tracked.original_answers['Days following the food plan'],5);
+ assert.equal(tracked.original_answers['Agreed goals at check-in'],'Two assigned sessions');
+ assert.equal(tracked.original_answers['Next week’s commitment'],'Train on Monday');
+ assert.equal(tracked.nutrition_adherence,71);
  // Draft receipts explicitly distinguish typing from a completed submission.
  w.state.data.checkins=[];w.clientCheckin();let saveTimer;
  w.setTimeout=fn=>(saveTimer=fn,1);w.clearTimeout=()=>{};
