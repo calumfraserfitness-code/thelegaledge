@@ -33,9 +33,10 @@ const select=async value=>{const picker=w.$('#checkinWeekChoice');picker.value=v
  assert(w.$('.checkin-goals').textContent.includes('Use the home workout'));
  assert(!w.$('.checkin-goals').textContent.includes('PRIVATE'));
  assert(w.$('.checkin-progress-metrics').textContent.includes('0 strength sessions'));
-assert.equal(live.elements.session_outcome_complete.value,'completed');
- assert(!live.elements.session_outcome_missed.required);assert.equal(live.weeklyTrainingReview().result,null,'Unanswered sessions are not marked as missed');assert(!live.elements.session_outcome_bike.required);
- live.elements.session_outcome_missed.value='missed';const report=live.weeklyTrainingReview();
- assert.equal(report.result,50);assert(Object.values(report.details).some(v=>v==='Gym B — Missed'));assert(live.elements.challenges.required);
+ assert(!live.querySelector('[name^="session_outcome_"]'));
+ assert(!live.elements.workload);
+ assert(live.elements.strength_sessions_completed);
+ assert(live.textContent.includes('1 logged · 2 assigned'));
+ assert(live.elements.challenges.required);
  dom.window.close();console.log('PASS clear this/last-week ranges, retrospective form dates, partial first week, no current-week prefill, isolated private drafts, saved-week duplicate prevention and owner-scoped selection.');
 })().catch(e=>{console.error(e);dom.window.close();process.exitCode=1;});

@@ -26,7 +26,7 @@ function event(){return {preventDefault(){},target:form(),submitter:w.$('#checki
  w.state.data.checkins=[];w.clientCheckin();form().elements.weight_display.value='175';already=true;await w.submitAtomicCoachingCheckin(event());assert(toasts.at(-1).includes('no new answers saved'),'Duplicate submission cannot imply the new form answers replaced a saved check-in');
  w.state.data.checkins=[];already=false;w.clientCheckin();
  form().innerHTML+='<input name="strength_sessions_completed" value="0"><input name="nutrition_days_on_plan" value="5"><input name="next_week_availability" value="Train on Monday">';
- form().weeklyTrainingReview=()=>({result:null,details:{}});
+ form().dataset.quickView='true';
  form().checkinGoalSnapshot='Two assigned sessions';
  await w.submitAtomicCoachingCheckin(event());
  const tracked=sent.at(-1).payload.answers;

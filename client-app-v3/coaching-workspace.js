@@ -118,17 +118,15 @@ clientCheckin=function(){originalCoachingCheckin();const form=$('#checkinForm');
 };
 async function submitAtomicCoachingCheckin(event){
  event.preventDefault();const fd=new FormData(event.target),answers={},clientId=state.client.id,userId=state.user?.id;const active=()=>state.client?.id===clientId&&state.user?.id===userId;const audioContext={clientId,userId,preview:state.preview,file:typeof checkinAudioFile==='undefined'?null:checkinAudioFile};
- for(const[key,value]of fd){if(key.startsWith('photo_')||key.startsWith('session_outcome_')||key==='weight_display'||['food_summary','strength_sessions_completed','nutrition_days_on_plan'].includes(key))continue;answers[key]=value===''?null:value;}
- if(event.target.weeklyTrainingReview){
-  const {result,details}=event.target.weeklyTrainingReview();
-  answers.training_adherence=result;
+ for(const[key,value]of fd){if(key.startsWith('photo_')||key==='weight_display'||['food_summary','strength_sessions_completed','nutrition_days_on_plan'].includes(key))continue;answers[key]=value===''?null:value;}
+ if(event.target.dataset.quickView){
   const strength=fd.get('strength_sessions_completed'),foodDays=fd.get('nutrition_days_on_plan');
   if(foodDays!==null&&foodDays!==''&&Number.isInteger(Number(foodDays))&&Number(foodDays)>=0&&Number(foodDays)<=7)answers.nutrition_adherence=Math.round(100*Number(foodDays)/7);
   answers.original_answers={
    ...(event.target.checkinGoalSnapshot?{'Agreed goals at check-in':event.target.checkinGoalSnapshot}:{}),
    ...(strength!==null&&strength!==''?{'Strength sessions completed':Number(strength)}:{}),
    ...(answers.nutrition_adherence!=null?{'Days following the food plan':Number(foodDays)}:{}),
-   'Training progress and barriers':answers.challenges,'Food this week':fd.get('food_summary'),'Help from Calum':answers.support_needed,'Win this week':answers.wins,'Average sleep hours':answers.sleep_hours,'Workload':answers.workload,'Next week’s commitment':answers.next_week_availability,...details};
+   'Training progress and barriers':answers.challenges,'Food this week':fd.get('food_summary'),'Help from Calum':answers.support_needed,'Win this week':answers.wins,'Average sleep hours':answers.sleep_hours,'Next week’s commitment':answers.next_week_availability};
  }
  if(fd.get('weight_display'))answers.weight_kg=Number(fd.get('weight_display'))/(state.client.weight_unit==='lbs'?2.2046226218:1);
  const period=answers.period_start;if(!period||new Date(period+'T12:00:00').getDay()!==1)return toast('Choose the Monday for this check-in','error');

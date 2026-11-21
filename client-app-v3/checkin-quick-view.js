@@ -1,30 +1,6 @@
 /* The weekly questions use the existing draft, upload and submission flow. */
 (function(){
  'use strict';
- const outcomes={completed:'Completed',modified:'Completed with changes',missed:'Missed',planned:'Still to do'};
- function sessionReview(form,period){
-  const week=(state.data.weeks||[]).find(w=>w.published&&w.week_start===period&&(!w.client_id||w.client_id===state.client.id));
-  const sessions=(state.data.sessions||[]).filter(s=>week&&s.week_id===week.id&&(!s.client_id||s.client_id===state.client.id)&&['weights','resistance','cardio'].includes(s.training_type)).sort((a,b)=>Number(a.sort_order||0)-Number(b.sort_order||0)||String(a.session_date).localeCompare(String(b.session_date)));
-  const section=document.createElement('section');
-  section.innerHTML='<h2>Workout details</h2>';
-  const tracked=sessions.map(s=>{
-   const label=document.createElement('label'),select=document.createElement('select');
-   label.textContent=s.title+(s.source_metadata?.optional===true?' (optional session)':'');
-   select.name='session_outcome_'+s.id;
-   select.innerHTML='<option value="">Choose outcome (optional)</option>'+Object.entries(outcomes).map(([key,value])=>'<option value="'+key+'">'+value+'</option>').join('');
-   if(s.status==='completed')select.value='completed';
-   else if(s.session_date>window.CheckinStatus?.localDate?.(new Date(),state.client.timezone||'Europe/Dublin'))select.value='planned';
-   label.append(select);section.append(label);
-   return {session:s,select};
-  });
-  function update(){
-   const selected=tracked.filter(({session})=>session.source_metadata?.optional!==true);
-   const result=selected.length&&selected.every(({select})=>select.value&&select.value!=='planned')?Math.round(100*selected.filter(({select})=>select.value!=='missed').length/selected.length):null;
-   return {result,details:Object.fromEntries(tracked.filter(({select})=>select.value).map(({session,select},i)=>['Session '+(i+1),session.title+' — '+outcomes[select.value]]))};
-  }
-  form.weeklyTrainingReview=update;
-  return section;
- }
  function goalContext(client,data,period){
   const current=period===window.CheckinStatus?.week?.(client);
   if(!current)return {summary:'',targets:[],recap:null};
@@ -89,35 +65,41 @@
   weightLabel.firstChild.textContent='Current weight ('+(client.weight_unit==='lbs'?'lb':'kg')+')';
   const weightHelp=form.querySelector('#checkinWeightHelp');
   if(weightHelp){
-   weightHelp.textContent=weightHelp.textContent.split('Enter a new reading')[0].trim()+' Leave blank if you haven’t weighed.';
+   const previous=weightHelp.textContent.split('Enter a new reading')[0].trim().replace('Latest saved weigh-in:', 'Last logged:');
+   weightHelp.textContent=previous;
+   const optional=document.createElement('small');optional.textContent='Optional';
+   weightLabel.insertBefore(optional,weight);
   }
   const main=document.createElement('section');
   main.className='checkin-main';
-  main.append(weightLabel);
-  if(weightHelp)main.append(weightHelp);
+  const weighIn=document.createElement('section');
+  weighIn.className='checkin-weigh-in';
+  weighIn.append(weightLabel);
+  if(weightHelp)weighIn.append(weightHelp);
+  main.append(weighIn);
   const goals=goalContext(client,state.data,period),agreed=goalPanel(goals,client);
   if(agreed)main.append(agreed);
   main.append(progressPanel(period,client));
   form.checkinGoalSnapshot=[goals.summary,...goals.targets.map(g=>targetText(g,client))].filter(Boolean).join(' · ').slice(0,2000);
 
   main.insertAdjacentHTML('beforeend',
-   '<label>What improved in training, and what held you back?<textarea name="challenges" rows="2" maxlength="1200" required placeholder="Name a lift, session or rep improvement, or tell me what stopped you training."></textarea></label>'+
-   '<label>What helped or got in the way with food?<textarea name="food_summary" rows="2" maxlength="1200" required placeholder="Tell me where meals went to plan or what made it difficult."></textarea></label>');
+   '<section class="checkin-reflection" aria-label="Training and food notes"><label>What improved in training, and what held you back?<textarea name="challenges" rows="2" maxlength="1200" required placeholder="Name a lift, session or rep improvement, or tell me what stopped you training."></textarea></label>'+
+   '<label>What helped or got in the way with food?<textarea name="food_summary" rows="2" maxlength="1200" required placeholder="Tell me where meals went to plan or what made it difficult."></textarea></label></section>');
   const recovery=document.createElement('fieldset');
   recovery.className='checkin-recovery';
-  recovery.innerHTML='<legend>Energy, sleep and stress <small>Optional</small></legend>';
+  recovery.innerHTML='<legend>Recovery <small>Optional</small></legend>';
   for(const name of ['energy','sleep','stress']){
    const score=form.querySelector('[name="'+name+'"]')?.closest('fieldset');
    if(score)recovery.append(score);
   }
   main.append(recovery);
-  main.insertAdjacentHTML('beforeend','<label>What’s one action you’ll commit to next week?<textarea name="next_week_availability" rows="2" maxlength="1200" required placeholder="Pick one step toward your goal and, if useful, say when you’ll do it."></textarea></label>');
+  main.insertAdjacentHTML('beforeend','<section class="checkin-next-week"><h2>Next week</h2><label>What’s one action you’ll commit to next week?<textarea name="next_week_availability" rows="2" maxlength="1200" required placeholder="Pick one step toward your goal and, if useful, say when you’ll do it."></textarea></label></section>');
   const support=form.querySelector('[name="support_needed"]');
   if(support){
    support.rows=2;support.maxLength=1200;support.placeholder='A question, a change you need, or a busy week coming up';
-   const label=support.closest('label');label.firstChild.textContent='What can I help with next week? ';
+   const label=support.closest('label');label.firstChild.textContent='Where can I help? ';
    const optional=document.createElement('small');optional.textContent='Optional';label.insertBefore(optional,support);
-   main.append(label);
+   main.querySelector('.checkin-next-week').append(label);
   }
   stages[0].before(main);
   const picker=document.querySelector('#checkinWeekChoice');
@@ -132,11 +114,10 @@
    }
    heading.after(bar);
   }
-  const training=sessionReview(form,period);
-  if(training.querySelector('select'))details.append(training);
   const steps=form.querySelector('.refresh-connected');if(steps)details.append(steps);
-  form.querySelector('[name="training_adherence"]')?.closest('fieldset')?.remove();
-  form.querySelector('[name="nutrition_adherence"]')?.closest('fieldset')?.remove();
+  for(const name of ['training_adherence','nutrition_adherence','workload']){
+   form.querySelector('[name="'+name+'"]')?.closest('fieldset')?.remove();
+  }
   for(const section of stages){
    section.querySelector('h2')?.remove();
    section.querySelector(':scope > p.muted:not(#checkinWeightHelp)')?.remove();
