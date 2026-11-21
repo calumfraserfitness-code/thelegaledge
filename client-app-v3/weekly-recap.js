@@ -8,7 +8,7 @@
  const dateOnly=value=>/^\d{4}-\d{2}-\d{2}$/.test(String(value||''));
  const clone=value=>JSON.parse(JSON.stringify(value));
  function isCoach(){return state.role==='coach'&&!!document.querySelector('#coachApp:not(.hidden) #clientWorkspaceBody');}
- function isClient(){return ['client','coach'].includes(state.role)&&state.clientView==='today'&&!!document.querySelector('#clientApp:not(.hidden) #personalCoachingHome');}
+ function isClient(){return ['client','coach'].includes(state.role)&&state.clientView==='support'&&!!document.querySelector('#clientApp:not(.hidden) #clientMain #coachContact');}
  function key(){return [state.user?.id,state.client?.id,state.role,isCoach()?'coach':'client',String(state.preview)].join('|');}
  function owner(){return {user:state.user?.id,client:state.client?.id,role:state.role,key:key()};}
  function current(value){return state.user?.id===value.user&&state.client?.id===value.client&&state.role===value.role&&key()===value.key;}
@@ -147,7 +147,7 @@
    c.privateRows=c.privateRows.filter(r=>r.week_start!==start);if(draft)c.privateRows.push(draft);
    if(publication){c.publicRows=c.publicRows.filter(r=>r.week_start!==start);c.publicRows.push(publication);}
    e.revision=Math.max(draft?.revision||0,publication?.revision||0);e.dirty=JSON.stringify(e.snapshot)!==fingerprint;e.conflict=false;
-   e.notice=(publish?'Published to the client’s Home.':'Private draft saved. The published recap is unchanged.')+(e.dirty?' Your newer edits are still here and remain unsaved.':'');
+   e.notice=(publish?'Published to the client’s Coach page.':'Private draft saved. The published recap is unchanged.')+(e.dirty?' Your newer edits are still here and remain unsaved.':'');
    if(root.isConnected)setStatus(root,e.notice);c.readAt=Date.now();
   }catch(error){if(current(scope)){e.notice='Not saved. '+(error.message||'Your current edits are kept; retry.');if(/changed|conflict|version/i.test(error.message||''))e.conflict=true;if(root.isConnected)setStatus(root,e.notice);}}
   finally{e.busy=false;if(current(scope))syncCoach(c);}
@@ -158,8 +158,8 @@
   else syncCoach(c);
  }
  function clientMount(c){
-  const home=document.querySelector('#clientApp:not(.hidden) #personalCoachingHome');if(!home||!isClient())return;let box=home.querySelector('#clientWeeklyRecap');
-  if(!box){box=document.createElement('section');box.id='clientWeeklyRecap';box.className='panel wr-client';const secondary=home.querySelector('[data-pch-secondary]');if(secondary)secondary.before(box);else home.append(box);}
+  const host=document.querySelector('#clientApp:not(.hidden) #clientMain');if(!host||!isClient())return;let box=host.querySelector('#clientWeeklyRecap');
+  if(!box){box=document.createElement('section');box.id='clientWeeklyRecap';box.className='panel wr-client';const contact=host.querySelector('#coachContact');if(contact)contact.after(box);else host.append(box);}
   const rows=c.publicRows.filter(r=>validRow(r,state.client.id,state.client.coach_id,false)).sort((a,b)=>b.week_start.localeCompare(a.week_start));
   const signature=JSON.stringify([rows,c.available,c.loaded,c.notice]);if(box.dataset.signature===signature)return;box.dataset.signature=signature;
   if(!rows.length){if(c.loaded&&c.available){box.remove();return;}box.innerHTML='<span class="eyebrow">YOUR WEEKLY RECAP</span><p role="status">'+esc(c.loaded?'Your saved recap could not load. Try again.':'Reading your approved recap…')+'</p>'+(c.loaded?'<button type="button" class="btn ghost small" data-wr-client-retry>Retry recap</button>':'');}
@@ -171,7 +171,7 @@
   const c=stateFor();if(isCoach())coachMount(c);else clientMount(c);read(c);
  }
  function refresh(){if(!state.client||!isClient()&&!(isCoach()&&['overview','check-ins'].includes(state.clientTab)))return;const c=stateFor();return read(c);}
- for(const name of ['renderClient','renderClientWorkspace','clientToday']){
+ for(const name of ['renderClient','renderClientWorkspace','clientCoachingSupport']){
   const before=window[name];if(typeof before!=='function')continue;window[name]=function(...args){const scope=owner(),result=before(...args);Promise.resolve(result).then(()=>{if(state.user?.id===scope.user&&state.client?.id===scope.client&&state.role===scope.role)mount();}).catch(()=>{});return result;};
  }
  window.WeeklyRecap={mount,refresh,body,figuresMarkup};

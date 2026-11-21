@@ -1,7 +1,18 @@
-.pch-home{display:grid;gap:18px;max-width:1050px;margin:0 auto}.pch-heading{padding:10px 0 2px}.pch-heading h1{margin:8px 0;font-size:clamp(26px,4vw,38px);line-height:1.15;letter-spacing:-.035em}.pch-heading p{color:var(--muted);margin:0}.pch-home>.panel{margin:0}.pch-goal{border-left:4px solid var(--gold,#bd964a)}.pch-goal h2{font-size:clamp(19px,2.5vw,24px);line-height:1.4;margin:8px 0}.pch-focus-text{font-size:17px;line-height:1.6;white-space:pre-line}.pch-next{background:var(--navy,#111b29);color:#fff}.pch-next .eyebrow{color:#e7cf9b}.pch-next h2{margin:10px 0;line-height:1.3}.pch-next p{color:#e2e7ed;max-width:680px}.pch-next .btn.primary{background:#e8cc91;color:#111b29;border-color:#e8cc91;min-height:46px}.pch-secondary{border:1px solid var(--line,#ded8cd);border-radius:18px;background:#fff}.pch-secondary>summary{display:flex;flex-direction:column;gap:5px;padding:20px;cursor:pointer;min-height:70px;list-style:none}.pch-secondary>summary>span{font-size:17px;font-weight:800}.pch-secondary>summary>small{font-size:13px;color:var(--muted)}.pch-secondary>summary::after{content:'Open';font-size:12px;font-weight:700;color:var(--muted)}.pch-secondary[open]>summary::after{content:'Close'}.pch-secondary>[data-pch-secondary-content]{padding:0 18px 18px}.pch-secondary .priority-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.pch-home [data-pch-video]>.panel{margin:0}.pch-home #cvLatest{overflow:hidden}.pch-home #cvLatest .cv-player{max-width:900px}.pch-home .pch-goal h2,.pch-home .pch-focus-text,.pch-home .pch-next h2{overflow-wrap:anywhere}.pch-home .text-btn{min-height:44px;text-align:left}.pch-secondary:focus-within,.pch-home button:focus-visible{outline-offset:4px}@media(max-width:650px){.pch-home{gap:14px}.pch-heading{padding:4px 0}.pch-home>.panel{padding:20px}.pch-secondary>summary{padding:18px}.pch-secondary>[data-pch-secondary-content]{padding:0 12px 12px}.pch-secondary .priority-grid{grid-template-columns:1fr}.pch-next .btn{width:100%}}
-/* Direct weekly action cards stay visible above secondary detail. */
-.pch-checkin small,.pch-milestone small{display:block;color:var(--muted);line-height:1.5;margin-top:12px}.pch-milestone progress{width:100%;height:12px;accent-color:var(--gold,#bd964a)}.pch-checkin h2,.pch-milestone h3{margin:8px 0;overflow-wrap:anywhere}.pch-checkin .btn{min-height:44px}.checkin-extra{border:1px solid var(--line,#ded8cd);border-radius:12px;padding:14px;margin:18px 0}.checkin-extra>summary{cursor:pointer;font-weight:700;min-height:44px;display:flex;align-items:center}.checkin-extra>section{margin-top:16px}.checkin-extra .refresh-score{margin:14px 0}.refresh-checkin [hidden]{display:none!important}
-@media(min-width:900px){.pch-home{grid-template-columns:repeat(2,minmax(0,1fr))}.pch-heading,.pch-goal,.pch-home>[data-pch-video],.pch-focus,.pch-milestone,.pch-secondary{grid-column:1/-1}}
+.pch-home{display:grid;gap:clamp(.85rem,3vw,1.35rem);max-width:46rem;margin:0 auto}
+.pch-heading h1{margin:.4rem 0;font-size:clamp(1.7rem,4vw,2.35rem);line-height:1.15;letter-spacing:-.035em}
+.pch-home>.pch-next{margin:0;padding:clamp(1.15rem,4vw,1.7rem);background:var(--navy,#111b29);color:#fff;border-radius:1rem}
+.pch-home .pch-next .eyebrow{margin:0;color:#e7cf9b}
+.pch-home .pch-next h2{margin:.4rem 0 1rem;line-height:1.25;overflow-wrap:anywhere}
+.pch-home .pch-next .btn.primary{min-height:46px;background:#e8cc91;color:#111b29;border-color:#e8cc91}
+.pch-shortcuts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.55rem}
+.pch-shortcuts .btn{min-height:46px;background:#fff;border-color:#cdd7e2}
+.pch-home button:focus-visible{outline-offset:4px}
+@media(max-width:480px){.pch-home .pch-next .btn{width:100%}}
+.checkin-extra{border:1px solid var(--line,#ded8cd);border-radius:12px;padding:14px;margin:18px 0}
+.checkin-extra>summary{cursor:pointer;font-weight:700;min-height:44px;display:flex;align-items:center}
+.checkin-extra>section{margin-top:16px}
+.checkin-extra .refresh-score{margin:14px 0}
+.refresh-checkin [hidden]{display:none!important}
 
 .gym-plan,.food-plan-brief{grid-column:1/-1}
 .gym-plan-heading{display:flex;justify-content:space-between;gap:12px}
@@ -21,41 +32,13 @@
 .food-plan-brief p{margin:0;line-height:1.5}
 .food-plan-brief .food-plan-baseline{margin-top:14px;font-weight:700}
 
-.pch-priorities{grid-column:1/-1;border-top:3px solid var(--gold,#bd964a)}
-.pch-priorities h2{font-size:clamp(20px,3vw,25px);margin:0 0 12px}
-.pch-priorities ul{list-style:none;padding:0;margin:0 0 16px}
-.pch-priorities li{display:grid;grid-template-columns:minmax(80px,1fr) minmax(0,2fr);gap:12px;padding:9px 0;border-top:1px solid var(--line,#ded8cd);align-items:baseline}
-.pch-priorities li>span{color:var(--muted);font-size:.9rem}
-.pch-priorities li>strong{font-size:.95rem;overflow-wrap:anywhere}
-.pch-priorities li small{font-weight:500;color:var(--muted);margin-left:5px;white-space:nowrap}
-.pch-priority-actions{display:flex;flex-wrap:wrap;gap:8px}
-.pch-priority-actions .btn{min-height:44px}
-.pch-week-notes{margin-top:12px;border-top:1px solid var(--line,#ded8cd)}
-.pch-week-notes summary{width:fit-content;min-height:44px;padding:12px 0;cursor:pointer;font-size:.9rem;font-weight:650}
-.pch-week-notes p{margin:0;max-width:70ch;line-height:1.6}
-.pch-home [data-pch-focus-compact][hidden]{display:none}
-
 .pch-start-hero{grid-column:1/-1;min-height:142px;padding:25px 28px;border:1px solid #e9dfcb;border-radius:18px;background:linear-gradient(90deg,#f6f2e7 12%,#f6f2e7d9 48%,#f6f2e700 76%),url('./assets/welcome-progress-20261008.webp') center right/cover}
 .pch-start-hero h1{max-width:70%}
-.pch-week-strip{grid-column:1/-1}
-.pch-week-strip h2{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin:0 0 14px}
-.pch-week-strip h2 small{font-size:.82rem;color:var(--muted);font-weight:500}
-.pch-week-strip ol{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:7px;padding:0;margin:0;list-style:none}
-.pch-week-strip li{padding:8px;border:1px solid #e6ddcb;border-radius:10px;min-width:0;min-height:64px;font-size:.83rem}
-.pch-week-strip li[aria-current=date]{border-color:#a67b33;background:#fcf8ef}
-.week-activity{display:block;width:100%;border:0;border-radius:7px;padding:7px;margin-top:6px;background:#edf1f6;color:#14243a;text-align:left;cursor:pointer;overflow-wrap:anywhere;font:inherit;font-weight:650}
-.week-activity small{display:block;margin-top:2px;font-weight:500}
-.week-checkin{background:#f3e7ce}.week-weigh-in{display:block;margin-top:7px;color:#695b47}
 .training-start-note{padding:12px 16px;max-width:720px;border-left:3px solid #b48b45;background:#faf6ec}
-@media(max-width:650px){.pch-start-hero{padding:22px 16px;min-height:110px}.pch-week-strip ol{grid-template-columns:repeat(4,minmax(0,1fr))}.pch-week-strip li{padding:6px}}
-
-.week-call{background:#e0e9e3;color:#233e30}
-.pch-next-call{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 10px;margin:0 0 14px}
-.pch-next-call span{color:#49566a;font-size:.85rem}
-.pch-planner-link{margin-top:14px}
 .gym-picker{margin:16px 0}
 .gym-picker>summary{width:fit-content;cursor:pointer;font-weight:650}
 .gym-picker>.gym-plan{margin-top:12px}
+@media(max-width:650px){.pch-start-hero{padding:22px 16px;min-height:110px}}
 
 .checkin-draft-status:empty{display:none}
 #checkinForm[data-quick-view]{
