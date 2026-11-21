@@ -1,4 +1,4 @@
-/* Short default check-in; move the existing controls, draft and submit handlers intact. */
+/* The weekly questions use the existing draft, upload and submission flow. */
 (function(){
  'use strict';
  const outcomes={completed:'Completed',modified:'Completed with changes',missed:'Missed',planned:'Still to do'};
@@ -31,7 +31,8 @@
   }
   const form=document.querySelector('#checkinForm');
   if(!form||form.dataset.quickView||!state.client||!['client','coach'].includes(state.role))return;
-  const stages=[...form.querySelectorAll('[data-checkin-stage]')];if(stages.length!==3)return;
+  const stages=[...form.querySelectorAll('[data-checkin-stage]')],weight=form.querySelector('[name="weight_display"]');
+  if(stages.length!==3||!weight)return;
   form.dataset.quickView='true';
   const details=document.createElement('details');details.className='checkin-extra';details.dataset.checkinExtra='';
   const summary=document.createElement('summary');summary.textContent='Add optional details';details.append(summary);
@@ -43,24 +44,58 @@
    const title=heading.querySelector('h1');if(title)title.textContent='Weekly check-in';
    heading.querySelector('p')?.remove();
   }
-  const intro=document.createElement('div');
-  intro.className='checkin-short';
-  if(due&&+due>Date.now()){
-   const deadline=document.createElement('p');deadline.className='muted';
-   deadline.textContent='Due '+new Intl.DateTimeFormat('en',{timeZone:zone,weekday:'short',day:'numeric',month:'short',hour:'numeric',minute:'2-digit',timeZoneName:'short'}).format(due);
-   intro.append(deadline);
+  const weightLabel=weight.closest('label');
+  weightLabel.firstChild.textContent='Current weight ('+(client.weight_unit==='lbs'?'lb':'kg')+')';
+  const weightHelp=form.querySelector('#checkinWeightHelp');
+  if(weightHelp){
+   weightHelp.textContent=weightHelp.textContent.split('Enter a new reading')[0].trim()+' Leave blank if you haven’t weighed.';
   }
-  intro.insertAdjacentHTML('beforeend','<label>How did your week go?<textarea name="challenges" rows="3" maxlength="1200" required placeholder="A couple of lines on training, food or what you need help with."></textarea></label>');
-  stages[0].before(intro);
+  const main=document.createElement('section');
+  main.className='checkin-main';
+  main.append(weightLabel);
+  if(weightHelp)main.append(weightHelp);
+  main.insertAdjacentHTML('beforeend',
+   '<label>How did training go?<textarea name="challenges" rows="2" maxlength="1200" required placeholder="What did you get done? What changed or got in the way?"></textarea></label>'+
+   '<label>How did your food plan go?<textarea name="food_summary" rows="2" maxlength="1200" required placeholder="What worked well? Where did you struggle?"></textarea></label>');
+  const recovery=document.createElement('fieldset');
+  recovery.className='checkin-recovery';
+  recovery.innerHTML='<legend>Energy, sleep and stress <small>Optional</small></legend>';
+  for(const name of ['energy','sleep','stress']){
+   const score=form.querySelector('[name="'+name+'"]')?.closest('fieldset');
+   if(score)recovery.append(score);
+  }
+  main.append(recovery);
+  const support=form.querySelector('[name="support_needed"]');
+  if(support){
+   support.rows=2;support.maxLength=1200;support.placeholder='A question, a change you need, or a busy week coming up';
+   const label=support.closest('label');label.firstChild.textContent='What can I help with next week? ';
+   const optional=document.createElement('small');optional.textContent='Optional';label.insertBefore(optional,support);
+   main.append(label);
+  }
+  stages[0].before(main);
+  const picker=document.querySelector('#checkinWeekChoice');
+  if(picker&&heading){
+   const bar=picker.closest('section');
+   bar.classList.add('checkin-week-picker');
+   bar.querySelector('p')?.remove();
+   if(due&&+due>Date.now()){
+    const deadline=document.createElement('small');
+    deadline.textContent='Due '+new Intl.DateTimeFormat('en',{timeZone:zone,weekday:'short',day:'numeric',month:'short',hour:'numeric',minute:'2-digit',timeZoneName:'short'}).format(due);
+    bar.append(deadline);
+   }
+   heading.after(bar);
+  }
   const training=sessionReview(form,period);
   if(training.querySelector('select'))details.append(training);
-  details.insertAdjacentHTML('beforeend','<label>Anything to add about food?<textarea name="food_summary" rows="2" maxlength="1200"></textarea></label>');
-  const support=form.querySelector('[name="support_needed"]');
-  if(support){support.maxLength=1200;support.placeholder='A question or change for next week';support.closest('label').firstChild.textContent='What can I help you with?';}
+  const steps=form.querySelector('.refresh-connected');if(steps)details.append(steps);
   form.querySelector('[name="training_adherence"]')?.closest('fieldset')?.remove();
   form.querySelector('[name="nutrition_adherence"]')?.closest('fieldset')?.remove();
-  const workload=form.querySelector('[name="workload"]')?.closest('fieldset');if(workload)details.append(workload);
-  for(const section of stages){section.hidden=false;details.append(section);}
+  for(const section of stages){
+   section.querySelector('h2')?.remove();
+   section.querySelector(':scope > p.muted:not(#checkinWeightHelp)')?.remove();
+   if(!section.children.length)continue;
+   section.hidden=false;details.append(section);
+  }
   const nav=form.querySelector('.refresh-checkin-navigation');if(nav)nav.before(details);else form.append(details);
   form.querySelector('.refresh-checkin-progress')?.setAttribute('hidden','');
   for(const id of ['checkinBack','checkinNext']){const button=form.querySelector('#'+id);if(button)button.hidden=true;}

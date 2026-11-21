@@ -2,7 +2,7 @@ const fs=require('node:fs');
 const assert=require('node:assert/strict');
 const {JSDOM}=require('jsdom');
 
-const dom=new JSDOM('<div id="home"><h1 class="pch-heading">Today</h1><section class="pch-next"></section></div>',{
+const dom=new JSDOM('<div id="home"><h1 class="pch-heading">Today</h1><section class="pch-next"></section><details data-pch-secondary><summary>Coaching tools</summary><div data-pch-secondary-content></div></details></div>',{
  url:'https://test.invalid',runScripts:'outside-only'
 });
 const w=dom.window,root=w.document.querySelector('#home');

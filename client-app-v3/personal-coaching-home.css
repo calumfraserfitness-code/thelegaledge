@@ -58,4 +58,18 @@
 .gym-picker>.gym-plan{margin-top:12px}
 
 .checkin-draft-status:empty{display:none}
-.checkin-short textarea{width:100%;box-sizing:border-box}
+#checkinForm[data-quick-view]{max-width:44rem;margin-inline:auto}
+.checkin-week-picker{max-width:44rem;margin-inline:auto;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;padding-block:.55rem}
+.checkin-week-picker label{display:flex;align-items:center;flex-wrap:wrap;gap:.5rem;margin:0}
+.checkin-week-picker select{width:auto;max-width:100%;margin:0}
+.checkin-main{display:grid;gap:.9rem}
+.checkin-main>label,.checkin-main>p{margin:0}
+.checkin-main>p{margin-top:-.55rem}
+.checkin-main textarea{width:100%;box-sizing:border-box}
+.checkin-main input[name="weight_display"]{max-width:12rem}
+.checkin-main small{color:var(--muted);font-weight:400}
+.checkin-recovery{min-width:0;margin:0;padding:.65rem;border:1px solid var(--line,#ded8cd);border-radius:.65rem;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,10rem),1fr));gap:.55rem}
+.checkin-recovery>.refresh-score{min-width:0;padding:.25rem;margin:0}
+.checkin-recovery .refresh-score label{min-width:0}
+.checkin-recovery .refresh-score label span{min-height:36px;padding:0;display:grid;place-items:center}
+.checkin-extra label{display:block;margin-top:.65rem}

@@ -40,13 +40,15 @@
  }
  function mount(root,m,sessions,active,route){
   if(!storageKey()||(!state.preview&&state.client.plan_status!=='published'))return;
+  const tools=root.querySelector('[data-pch-secondary]');
+  if(!tools)return;
   const section=document.createElement('section');
   section.className='panel day-type';
   section.setAttribute('aria-labelledby','dayTypeHeading');
   section.innerHTML='<h2 id="dayTypeHeading">Today’s day type</h2><div class="day-type-options" role="group" aria-label="Day type">'+
    Object.entries(types).map(([id,t])=>'<button type="button" data-day-type="'+id+'" aria-pressed="false"><strong>'+t.label+'</strong><span>'+t.when+'</span></button>').join('')+
    '</div><div data-day-actions></div>';
-  root.querySelector('.pch-heading').after(section);
+  tools.querySelector('[data-pch-secondary-content]').prepend(section);
   const actions=section.querySelector('[data-day-actions]');
   function paint(){
    const type=get(m.date),adjusted=type!=='normal',trial=type==='trial';
