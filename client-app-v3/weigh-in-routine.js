@@ -31,10 +31,7 @@
  }
  function clientMount(plan){
   const host=document.querySelector('#clientMain');if(!host||!clientSurface())return;
-  if(state.clientView==='today'){
-   const home=host.querySelector('#personalCoachingHome');if(!home){remove(host);return;}
-   mountCard(home,plan,'client',card=>{const next=home.querySelector('.pch-next');if(next)next.after(card);else home.prepend(card);});
-  }else if(state.clientView==='progress'){
+  if(state.clientView==='progress'){
    const form=host.querySelector('#progressForm');if(!form){remove(host);return;}
    mountCard(host,plan,'client',card=>form.before(card));
   }else if(state.clientView==='checkin'){

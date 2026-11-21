@@ -1,92 +1,62 @@
-const fs=require('fs'),vm=require('vm'),assert=require('assert'),{JSDOM}=require('jsdom');
+const fs=require('node:fs'),assert=require('node:assert/strict'),{JSDOM}=require('jsdom');
 const dom=new JSDOM('<main id="clientMain"></main>',{runScripts:'outside-only',pretendToBeVisual:true}),w=dom.window;
-const esc=v=>String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
-let pending=[],routed=0,videoClicks=0,queries=0;
-const chain=()=>new Proxy({}, {get:(o,k)=>k==='then'?undefined:()=>chain()});
-Object.assign(w,{$:s=>w.document.querySelector(s),esc,db:{from:chain},query:()=>{queries++;return new Promise(resolve=>pending.push(resolve));},renderClient(){routed++;},clientToday(){
- w.$('#clientMain').innerHTML='<header class="page-head">Old heading</header><section id="cvLatest"><iframe src="https://www.loom.com/embed/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"></iframe><button>Watch feedback</button></section><div class="priority-grid"><section class="priority-training">Prior session</section><section>Meals & swaps<button id="keepHandler">Meals</button></section></div><section class="priority-progress">Saved progress</section><section id="cfClient">Saved call actions</section>';
- w.$('#cvLatest button').onclick=()=>videoClicks++;
-},state:{role:'client',preview:false,clientView:'today',user:{id:'user-a'},client:{id:'a',display_name:'Client <safe>',onboarding_status:'complete',plan_status:'published',goal_summary:'Maintain strength <safely>',timezone:'Europe/Dublin',checkin_day:5,checkin_due_time:'23:59:00'},data:{weeks:[],sessions:[],coachingGoals:[],checkins:[]}}});
-vm.runInContext(fs.readFileSync(__dirname+'/../checkin-status-model.js','utf8'),dom.getInternalVMContext());
-w.localCoachingDate=()=>w.CheckinStatus.localDate(new Date(),'Europe/Dublin');
-vm.runInContext(fs.readFileSync(__dirname+'/../day-type.js','utf8'),dom.getInternalVMContext());
-const date=w.CheckinStatus.localDate(new Date(),'Europe/Dublin'),period=w.CheckinStatus.week(w.state.client),fixed=new Date('2026-11-02T12:00:00Z');
-w.state.data.weeks=[{id:'week-a',client_id:'a',published:true,week_start:period,coach_note:'Keep two manageable sessions.'},{id:'peer-week',client_id:'peer',published:true,week_start:period,coach_note:'PRIVATE PEER FOCUS'}];
-// This case exercises session navigation, irrespective of the real weekday deadline.
-w.state.data.checkins=[{id:'current-checkin',client_id:'a',period_start:period,submitted_at:date+'T12:00:00Z'}];
-w.state.data.sessions=[{id:'first',week_id:'week-a',title:'First unfinished session',session_date:period,status:'planned',training_type:'weights'},{id:'next',week_id:'week-a',title:'Second session',session_date:date,status:'planned',training_type:'weights'},{id:'peer',week_id:'peer-week',title:'PRIVATE PEER SESSION',session_date:period,status:'planned',training_type:'weights'}];
-vm.runInContext(fs.readFileSync(__dirname+'/../personal-coaching-home.js','utf8'),dom.getInternalVMContext());
-const tick=()=>new Promise(r=>setImmediate(r));
+const $=s=>w.document.querySelector(s), tick=()=>new Promise(resolve=>setImmediate(resolve));
+const client={id:'client',display_name:'Katherine <safe>',onboarding_status:'complete',plan_status:'published',
+ timezone:'Europe/Dublin',checkin_day:1,checkin_due_time:'09:00',goal_summary:'Private goal details in Progress'};
+let routed=0;
+Object.assign(w,{$,esc:v=>String(v??'').replaceAll('<','&lt;').replaceAll('>','&gt;'),fmt:v=>v,
+ state:{client,role:'client',clientView:'today',user:{id:'account'},data:{weeks:[],sessions:[],checkins:[]}},
+ renderClient(){routed++;},
+ clientToday(){$('#clientMain').innerHTML='<form id="legalGate">Consent</form>';},
+ openDailyNutritionDate(date){w.selectedMealDate=date;}
+});
+for(const name of ['checkin-status-model.js','personal-coaching-home.js'])w.eval(fs.readFileSync(require.resolve('../'+name),'utf8'));
+const M=w.CheckinStatus,S=w.state,home=w.PersonalCoachingHome;
+const now=new Date(),period=M.week(client,now),date=M.localDate(now,client.timezone);
+S.data.weeks=[{id:'published',client_id:'client',week_start:period,published:true}];
+S.data.sessions=[
+ {id:'done',week_id:'published',title:'Completed session',status:'completed',session_date:period},
+ {id:'action',week_id:'published',title:'Assigned cardio',status:'planned',session_date:period,training_type:'cardio'},
+ {id:'peer',week_id:'published',client_id:'peer',title:'Peer session',status:'planned',session_date:period}
+];
 (async()=>{
- const model=w.PersonalCoachingHome.model(w.state.client,{weeks:[{id:'fixed',client_id:'a',published:true,week_start:'2026-11-02'}],sessions:[],checkins:[]},fixed);assert.equal(model.action.route,'support','No sessions does not claim all sessions completed');
- w.state.data.coachingGoals=[{id:'g',client_id:'a',status:'active',title:'Agreed target',target:4,baseline:0,current_value:0,unit:'sessions',metric:'manual'},{client_id:'peer',status:'active',title:'PRIVATE PEER TARGET',target:99}];w.coachingGoalValue=g=>g.current_value;w.coachingGoalPercent=()=>0;
- w.clientToday();assert(w.$('#personalCoachingHome'));assert.equal(w.document.querySelectorAll('#personalCoachingHome').length,1);assert(!w.$('[data-pch-secondary]').open);assert(w.$('[data-pch-secondary-content] .priority-grid'));assert(w.$('.pch-goal').textContent.includes('Maintain strength <safely>'));assert(w.$('.pch-goal').innerHTML.includes('&lt;safely&gt;'));assert(!w.$('#personalCoachingHome').textContent.includes('PRIVATE'));
- assert(w.$('.pch-milestone').textContent.includes('Agreed target'));assert(w.$('.pch-milestone').textContent.includes('0'));assert.equal(w.$('.pch-milestone progress').value,0);assert(w.$('.pch-checkin').textContent.includes('Submitted'));
- const video=w.$('#cvLatest');assert(w.$('[data-pch-video] #cvLatest'));video.querySelector('button').click();assert.equal(videoClicks,1,'Existing video handlers survive');
- assert.equal(pending.length,1);pending.shift()([{id:'focus',client_id:'a',approved_at:date,starts_on:period,expires_on:'2099-12-31',description:'Published action',completed_at:null},{id:'future',client_id:'a',approved_at:date,starts_on:'2099-01-01',expires_on:'2099-12-31',description:'FUTURE ACTION'}]);await tick();assert(w.$('[data-pch-focus]').textContent.includes('Keep two manageable sessions.'));assert(!w.$('[data-pch-focus]').textContent.includes('FUTURE'));
- w.PersonalCoachingHome.mount();assert.equal(w.document.querySelectorAll('#personalCoachingHome').length,1,'Repeated mount is idempotent');assert.equal(queries,1);
- // The feedback module prepends an unchanged player during its refresh. Reuse it in the home slot.
- w.$('#clientMain').prepend(video);await tick();await tick();assert.equal(w.$('[data-pch-video] #cvLatest'),video);assert.equal(w.document.querySelectorAll('iframe').length,1);
- w.$('[data-pch-next]').click();assert.equal(w.state.selectedSessionId,'first');assert.equal(w.state.clientView,'training');assert.equal(routed,1);
- w.state.clientView='today';const old=w.$('[data-pch-next]');w.state.user.id='different';old.click();assert.equal(routed,1,'Stale owner cannot route a saved session');
- w.state.user.id='user-a';w.state.client.onboarding_status='pending_legal';w.$('#clientMain').innerHTML='<form id="legalGate">Consent</form>';w.PersonalCoachingHome.mount();assert(w.$('#legalGate'));assert(!w.$('#personalCoachingHome'),'Consent gate remains untouched');
- // Pure model includes only the current owned published week, with check-in deadlines taking priority.
- const overdue=w.PersonalCoachingHome.model({...w.state.client,checkin_day:1,checkin_due_time:'09:00:00'}, {weeks:[],sessions:[],checkins:[]},fixed);assert.equal(overdue.action.route,'checkin');
- const hidden=w.PersonalCoachingHome.model(w.state.client,{weeks:[{id:'draft',client_id:'a',published:false,week_start:'2026-11-02',coach_note:'DRAFT SECRET'}],sessions:[{id:'draft-session',week_id:'draft',title:'DRAFT SECRET'}]},fixed);assert.equal(hidden.focus,'');assert.equal(hidden.action.route,'support');
- w.state.client.onboarding_status='complete';
+ S.data.checkins=[{client_id:'client',period_start:period}];
+ w.clientToday();
+ const root=$('#personalCoachingHome');
+ assert.equal(root.querySelector('h1').textContent,'Hi, Katherine');
+ assert.equal(root.querySelectorAll(':scope > section').length,1);
+ assert.equal(root.querySelector('.pch-next h2').textContent,'Assigned cardio');
+ assert(!root.querySelector('[data-pch-route=training]'),'The primary route appears only once');
+ assert(!root.textContent.includes('Private goal details'));
+ assert(!root.textContent.includes('Peer session'));
+ $('#clientMain').insertAdjacentHTML('beforeend','<section id="lateWidget">Legacy card</section><p id="coachingConnectionStatus">Offline</p>');
+ await tick();
+ assert(!$('#lateWidget'),'Late widgets cannot reappear on Today');
+ assert($('#coachingConnectionStatus'));
+ root.querySelector('[data-pch-next]').click();
+ assert.equal(S.selectedSessionId,'action');
+ assert.equal(S.trainingCategory,'cardio');
+ assert.equal(routed,1);
+ S.clientView='today';S.user.id='different';root.querySelector('[data-pch-next]').click();
+ assert.equal(routed,1,'Old account shortcuts cannot navigate');
+ S.user.id='account';client.onboarding_status='pending_legal';w.clientToday();
+ assert($('#legalGate')&&!$('#personalCoachingHome'));
+ client.onboarding_status='complete';client.plan_status='draft';w.clientToday();
+ assert($('#legalGate')&&!$('#personalCoachingHome'),'Unpublished plan gate is preserved');
+ client.plan_status='published';
+ const fixed=new Date('2026-11-02T12:00:00Z');
+ assert.equal(home.model(client,{weeks:[],sessions:[],checkins:[]},fixed).action.route,'checkin');
+ assert.equal(home.model({...client,weekly_checkin_enabled:false},{weeks:[],sessions:[],checkins:[]},fixed).action.route,'support');
  const firstMonday=new Date(date+'T12:00:00Z');
  firstMonday.setUTCDate(firstMonday.getUTCDate()+7-((firstMonday.getUTCDay()+6)%7));
- const firstDate=firstMonday.toISOString().slice(0,10);
- w.state.client.start_date=firstDate;
- w.state.client.weekly_weigh_in_minimum=2;
- w.state.client.daily_steps_goal=8000;
- w.state.data.weeks=[{id:'peer-start',client_id:'peer',published:true,week_start:firstDate},{id:'draft-start',client_id:'a',published:false,week_start:firstDate},{id:'first-published',client_id:'a',published:true,week_start:firstDate,coach_note:'Two sessions and an afternoon snack.'}];
- w.state.data.sessions=[{id:'a-start',week_id:'first-published',title:'Full body A',training_type:'weights',session_date:firstDate,source_metadata:{gym_days:{}}},{id:'c-start',week_id:'first-published',title:'Full body B',training_type:'weights',session_date:firstDate,source_metadata:{gym_days:{}}},{id:'b-start',week_id:'first-published',title:'Peloton',training_type:'cardio',session_date:firstDate},{id:'hidden-start',week_id:'draft-start',title:'DRAFT SECRET'}];
- w.state.data.nutritionDays=[{week_id:'first-published',nutrition_plan_id:'menu'}];
- w.state.data.exercises=[{session_id:'a-start',name:'Leg Press',sets:2,reps:'8–12'}];
+ client.start_date=firstMonday.toISOString().slice(0,10);
+ S.data.weeks=[{id:'upcoming',client_id:'client',week_start:client.start_date,published:true}];
+ S.data.nutritionDays=[{week_id:'upcoming',nutrition_plan_id:'menu'}];
  w.clientToday();
- const starting=w.$('#personalCoachingHome');
- assert(starting.textContent.includes('Your first week')&&!starting.textContent.includes('Leg Press · 2 × 8–12'));
- assert(starting.querySelector('.pch-start-hero'));
- assert(!starting.querySelector('.pch-start-hero').nextElementSibling.matches('.day-type'),'Day types stay out of the top of Today');
- assert(starting.querySelector('[data-pch-secondary]:not([open]) .day-type'),'Day types remain available under collapsed coaching tools');
- assert.equal(starting.querySelector('[data-day-type=normal]').getAttribute('aria-pressed'),'true');
- const priorities=starting.querySelector('.pch-priorities');
- assert(priorities.textContent.includes('2 full-body lifts · 1 Peloton ride'));
- assert(priorities.textContent.includes('8,000')&&priorities.textContent.includes('Tue, Fri, Sun'));
- assert(priorities.nextElementSibling.matches('.pch-week-strip'),'priorities come before the dashboard calendar');
- assert(!priorities.querySelector('details').open&&priorities.querySelector('details').textContent.includes('afternoon snack'));
- assert(!priorities.querySelector('[data-pch-checkin]'),'the check-in is dated but unopened before coaching starts');
- priorities.querySelector('[data-pch-priority-training]').click();
- assert.equal(w.state.clientView,'training');
- assert.equal(w.state.trainingCategory,'weights');
- assert.equal(w.state.selectedSessionId,null);
- w.state.clientView='today';
- assert(starting.querySelector('.pch-week-strip').textContent.includes('Peloton'));
- assert(starting.querySelector('.pch-goal').textContent.includes('Maintain strength'));
- starting.querySelector('[data-week-session="b-start"]').click();
- assert.equal(w.state.clientView,'training');assert.equal(w.state.trainingCategory,'cardio');
- assert.equal(w.state.selectedSessionId,'b-start');
- w.state.clientView='today';
- const client={...w.state.client,timezone:'America/New_York',checkin_day:5,checkin_due_time:'09:00'};
- const call={id:'appt',client_id:client.id,title:'App walkthrough call',status:'scheduled',scheduled_at:'2026-11-27T15:00:00Z'};
- const upcoming={week_start:'2026-11-23'};
- const htmlBefore=w.PersonalCoachingHome.weekSchedule(upcoming,[],client,[call],new Date('2026-11-23T04:59:00Z'));
- const htmlAfter=w.PersonalCoachingHome.weekSchedule(upcoming,[],client,[call],new Date('2026-11-23T05:00:00Z'));
- assert(htmlBefore.includes('Next week')&&htmlAfter.includes('This week'));
- assert(htmlAfter.includes('Coaching call')&&htmlAfter.includes('10:00 AM EST'));
- assert(htmlAfter.includes('Check-in form')&&htmlAfter.includes('9:00 AM EST'));
- assert(w.PersonalCoachingHome.weekSchedule({week_start:'2026-11-16'},[],client,[call],new Date('2026-11-20T15:00:00Z')).includes('next week'));
- assert(!starting.textContent.includes('DRAFT SECRET')&&!starting.querySelector('[data-pch-secondary]').open);
- assert.equal(w.PersonalCoachingHome.startingPlan(w.state.client,w.state.data,firstDate),null);
- starting.querySelector('[data-pch-start-meals]').click();assert.equal(w.state.clientView,'nutrition');
- w.state.clientView='today';w.state.client.start_date=period;
- w.state.data.weeks[2].week_start=period;
- w.state.data.sessions.forEach(session=>{session.session_date=period;});
- w.clientToday();
- const current=w.$('.pch-priorities');
- assert(current.textContent.includes('This week’s priorities')&&current.textContent.includes('Submitted'));
- assert(!w.$('.pch-checkin')&&!w.$('.pch-next'),'the priorities card replaces duplicate check-in and next-session cards');
- current.querySelector('[data-pch-checkin]').click();assert.equal(w.state.clientView,'checkin');
- dom.window.close();console.log('PASS personal home: owned published goal/focus, one flexible action, existing video reuse, collapsed tools, idempotent layout, empty evidence and stale/consent guards');
-})().catch(e=>{console.error(e);process.exitCode=1;dom.window.close();});
+ assert.match($('.pch-next h2').textContent,/Your first week starts/);
+ assert(! $('[data-pch-route=checkin]'));
+ $('[data-pch-route=nutrition]').click();
+ assert.equal(S.clientView,'nutrition');
+ assert.equal(w.selectedMealDate,client.start_date);
+ console.log('PASS simple Today, one next action, retained navigation, late-widget removal and plan/owner gates.');
+})().catch(e=>{console.error(e);process.exitCode=1;}).finally(()=>w.close());

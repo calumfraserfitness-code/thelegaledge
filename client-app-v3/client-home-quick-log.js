@@ -87,7 +87,7 @@
   target.querySelector('button')?.focus();
  }
  function home(host){
-  const root=host.querySelector('#personalCoachingHome');if(!root)return;
+  const root=host.querySelector('#personalCoachingHome');if(!root||root.hasAttribute('data-pch-simple'))return;
   let box=root.querySelector('#homeQuickLog');const key=owner(),weight=state.client.track_weight!==false,published=!!week();
   if(homeOwners.has(root)&&homeOwners.get(root)!==key){box?.remove();root.querySelectorAll('.home-quick-weight-duplicate').forEach(button=>button.classList.remove('home-quick-weight-duplicate'));return;}homeOwners.set(root,key);
   if(!box){
