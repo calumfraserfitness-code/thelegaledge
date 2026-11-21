@@ -24,7 +24,20 @@
   form.addEventListener('submit',e=>e.preventDefault());
   if(!state.preview)db.from('client_checkin_drafts').select('answers').eq('client_id',client).eq('period_start',period).maybeSingle().then(({data,error})=>{
    if(!active()||dirty)return;if(error){status.textContent='Draft unavailable. You can still submit your check-in.';return;}
-   if(data){for(const [k,v] of Object.entries(data.answers||{})){const nodes=form.querySelectorAll('[name]');nodes.forEach(n=>{if(n.name!==k||n.type==='file'||n.type==='hidden')return;if(n.type==='radio')n.checked=n.value===String(v);else n.value=String(v);});}status.textContent='Draft restored.';}
+   if(data){
+    const answers={...data.answers};
+    if(form.dataset.quickView){
+     if(answers.support_needed)answers.next_week_availability=[answers.next_week_availability,answers.support_needed].filter(Boolean).join('\n').slice(0,1200);
+     if(answers.wins)answers.challenges=[answers.challenges,answers.wins].filter(Boolean).join('\n').slice(0,1200);
+    }
+    for(const node of form.querySelectorAll('[name]')){
+     const value=answers[node.name];
+     if(node.type==='file'||node.type==='hidden'||value==null)continue;
+     if(node.type==='radio'||node.type==='checkbox')node.checked=node.value===String(value);else node.value=String(value);
+    }
+    form.dispatchEvent(new Event('checkin-draft-restored'));
+    status.textContent='Draft restored.';
+   }
   }).catch(()=>{if(active())status.textContent='Draft unavailable. You can still submit your check-in.';});
  };
 })();

@@ -118,7 +118,7 @@ clientCheckin=function(){originalCoachingCheckin();const form=$('#checkinForm');
 };
 async function submitAtomicCoachingCheckin(event){
  event.preventDefault();const fd=new FormData(event.target),answers={},clientId=state.client.id,userId=state.user?.id;const active=()=>state.client?.id===clientId&&state.user?.id===userId;const audioContext={clientId,userId,preview:state.preview,file:typeof checkinAudioFile==='undefined'?null:checkinAudioFile};
- for(const[key,value]of fd){if(key.startsWith('photo_')||key==='weight_display'||['food_summary','strength_sessions_completed','nutrition_days_on_plan'].includes(key))continue;answers[key]=value===''?null:value;}
+ for(const[key,value]of fd){if(key.startsWith('photo_')||['weight_display','weight_not_recorded'].includes(key)||['food_summary','strength_sessions_completed','nutrition_days_on_plan'].includes(key))continue;answers[key]=value===''?null:value;}
  if(event.target.dataset.quickView){
   const strength=fd.get('strength_sessions_completed'),foodDays=fd.get('nutrition_days_on_plan');
   if(foodDays!==null&&foodDays!==''&&Number.isInteger(Number(foodDays))&&Number(foodDays)>=0&&Number(foodDays)<=7)answers.nutrition_adherence=Math.round(100*Number(foodDays)/7);

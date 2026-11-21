@@ -1,11 +1,57 @@
-const fs=require('fs'),vm=require('vm'),assert=require('assert'),{JSDOM}=require('jsdom');const dom=new JSDOM('<main id="clientMain"></main><div id="clientWorkspaceBody"></div>',{runScripts:'outside-only'}),w=dom.window;let saved=null,fail=false,saveCount=0,hold=null;
-const state={user:{id:'u'},role:'client',client:{id:'c',onboarding_status:'complete',plan_status:'published'},clientView:'planner',clientTab:'overview',preview:false,data:{weeks:[{id:'week',week_start:'2026-10-12',published:true}],sessions:[{id:'s',week_id:'week',training_type:'weights',status:'planned',session_date:'2026-10-14',title:'Assigned strength',duration_minutes:60}],programs:[],exerciseLogs:[]}};
-function table(){return {select(){return this;},eq(){return this;},then(resolve){resolve({data:[],error:null});}};}
-Object.assign(w,{state,$:s=>w.document.querySelector(s),esc:s=>String(s??'').replace(/</g,'&lt;'),fmt:s=>s,localCoachingDate:()=> '2026-10-12',setBusy:(b,on)=>{if(b)b.disabled=on;},toast(){},exerciseCard:()=>'',programDayExercises:()=>[],renderClient(){w.clientPlanner();},clientToday(){w.$('#clientMain').innerHTML='Today';},clientPlanner(){w.$('#clientMain').innerHTML='<section id="cwTimingPanel">Move training</section>';},clientTraining(){w.$('#clientMain').innerHTML='Training';},renderWeeklyNutrition(){w.$('#clientMain').innerHTML='Meals';},clientCheckin(){w.$('#clientMain').innerHTML='<section id="checkin">Weekly check-in</section>';},coachOverview(){w.$('#clientWorkspaceBody').innerHTML='Overview';},loadClientData:async()=>{},db:{from:table,rpc:async(name,args)=>{saveCount++;if(hold)await new Promise(r=>hold=r);if(fail)throw Error('Connection failed');saved={...args.p_values,client_id:args.p_client,week_start:args.p_week,mode:w.BusyWeekModel.assess(args.p_values).mode,updated_at:'2026-10-12T18:00:00Z'};return {data:saved};}},query:async(_,p)=>{const r=await p;if(r.error)throw Error(r.error.message);return r.data;}});
-for(const file of ['busy-week-model.js','busy-week.js'])vm.runInContext(fs.readFileSync(__dirname+'/../'+file,'utf8'),dom.getInternalVMContext());const tick=()=>new Promise(r=>setTimeout(r,0));
-(async()=>{w.clientPlanner();await tick();let form=w.$('#bwWeekForm');assert(form);assert(!w.$('#bwOptional').open,'Backup options start collapsed');assert.equal(w.$('#clientMain').lastElementChild.id,'bwOptional','Backup is below the plan');assert(w.$('#bwClient').textContent.includes('usual plan difficult'));w.clientCheckin();assert(w.$('#checkin'));assert(!w.$('#bwWeekForm'),'Busy-week setup does not interrupt the check-in');w.clientPlanner();form=w.$('#bwWeekForm');form.elements.work_hours.value='65';form.oninput();assert.equal(w.$('#bwPreview [data-bw-mode]').dataset.bwMode,'crisis');fail=true;await form.onsubmit({preventDefault(){},submitter:form.querySelector('button')});assert(form.textContent.includes('Connection failed'));assert.equal(form.elements.work_hours.value,'65','Failed saves retain answers');assert(!saved);
-fail=false;await form.onsubmit({preventDefault(){},submitter:form.querySelector('button')});assert.equal(saved.mode,'crisis');assert(w.$('#bwClient').textContent.includes('Crisis minimum'));assert(w.$('[data-bw-session=s]'));assert.equal(state.data.sessions[0].status,'planned');
-form=w.$('#bwWeekForm');form.elements.health.value='injury';form.oninput();assert.equal(w.$('#bwPreview [data-bw-mode]').dataset.bwMode,'review');await form.onsubmit({preventDefault(){},submitter:form.querySelector('button')});assert.equal(saved.mode,'review');assert(w.$('#bwClient').textContent.includes('Coach review'));assert(!w.$('.bw-priorities > [data-bw-session]'));
-form=w.$('#bwWeekForm');hold=true;const count=saveCount,one=form.onsubmit({preventDefault(){},submitter:form.querySelector('button')});await form.onsubmit({preventDefault(){},submitter:form.querySelector('button')});assert.equal(saveCount,count+1);state.client={...state.client,id:'other'};hold();await one;w.clientPlanner();await tick();assert(!w.$('#bwClient').textContent.includes('Saved for week beginning'),'Account changes do not paint saved state into another client');
-state.preview=true;state.clientView='planner';w.clientPlanner();await tick();assert(w.$('#bwWeekForm'),'Preview stays local');state.client.onboarding_status='pending_legal';state.preview=false;w.clientPlanner();assert(!w.$('#bwClient'),'Onboarding gates remain enforced');
-console.log('Busy-week setup, live preview, confirmed save, failure retention, duplicate protection, health review and account isolation passed.');dom.window.close();})().catch(e=>{console.error(e);dom.window.close();process.exitCode=1;});
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),{JSDOM}=require('jsdom');
+const dom=new JSDOM('<main id="clientMain"></main><div id="clientWorkspaceBody"></div>',{runScripts:'outside-only'}),w=dom.window;
+const planWeek={id:'week',week_start:'2026-10-12',published:true,client_id:'client'};
+const session=(id,title,training_type,fields={})=>({id,title,training_type,week_id:'week',client_id:'client',status:'planned',session_date:'2026-10-14',...fields});
+const plan=[
+ session('completed','Already done','weights',{status:'completed'}),
+ session('a','Full body A','weights',{programme_day_id:'day-a'}),
+ session('b','Full body B','weights',{programme_day_id:'day-b'}),
+ session('bike','Easy cycle','cardio'),
+ session('bonus','Optional run','cardio',{source_metadata:{optional:true}}),
+ session('peer','Peer workout','weights',{client_id:'peer'})
+];
+const state={user:{id:'user'},role:'client',client:{id:'client',onboarding_status:'complete',plan_status:'published'},clientView:'training',
+ data:{weeks:[planWeek],sessions:plan,programs:[],nutritionDays:[{week_id:'week',nutrition_plan_id:'quick'}],nutritionPlans:[{id:'quick',client_id:'client',day_type:'Busy Day'}],coachingGuidance:[{client_id:'peer',published:true,category:'eating_out',body:'Private meal'}]}};
+let settings={published:true,heavy_day_a:'day-b',heavy_sessions:3,crisis_sessions:2,office_food:'Pack the lunch you agreed with Calum.'};
+let saved=null,lastView;
+function table(name){
+ let client;
+ return {select(){return this;},eq(field,value){if(field==='client_id')client=value;return this;},then(resolve){
+  const row=client==='client'&&(name==='client_busy_week_settings'?settings:name==='client_busy_weeks'?saved:null);
+  resolve({data:row?[row]:[]});
+ }};
+}
+const $=s=>w.document.querySelector(s),tick=()=>new Promise(r=>setTimeout(r,0));
+Object.assign(w,{state,$,esc:s=>String(s??'').replace(/</g,'&lt;'),fmt:s=>s,localCoachingDate:()=> '2026-10-12',
+ db:{from:table,rpc(){throw Error('The guide should not write changes');}},query:async(_,promise)=>(await promise).data,
+ clientTrainingWeek:()=>state.data.weeks[0],mealsForNutritionPlan:()=>[{name:'Assigned packed lunch',meal_type:'Lunch'}],
+ renderClient(){lastView=state.clientView;},
+ clientPlanner(){state.clientView='planner';$('#clientMain').innerHTML='<section class="client-page-head">Schedule</section>';},
+ clientTraining(){state.clientView='training';$('#clientMain').innerHTML='<div class="training-category-tabs">Training</div>';},
+ clientCheckin(){state.clientView='checkin';$('#clientMain').innerHTML='Check-in';},
+ coachOverview(){},loadClientData:async()=>{}
+});
+for(const file of ['busy-week-model.js','busy-week.js'])vm.runInContext(fs.readFileSync(require.resolve('../'+file),'utf8'),dom.getInternalVMContext());
+(async()=>{
+ w.clientTraining();await tick();
+ let card=$('#bwOptional');
+ assert(card&&!card.open);
+ assert.equal($('.training-category-tabs').nextElementSibling,card);
+ assert.match(card.textContent,/Drop 2 sessions.*Full body B · Full body A/s);
+ assert.match(card.textContent,/Drop 3 sessions.*Full body B/s);
+ assert.match(card.textContent,/Pack the lunch you agreed/);
+ assert.doesNotMatch(card.textContent,/Peer workout|Private meal|Optional run/);
+ assert.equal($('#bwWeekForm'),null);
+ card.querySelector('[data-bw-meals]').click();assert.equal(lastView,'nutrition');
+ assert.equal(state.data.sessions[1].status,'planned');
+ settings=null;await w.loadClientData('client');w.clientPlanner();await tick();
+ card=$('#bwOptional');assert.match(card.textContent,/Drop 1 session/);assert.match(card.textContent,/Drop 2 sessions/);assert.match(card.textContent,/Assigned packed lunch/);
+ saved={mode:'review',week_start:planWeek.week_start};await w.loadClientData('client');w.clientTraining();await tick();
+ assert.match($('#bwOptional').textContent,/Pause any affected training/);
+ assert.doesNotMatch($('#bwOptional').textContent,/Prioritise/);
+ state.client={...state.client,id:'peer'};state.data.weeks=[{...planWeek,client_id:'peer'}];w.clientTraining();await tick();
+ assert.doesNotMatch($('#bwOptional').textContent,/Pack the lunch|Full body/);
+ w.clientCheckin();w.BusyWeekAccess.mount();assert.equal($('#bwOptional'),null);
+ state.client.onboarding_status='pending_legal';w.clientTraining();assert.equal($('#bwOptional'),null);
+ console.log('PASS private, plan-specific busy-week guide, published preferences, no writes and health review.');
+})().catch(e=>{console.error(e);process.exitCode=1;}).finally(()=>w.close());
