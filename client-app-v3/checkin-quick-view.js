@@ -65,35 +65,41 @@
   weightLabel.firstChild.textContent='Current weight ('+(client.weight_unit==='lbs'?'lb':'kg')+')';
   const weightHelp=form.querySelector('#checkinWeightHelp');
   if(weightHelp){
-   weightHelp.textContent=weightHelp.textContent.split('Enter a new reading')[0].trim()+' Leave blank if you haven’t weighed.';
+   const previous=weightHelp.textContent.split('Enter a new reading')[0].trim().replace('Latest saved weigh-in:', 'Last logged:');
+   weightHelp.textContent=previous;
+   const optional=document.createElement('small');optional.textContent='Optional';
+   weightLabel.insertBefore(optional,weight);
   }
   const main=document.createElement('section');
   main.className='checkin-main';
-  main.append(weightLabel);
-  if(weightHelp)main.append(weightHelp);
+  const weighIn=document.createElement('section');
+  weighIn.className='checkin-weigh-in';
+  weighIn.append(weightLabel);
+  if(weightHelp)weighIn.append(weightHelp);
+  main.append(weighIn);
   const goals=goalContext(client,state.data,period),agreed=goalPanel(goals,client);
   if(agreed)main.append(agreed);
   main.append(progressPanel(period,client));
   form.checkinGoalSnapshot=[goals.summary,...goals.targets.map(g=>targetText(g,client))].filter(Boolean).join(' · ').slice(0,2000);
 
   main.insertAdjacentHTML('beforeend',
-   '<label>What improved in training, and what held you back?<textarea name="challenges" rows="2" maxlength="1200" required placeholder="Name a lift, session or rep improvement, or tell me what stopped you training."></textarea></label>'+
-   '<label>What helped or got in the way with food?<textarea name="food_summary" rows="2" maxlength="1200" required placeholder="Tell me where meals went to plan or what made it difficult."></textarea></label>');
+   '<section class="checkin-reflection" aria-label="Training and food notes"><label>What improved in training, and what held you back?<textarea name="challenges" rows="2" maxlength="1200" required placeholder="Name a lift, session or rep improvement, or tell me what stopped you training."></textarea></label>'+
+   '<label>What helped or got in the way with food?<textarea name="food_summary" rows="2" maxlength="1200" required placeholder="Tell me where meals went to plan or what made it difficult."></textarea></label></section>');
   const recovery=document.createElement('fieldset');
   recovery.className='checkin-recovery';
-  recovery.innerHTML='<legend>Energy, sleep and stress <small>Optional</small></legend>';
+  recovery.innerHTML='<legend>Recovery <small>Optional</small></legend>';
   for(const name of ['energy','sleep','stress']){
    const score=form.querySelector('[name="'+name+'"]')?.closest('fieldset');
    if(score)recovery.append(score);
   }
   main.append(recovery);
-  main.insertAdjacentHTML('beforeend','<label>What’s one action you’ll commit to next week?<textarea name="next_week_availability" rows="2" maxlength="1200" required placeholder="Pick one step toward your goal and, if useful, say when you’ll do it."></textarea></label>');
+  main.insertAdjacentHTML('beforeend','<section class="checkin-next-week"><h2>Next week</h2><label>What’s one action you’ll commit to next week?<textarea name="next_week_availability" rows="2" maxlength="1200" required placeholder="Pick one step toward your goal and, if useful, say when you’ll do it."></textarea></label></section>');
   const support=form.querySelector('[name="support_needed"]');
   if(support){
    support.rows=2;support.maxLength=1200;support.placeholder='A question, a change you need, or a busy week coming up';
-   const label=support.closest('label');label.firstChild.textContent='What can I help with next week? ';
+   const label=support.closest('label');label.firstChild.textContent='Where can I help? ';
    const optional=document.createElement('small');optional.textContent='Optional';label.insertBefore(optional,support);
-   main.append(label);
+   main.querySelector('.checkin-next-week').append(label);
   }
   stages[0].before(main);
   const picker=document.querySelector('#checkinWeekChoice');
