@@ -6,8 +6,10 @@ const chain=()=>new Proxy({}, {get:(o,k)=>k==='then'?undefined:()=>chain()});
 Object.assign(w,{$:s=>w.document.querySelector(s),esc,db:{from:chain},query:()=>{queries++;return new Promise(resolve=>pending.push(resolve));},renderClient(){routed++;},clientToday(){
  w.$('#clientMain').innerHTML='<header class="page-head">Old heading</header><section id="cvLatest"><iframe src="https://www.loom.com/embed/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"></iframe><button>Watch feedback</button></section><div class="priority-grid"><section class="priority-training">Prior session</section><section>Meals & swaps<button id="keepHandler">Meals</button></section></div><section class="priority-progress">Saved progress</section><section id="cfClient">Saved call actions</section>';
  w.$('#cvLatest button').onclick=()=>videoClicks++;
-},state:{role:'client',preview:false,clientView:'today',user:{id:'user-a'},client:{id:'a',display_name:'Client <safe>',onboarding_status:'complete',goal_summary:'Maintain strength <safely>',timezone:'Europe/Dublin',checkin_day:5,checkin_due_time:'23:59:00'},data:{weeks:[],sessions:[],coachingGoals:[],checkins:[]}}});
+},state:{role:'client',preview:false,clientView:'today',user:{id:'user-a'},client:{id:'a',display_name:'Client <safe>',onboarding_status:'complete',plan_status:'published',goal_summary:'Maintain strength <safely>',timezone:'Europe/Dublin',checkin_day:5,checkin_due_time:'23:59:00'},data:{weeks:[],sessions:[],coachingGoals:[],checkins:[]}}});
 vm.runInContext(fs.readFileSync(__dirname+'/../checkin-status-model.js','utf8'),dom.getInternalVMContext());
+w.localCoachingDate=()=>w.CheckinStatus.localDate(new Date(),'Europe/Dublin');
+vm.runInContext(fs.readFileSync(__dirname+'/../day-type.js','utf8'),dom.getInternalVMContext());
 const date=w.CheckinStatus.localDate(new Date(),'Europe/Dublin'),period=w.CheckinStatus.week(w.state.client),fixed=new Date('2026-11-02T12:00:00Z');
 w.state.data.weeks=[{id:'week-a',client_id:'a',published:true,week_start:period,coach_note:'Keep two manageable sessions.'},{id:'peer-week',client_id:'peer',published:true,week_start:period,coach_note:'PRIVATE PEER FOCUS'}];
 // This case exercises session navigation, irrespective of the real weekday deadline.
@@ -46,6 +48,8 @@ const tick=()=>new Promise(r=>setImmediate(r));
  const starting=w.$('#personalCoachingHome');
  assert(starting.textContent.includes('Your first week')&&!starting.textContent.includes('Leg Press · 2 × 8–12'));
  assert(starting.querySelector('.pch-start-hero'));
+ assert(starting.querySelector('.pch-start-hero').nextElementSibling.matches('.day-type'),'Day types appear before the first coaching week starts');
+ assert.equal(starting.querySelector('[data-day-type=normal]').getAttribute('aria-pressed'),'true');
  const priorities=starting.querySelector('.pch-priorities');
  assert(priorities.textContent.includes('2 full-body lifts · 1 Peloton ride'));
  assert(priorities.textContent.includes('8,000')&&priorities.textContent.includes('Tue, Fri, Sun'));

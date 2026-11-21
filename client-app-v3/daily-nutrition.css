@@ -7,3 +7,6 @@
 .dn-ingredients li>span small{display:block;color:var(--muted);font-size:12px;line-height:1.5;margin-top:4px;font-weight:400}.dn-recipe-controls .dn-measurements{max-width:100%}.dn-recipe-controls .dn-measurements small{max-width:420px}.dn-ingredients li>strong{max-width:52%;white-space:normal;text-align:right}
 
 .dn-rush-guide{margin:12px 0 18px;padding:12px 16px;border:1px solid #dfcfad;border-radius:12px;background:#faf5e9}.dn-rush-guide summary{cursor:pointer;font-weight:700}.dn-rush-guide small{display:block;margin:3px 0 0 16px;color:#645743;font-weight:500}.dn-rush-guide p{max-width:72ch;margin:12px 0 0;line-height:1.55}
+
+.dn-heading .head-actions{display:flex;flex-wrap:wrap;gap:.5rem}
+@media(max-width:650px){.dn-heading .head-actions{margin-top:.75rem}}

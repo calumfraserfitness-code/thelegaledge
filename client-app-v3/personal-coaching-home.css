@@ -56,3 +56,6 @@
 .gym-picker{margin:16px 0}
 .gym-picker>summary{width:fit-content;cursor:pointer;font-weight:650}
 .gym-picker>.gym-plan{margin-top:12px}
+
+.checkin-draft-status:empty{display:none}
+.checkin-short textarea{width:100%;box-sizing:border-box}
