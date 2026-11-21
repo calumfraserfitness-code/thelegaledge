@@ -190,6 +190,7 @@
    root.innerHTML=startingMarkup(start,state.client,state.data)+'<div data-pch-video hidden></div><details class="pch-secondary" data-pch-secondary><summary><span>More coaching tools</span></summary><div data-pch-secondary-content></div></details>';
    host.prepend(root);
    const active=()=>root.isConnected&&eligible()&&state.user?.id===user&&state.client?.id===client;
+   window.DayType?.mount(root,m,[],active,route);
    bindPriorities(root,active,state.client.start_date);
    root.querySelector('[data-pch-start-coach]')?.addEventListener('click',()=>{if(active())route('support');});
    bindWeekSchedule(root);
