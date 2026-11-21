@@ -69,7 +69,6 @@
   form.addEventListener('invalid',e=>{if(details.contains(e.target))details.open=true;},true);
   const submitCheckin=form.onsubmit;
   form.onsubmit=function(event){
-   form.weeklyTrainingReview();
    for(const field of form.querySelectorAll('textarea[required]'))field.value=field.value.trim();
    if(!form.reportValidity()){event.preventDefault();return;}
    return submitCheckin.call(this,event);

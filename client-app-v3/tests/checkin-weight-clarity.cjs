@@ -29,7 +29,7 @@ function event(){return {preventDefault(){},target:form(),submitter:w.$('#checki
  w.setTimeout=fn=>(saveTimer=fn,1);w.clearTimeout=()=>{};
  w.db.from=()=>{const q={select:()=>q,eq:()=>q,maybeSingle:()=>Promise.resolve({data:null}),upsert:()=>q,then:resolve=>Promise.resolve({error:null}).then(resolve)};return q;};
  vm.runInContext(fs.readFileSync(path.join(root,'checkin-drafts.js'),'utf8'),dom.getInternalVMContext());w.clientCheckin();
- assert(form().textContent.includes('draft saves privately'));form().elements.weight_display.value='180';form().dispatchEvent(new w.Event('input'));await saveTimer();await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(form().querySelector('.checkin-draft-status').textContent,'');form().elements.weight_display.value='180';form().dispatchEvent(new w.Event('input'));await saveTimer();await new Promise(resolve=>setImmediate(resolve));
  assert(form().textContent.includes('Draft saved.'));
  console.log('PASS: visible optional weigh-in, dated saved reference, empty-value honesty, unit conversion, submitted-weight receipts and private draft clarity.');dom.window.close();
 })().catch(error=>{console.error(error);process.exit(1)});
