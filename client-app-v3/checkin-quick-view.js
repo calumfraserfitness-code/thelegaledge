@@ -1,30 +1,6 @@
 /* The weekly questions use the existing draft, upload and submission flow. */
 (function(){
  'use strict';
- const outcomes={completed:'Completed',modified:'Completed with changes',missed:'Missed',planned:'Still to do'};
- function sessionReview(form,period){
-  const week=(state.data.weeks||[]).find(w=>w.published&&w.week_start===period&&(!w.client_id||w.client_id===state.client.id));
-  const sessions=(state.data.sessions||[]).filter(s=>week&&s.week_id===week.id&&(!s.client_id||s.client_id===state.client.id)&&['weights','resistance','cardio'].includes(s.training_type)).sort((a,b)=>Number(a.sort_order||0)-Number(b.sort_order||0)||String(a.session_date).localeCompare(String(b.session_date)));
-  const section=document.createElement('section');
-  section.innerHTML='<h2>Workout details</h2>';
-  const tracked=sessions.map(s=>{
-   const label=document.createElement('label'),select=document.createElement('select');
-   label.textContent=s.title+(s.source_metadata?.optional===true?' (optional session)':'');
-   select.name='session_outcome_'+s.id;
-   select.innerHTML='<option value="">Choose outcome (optional)</option>'+Object.entries(outcomes).map(([key,value])=>'<option value="'+key+'">'+value+'</option>').join('');
-   if(s.status==='completed')select.value='completed';
-   else if(s.session_date>window.CheckinStatus?.localDate?.(new Date(),state.client.timezone||'Europe/Dublin'))select.value='planned';
-   label.append(select);section.append(label);
-   return {session:s,select};
-  });
-  function update(){
-   const selected=tracked.filter(({session})=>session.source_metadata?.optional!==true);
-   const result=selected.length&&selected.every(({select})=>select.value&&select.value!=='planned')?Math.round(100*selected.filter(({select})=>select.value!=='missed').length/selected.length):null;
-   return {result,details:Object.fromEntries(tracked.filter(({select})=>select.value).map(({session,select},i)=>['Session '+(i+1),session.title+' — '+outcomes[select.value]]))};
-  }
-  form.weeklyTrainingReview=update;
-  return section;
- }
  function goalContext(client,data,period){
   const current=period===window.CheckinStatus?.week?.(client);
   if(!current)return {summary:'',targets:[],recap:null};
@@ -132,11 +108,10 @@
    }
    heading.after(bar);
   }
-  const training=sessionReview(form,period);
-  if(training.querySelector('select'))details.append(training);
   const steps=form.querySelector('.refresh-connected');if(steps)details.append(steps);
-  form.querySelector('[name="training_adherence"]')?.closest('fieldset')?.remove();
-  form.querySelector('[name="nutrition_adherence"]')?.closest('fieldset')?.remove();
+  for(const name of ['training_adherence','nutrition_adherence','workload']){
+   form.querySelector('[name="'+name+'"]')?.closest('fieldset')?.remove();
+  }
   for(const section of stages){
    section.querySelector('h2')?.remove();
    section.querySelector(':scope > p.muted:not(#checkinWeightHelp)')?.remove();
