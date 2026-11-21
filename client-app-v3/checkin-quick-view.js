@@ -31,9 +31,9 @@
    ['weights','resistance'].includes(s.training_type)&&s.source_metadata?.optional!==true);
   const recorded=lifts.filter(s=>s.status==='completed').length;
   section.innerHTML='<h2>Progress this week</h2><div class="checkin-counts">'+
-   '<label>Strength sessions completed<input name="strength_sessions_completed" type="number" min="0" max="28" step="1" inputmode="numeric">'+
+   '<label>Strength sessions completed<input name="strength_sessions_completed" type="number" min="0" max="28" step="1" inputmode="numeric" required>'+
    (lifts.length?'<small>'+recorded+' logged · '+lifts.length+' assigned. Include any you did outside the app.</small>':'<small>Include any sessions you did outside the app.</small>')+'</label>'+
-   '<label>Days you followed your food plan<input name="nutrition_days_on_plan" type="number" min="0" max="7" step="1" inputmode="numeric"><small>Out of 7. Leave blank if you’re unsure.</small></label></div>';
+   '<label>Days you followed your food plan<input name="nutrition_days_on_plan" type="number" min="0" max="7" step="1" inputmode="numeric" required><small>Out of 7. Your best estimate is fine.</small></label></div>';
   const previous=(state.data.checkins||[]).filter(r=>r.client_id===client.id&&r.period_start<period)
    .sort((a,b)=>b.period_start.localeCompare(a.period_start))[0];
   const values=previous?.original_answers||{};
@@ -51,8 +51,6 @@
   const stages=[...form.querySelectorAll('[data-checkin-stage]')],weight=form.querySelector('[name="weight_display"]');
   if(stages.length!==3||!weight)return;
   form.dataset.quickView='true';
-  const details=document.createElement('details');details.className='checkin-extra';details.dataset.checkinExtra='';
-  const summary=document.createElement('summary');summary.textContent='Add optional details';details.append(summary);
   const period=form.elements.period_start.value,client=state.client,zone=client.timezone||'Europe/Dublin';
   const due=window.CheckinStatus?.due?.(client,period);
   const heading=document.querySelector('#clientMain .client-page-head');
@@ -67,16 +65,22 @@
   if(weightHelp){
    const previous=weightHelp.textContent.split('Enter a new reading')[0].trim().replace('Latest saved weigh-in:', 'Last logged:');
    weightHelp.textContent=previous;
-   const optional=document.createElement('small');optional.textContent='Optional';
-   weightLabel.insertBefore(optional,weight);
   }
   const main=document.createElement('section');
   main.className='checkin-main';
-  const weighIn=document.createElement('section');
-  weighIn.className='checkin-weigh-in';
-  weighIn.append(weightLabel);
-  if(weightHelp)weighIn.append(weightHelp);
-  main.append(weighIn);
+  if(client.track_weight!==false){
+   const weighIn=document.createElement('section');
+   weighIn.className='checkin-weigh-in';
+   weighIn.append(weightLabel);
+   if(weightHelp)weighIn.append(weightHelp);
+   weighIn.insertAdjacentHTML('beforeend','<label class="checkin-no-weight"><input type="checkbox" name="weight_not_recorded" value="yes"> I haven’t weighed this week</label>');
+   const skipped=weighIn.querySelector('input[type="checkbox"]');
+   function syncWeight(){weight.disabled=skipped.checked;weight.required=!skipped.checked;}
+   skipped.addEventListener('change',syncWeight);
+   form.addEventListener('checkin-draft-restored',syncWeight);
+   syncWeight();
+   main.append(weighIn);
+  }
   const goals=goalContext(client,state.data,period),agreed=goalPanel(goals,client);
   if(agreed)main.append(agreed);
   main.append(progressPanel(period,client));
@@ -87,20 +91,13 @@
    '<label>What helped or got in the way with food?<textarea name="food_summary" rows="2" maxlength="1200" required placeholder="Tell me where meals went to plan or what made it difficult."></textarea></label></section>');
   const recovery=document.createElement('fieldset');
   recovery.className='checkin-recovery';
-  recovery.innerHTML='<legend>Recovery <small>Optional</small></legend>';
+  recovery.innerHTML='<legend>Recovery</legend>';
   for(const name of ['energy','sleep','stress']){
    const score=form.querySelector('[name="'+name+'"]')?.closest('fieldset');
-   if(score)recovery.append(score);
+   if(score){score.querySelector('input').required=true;recovery.append(score);}
   }
   main.append(recovery);
-  main.insertAdjacentHTML('beforeend','<section class="checkin-next-week"><h2>Next week</h2><label>What’s one action you’ll commit to next week?<textarea name="next_week_availability" rows="2" maxlength="1200" required placeholder="Pick one step toward your goal and, if useful, say when you’ll do it."></textarea></label></section>');
-  const support=form.querySelector('[name="support_needed"]');
-  if(support){
-   support.rows=2;support.maxLength=1200;support.placeholder='A question, a change you need, or a busy week coming up';
-   const label=support.closest('label');label.firstChild.textContent='Where can I help? ';
-   const optional=document.createElement('small');optional.textContent='Optional';label.insertBefore(optional,support);
-   main.querySelector('.checkin-next-week').append(label);
-  }
+  main.insertAdjacentHTML('beforeend','<section class="checkin-next-week"><h2>Next week</h2><label>What’s your next step, and where can I help?<textarea name="next_week_availability" rows="2" maxlength="1200" required placeholder="Name one action and when you’ll do it. Include any help you need."></textarea></label></section>');
   stages[0].before(main);
   const picker=document.querySelector('#checkinWeekChoice');
   if(picker&&heading){
@@ -114,22 +111,23 @@
    }
    heading.after(bar);
   }
-  const steps=form.querySelector('.refresh-connected');if(steps)details.append(steps);
-  for(const name of ['training_adherence','nutrition_adherence','workload']){
-   form.querySelector('[name="'+name+'"]')?.closest('fieldset')?.remove();
-  }
+  const nav=form.querySelector('.refresh-checkin-navigation');
+  const voice=stages[2].querySelector('.refresh-voice');
   for(const section of stages){
-   section.querySelector('h2')?.remove();
-   section.querySelector(':scope > p.muted:not(#checkinWeightHelp)')?.remove();
-   if(!section.children.length)continue;
-   section.hidden=false;details.append(section);
+   if(section===stages[2]&&voice){section.replaceChildren(voice);continue;}
+   section.remove();
   }
-  const nav=form.querySelector('.refresh-checkin-navigation');if(nav)nav.before(details);else form.append(details);
+  if(voice){
+   const details=document.createElement('details');details.className='checkin-extra';details.dataset.checkinExtra='';
+   details.innerHTML='<summary>Voice note <small>Optional</small></summary>';
+   voice.querySelector('h3')?.remove();
+   const description=voice.querySelector('p');if(description)description.textContent='Record up to 2 minutes or attach an audio file.';
+   voice.before(details);details.append(voice);stages[2].hidden=false;
+   if(nav)nav.before(stages[2]);
+  }
   form.querySelector('.refresh-checkin-progress')?.setAttribute('hidden','');
   for(const id of ['checkinBack','checkinNext']){const button=form.querySelector('#'+id);if(button)button.hidden=true;}
   const submit=form.querySelector('#checkinSubmit');if(submit)submit.hidden=false;
-  // Native validation must reveal any invalid optional field before focusing it.
-  form.addEventListener('invalid',e=>{if(details.contains(e.target))details.open=true;},true);
   const submitCheckin=form.onsubmit;
   form.onsubmit=function(event){
    for(const field of form.querySelectorAll('textarea[required]'))field.value=field.value.trim();

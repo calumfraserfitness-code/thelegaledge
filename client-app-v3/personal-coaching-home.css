@@ -112,3 +112,8 @@
  #checkinForm[data-quick-view] #checkinSubmit{width:100%}
 }
 @media(max-width:460px){.checkin-counts{grid-template-columns:1fr}}
+
+.checkin-weigh-in .checkin-no-weight{display:flex;align-items:center;gap:.5rem;margin-top:.6rem;font-weight:500}
+.checkin-no-weight input[type="checkbox"]{width:1rem;height:1rem;margin:0;flex:none}
+.checkin-weigh-in input[name="weight_display"]:disabled{opacity:.55}
+#checkinForm[data-quick-view] .checkin-extra summary small{margin-inline-start:.45rem;color:var(--checkin-muted);font-weight:400}
