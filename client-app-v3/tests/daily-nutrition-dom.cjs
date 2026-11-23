@@ -37,6 +37,12 @@ async function tick(){await new Promise(r=>setTimeout(r,0));}
 (async()=>{
  await tick();
  run(`state.data.mealAssignments.push({id:'optional-a',client_id:state.client.id,nutrition_plan_id:null,historical:false,meal:{id:'optional-m',name:'Turkey rice bowl',meal_type:'Main meal',calories:550,protein_g:45,carbs_g:60,fat_g:14,ingredients:[],cooking_instructions:'Cook and serve.'}});renderClient();`);await tick();
+ run("state.data.coachingGuidance=[{client_id:state.client.id,published:true,category:'meal_example',title:'Sunday meal prep · Monday to Friday',body:'Shopping list\\nBuy a chicken pack <test>.'},{client_id:'peer',published:true,category:'meal_example',title:'Sunday meal prep · Monday to Friday',created_at:'2099',body:'Peer guide\\nPrivate'}];renderClient();");
+ const prep=doc.querySelector('[data-dn-weekday-prep]');
+ assert(prep&&!prep.open);
+ assert.match(prep.textContent,/Buy a chicken pack <test>/);
+ assert(!prep.textContent.includes('Peer guide'));
+ prep.open=true;run('renderClient()');assert(doc.querySelector('[data-dn-weekday-prep]').open);
  assert(!doc.querySelector('.dn-meals').textContent.includes('Turkey rice bowl'),'Optional swaps do not become extra scheduled meals');
  doc.querySelector('#dnLibrary').click();assert(doc.querySelector('[role=dialog]').textContent.includes('Turkey rice bowl'),'Assigned optional recipes are selectable');doc.querySelector('[data-dn-filter="Breakfast"]').click();assert(!doc.querySelector('[role=dialog]').textContent.includes('Turkey rice bowl'),'Main meals never enter breakfast');doc.querySelector('[data-dn-filter="Dinner"]').click();assert(doc.querySelector('[role=dialog]').textContent.includes('Turkey rice bowl'),'Optional mains stay available for dinner');doc.querySelector('#dnClose').click();
  run(`state.data.mealAssignments.push(...[{id:'fruit-a',name:'Greek Yogurt Bowl · strawberries',calories:400,protein_g:30,carbs_g:45,fat_g:12,ingredients:[{name:'Strawberries',quantity:100,unit:'g'}]},{id:'fruit-b',name:'Greek Yogurt Bowl · banana',calories:420,protein_g:32,carbs_g:48,fat_g:13,ingredients:[{name:'Banana',quantity:80,unit:'g'}]}].map(meal=>({id:meal.id,client_id:state.client.id,nutrition_plan_id:null,historical:false,meal:{...meal,meal_type:'Breakfast'}})));`);

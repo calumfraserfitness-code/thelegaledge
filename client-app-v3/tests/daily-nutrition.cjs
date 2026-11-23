@@ -37,3 +37,9 @@ assert.equal(recipeModel.recipeFamily({name:'Greek Yogurt Fruit Cup · strawberr
 const sanitized=recipeModel.slots([{name:'New meal',meal_type:'Snack'},{name:'Banana bites',meal_type:'Snack',ingredients:[{name:'Banana'}]}]);
 assert.equal(sanitized.length,1);
 assert.equal(sanitized[0].key,'snacks-2','Placeholder filtering preserves existing meal-slot keys');
+
+const internationalMeal={name:'Greek Yoghurt with Apple',ingredients:[{name:'Cooked chick peas'},{name:'Courgette'},{name:'Red bell pepper'}]};
+assert(recipeModel.matchesRecipeSearch(internationalMeal,'  peppers zucchini CHICKPEAS  ',{ingredients:[]}));
+assert(recipeModel.matchesRecipeSearch(internationalMeal,'greek yogurt'));
+assert(!recipeModel.matchesRecipeSearch(internationalMeal,'zucchini chicken'));
+assert(recipeModel.matchesRecipeSearch({name:'Prawn bowl',items:[{food:'Tomato'}]},'shrimp with tomatoes'));

@@ -94,6 +94,18 @@
   const assigned=plans.flatMap(plan=>M.slots(mealsForNutritionPlan(plan)).map((row,i)=>({...row,key:String(row.meal.id||plan.id+':'+i)})));
   return M.mealIdeas(assigned,m.rows,m.targets).slice(0,3);
  }
+ function weekdayPrepMarkup(){
+  const guide=(state.data.coachingGuidance||[]).filter(g=>g.client_id===state.client.id&&g.published&&g.category==='meal_example'&&
+   g.title==='Sunday meal prep · Monday to Friday'&&g.body?.trim()).sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at)))[0];
+  if(!guide)return '';
+  const open=host().querySelector('[data-dn-weekday-prep]')?.open;
+  const sections=guide.body.trim().split(/\n\s*\n/).map(section=>{
+   const [heading,...lines]=section.split(/\r?\n/).map(line=>line.trim()).filter(Boolean);
+   return '<section><h3>'+esc(heading)+'</h3><ul>'+lines.map(line=>'<li>'+esc(line)+'</li>').join('')+'</ul></section>';
+  });
+  return '<details class="panel dn-weekday-prep" data-dn-weekday-prep '+(open?'open':'')+'><summary>'+esc(guide.title)+
+   '<small>Shopping list · Five lunches · Dinner portions</small></summary><div>'+sections.join('')+'</div></details>';
+ }
  function paint(){
   if(owner!==ownerKey())reset();
   const m=current(),today=localCoachingDate(),consumed=loaded?M.totals(m.rows,true):Object.fromEntries(M.fields.map(k=>[k,null])),planned=M.totals(m.rows),eaten=m.rows.filter(r=>r.eaten).length;
@@ -113,6 +125,7 @@
   const quick=quickChoices(m,today),adjusted=m.date===today&&window.DayType&&window.DayType.get(today)!=='normal';
   state.foodUnits=state.foodUnits||(state.client?.weight_unit==='kg'?'metric':'us');
   host().innerHTML=`<div class="dn-page"><header class="dn-heading"><div><span class="eyebrow">YOUR NUTRITION</span><h1>Your meals</h1></div><div class="head-actions"><button class="btn primary small" id="dnLibrary" type="button">Find a recipe</button><button class="btn ghost small" id="dnAnywhere" type="button">Search foods & barcodes</button></div></header>
+   ${weekdayPrepMarkup()}
    ${menuPicker}
    ${rushGuide}
    ${adjusted?`<section class="panel day-type-food" aria-labelledby="dnDayTypeTitle"><h2 id="dnDayTypeTitle">Quick meal options</h2>${quick.length?

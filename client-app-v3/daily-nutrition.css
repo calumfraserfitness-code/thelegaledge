@@ -26,3 +26,12 @@
 .dn-page-units{margin:.65rem 0;padding:.55rem 0;border:0}
 .dn-meal-actions button{min-height:44px}
 .dn-meals{margin-bottom:1.25rem}
+
+.dn-weekday-prep{padding:clamp(.85rem,3vw,1.35rem);border-inline-start:4px solid #a77d3b;margin-bottom:1rem}
+.dn-weekday-prep summary{min-height:44px;cursor:pointer;font-weight:750}
+.dn-weekday-prep summary small{display:block;margin:.2rem 0 0;font-weight:500;color:#526172}
+.dn-weekday-prep>div{display:grid;gap:.8rem;margin-top:1rem;grid-template-columns:repeat(auto-fit,minmax(min(100%,22rem),1fr))}
+.dn-weekday-prep section{padding:.85rem;background:#f5f7fa;border-radius:.6rem}
+.dn-weekday-prep h3{font-size:1rem;margin:0 0 .5rem}
+.dn-weekday-prep ul{padding-inline-start:1.1rem;margin:0}
+.dn-weekday-prep li+li{margin-top:.4rem}

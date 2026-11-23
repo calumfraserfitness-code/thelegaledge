@@ -43,14 +43,23 @@
   return a!==null&&a>0&&b!==null&&p!==null&&q!==null&&Math.abs(a-b)<=Math.max(50,a*.2)&&Math.abs(p-q)<=Math.max(5,p*.25);
  }
  function matchesGroup(recipe,group){return recipe.group===group||recipe.groups?.includes(group)===true;}
+ const foodWords={
+  yoghurt:'yogurt', oats:'oat', porridge:'oat', courgette:'zucchini', courgettes:'zucchini', zucchinis:'zucchini',
+  aubergine:'eggplant', aubergines:'eggplant', eggplants:'eggplant', capsicum:'pepper', peppers:'pepper',
+  prawns:'shrimp', prawn:'shrimp', shrimps:'shrimp', mince:'ground', minced:'ground',
+  scallions:'scallion', chickpeas:'chickpea', potatoes:'potato', tomatoes:'tomato',
+  strawberries:'strawberry', raspberries:'raspberry', blueberries:'blueberry',
+  bananas:'banana', apples:'apple', tortillas:'tortilla', eggs:'egg', wraps:'wrap'
+ };
  function searchTerms(value){
-  return String(value||'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase()
-   .replace(/\byoghurt\b/g,'yogurt').replace(/\bporridge\b/g,'oats').match(/[a-z0-9]+/g)||[];
+  const words=String(value||'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase()
+   .replace(/\bchick[\s-]+peas?\b/g,'chickpea').match(/[a-z0-9]+/g)||[];
+  return words.filter(word=>!['and','with','the'].includes(word)).map(word=>Object.hasOwn(foodWords,word)?foodWords[word]:word);
  }
  function matchesRecipeSearch(meal,query,presentation={}){
   const {name,description,ingredients}=presentation;
-  const items=ingredients||meal.ingredients||meal.items||[];
-  const haystack=searchTerms([meal.name,name,description,...items.map(i=>typeof i==='string'?i:i.name||i.food)].join(' '));
+  const items=[ingredients,meal.ingredients,meal.items].filter(Array.isArray).flat();
+  const haystack=searchTerms([meal.name,name,description,...items.map(i=>typeof i==='string'?i:i?.name||i?.food)].join(' '));
   return searchTerms(query).every(term=>haystack.some(word=>word===term||term.length>=3&&word.startsWith(term)));
  }
  function sameRecipe(a,b){
