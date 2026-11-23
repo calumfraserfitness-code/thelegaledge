@@ -36,8 +36,22 @@
  clientPlanner=function(){const week=clientTrainingWeek();if(!week?.published&&!state.preview)return plannerBefore();const rows=ordered(weekSessions()),sessions=rows.filter(s=>!daily(s)),practice=rows.filter(daily),host=$('#clientMain');
   host.dataset.completionDate=today();
   const label=week?window.CheckinStatus.weekLabel(week.week_start,state.client)+' · '+fmt(week.week_start,{day:'numeric',month:'short'}):'';
-  const card=s=>'<article class="flex-session"><p class="muted">'+esc(fmt(s.session_date,{weekday:'long',day:'numeric',month:'short'}))+'</p>'+taskMarkup(s)+'<button type="button" class="btn ghost small" data-open-session="'+esc(s.id)+'">Open session</button></article>';
+  const card=s=>'<article class="flex-session"><p class="muted">'+esc(fmt(s.session_date,{weekday:'long',day:'numeric',month:'short'}))+(s.scheduled_time?' · '+esc(s.scheduled_time.slice(0,5)):'')+'</p>'+taskMarkup(s)+'<button type="button" class="btn ghost small" data-open-session="'+esc(s.id)+'">Open session</button></article>';
   host.innerHTML=clientHeader('YOUR WEEK','Weekly planner',label)+'<section class="panel"><h2 id="flexSessionSummary">'+sessions.filter(s=>done(s)).length+' / '+sessions.length+' sessions complete</h2><p>Session order is a guide, not a fixed weekday. Your recorded workouts stay attached to the same session.</p>'+sessions.map(card).join('')+'</section>'+(practice.length?'<section class="panel"><h2>Mobility, breathing & recovery</h2><p>Log each practice for today when you do it. You do not need to undo yesterday’s tick.</p>'+practice.map(card).join('')+'</section>':'')+'<details class="panel"><summary>Today’s steps</summary><p>Your step target: '+esc(state.client.daily_steps_goal||'To agree')+'. Record the actual count from your phone or watch.</p><form id="flexSteps"><label>Actual steps<input name="steps" type="number" min="0" max="150000" required></label><button class="btn ghost">Save steps</button><p role="status"></p></form></details>';bindCompletionActions();bindOpenSessions();
+  if(typeof clientScheduleMarkup==='function'){
+   const timing=clientScheduleMarkup(week);
+   if(timing){host.insertAdjacentHTML('beforeend','<details class="panel flex-timing" id="flexTiming"><summary>Arrange my training days</summary>'+timing+'</details>');bindClientScheduling();}
+  }
+  if(typeof weekDays==='function'&&window.openDailyNutritionDate){
+   const days=weekDays(week).filter(day=>day.nutrition?.nutrition_plan_id);
+   if(days.length){
+    host.insertAdjacentHTML('beforeend','<section class="panel flex-meal-days"><h2>Meals for the week</h2><div>'+days.map(day=>
+     '<button type="button" class="btn ghost small" data-flex-meals="'+esc(day.date)+'">'+esc(fmt(day.date,{weekday:'short',day:'numeric',month:'short'}))+'</button>').join('')+'</div></section>');
+    host.querySelectorAll('[data-flex-meals]').forEach(button=>button.onclick=()=>{
+     state.clientView='nutrition';window.openDailyNutritionDate(button.dataset.flexMeals);
+    });
+   }
+  }
   const form=host.querySelector('#flexSteps'),client=state.client.id,user=state.user?.id,date=today();form.onsubmit=async e=>{e.preventDefault();const active=()=>form.isConnected&&state.client?.id===client&&state.user?.id===user;if(!active())return;const n=Number(new FormData(form).get('steps')),status=form.querySelector('[role=status]'),button=form.querySelector('button');if(!Number.isInteger(n)||n<0||n>150000){status.textContent='Enter a whole step count from 0 to 150,000.';return;}button.disabled=true;try{const row={client_id:client,entry_date:date,actual_steps:n,target_steps:state.client.daily_steps_goal||null},saved=state.preview?row:(await query('Save actual steps',db.from('step_entries').upsert(row,{onConflict:'client_id,entry_date'}).select()))[0];if(!active())return;if(saved?.client_id!==client||saved.entry_date!==date)throw Error('Save not confirmed');state.data.steps=[saved,...(state.data.steps||[]).filter(r=>r.entry_date!==date)];status.textContent=state.preview?'Sample steps saved locally':'Steps saved.';}catch(error){if(active())status.textContent='Not saved. Retry. '+error.message;}finally{if(active())button.disabled=false;}};
  };
  function events(rows,client){const out=[];for(const s of rows){if(/legacy|import/i.test(s.source_system||''))continue;const days=Object.values(s.source_metadata?.practice_days||{});for(const day of days)for(const r of Object.values(day.exercises||{}))if(r?.saved_at)out.push({client_id:client.id,name:client.display_name,title:s.title+' · '+r.exercise_name,at:r.saved_at,date:r.local_date,completed:r.completed,actor:r.actor_role});const receipts=[...days,...(!daily(s)&&s.source_metadata?.completion_receipt?[s.source_metadata.completion_receipt]:[])];

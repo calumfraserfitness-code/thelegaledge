@@ -147,3 +147,11 @@
 .pch-meal-link{display:flex;align-items:center;justify-content:space-between;gap:.6rem;text-align:left;color:#172b42;
  width:100%;min-height:44px;padding:.5rem .2rem;background:none;border:0;font:inherit;cursor:pointer}
 .pch-meal-link span{font-size:1.2em;color:#88632a}
+
+.pch-next .pch-week-link{margin-inline-start:.45rem;color:#fff;border-color:#8392a6;background:transparent}
+.flex-meal-days>div{display:flex;flex-wrap:wrap;gap:.5rem}
+.flex-timing>summary,.flex-meal-days button{min-height:44px}
+.flex-timing>summary{align-content:center;cursor:pointer;font-weight:700}
+.flex-timing #cwTimingPanel{padding:0;border:0;box-shadow:none;margin:0}
+.flex-timing [data-schedule-status]{margin:0;grid-column:1/-1;font-size:.85rem}
+@media(max-width:480px){.pch-next .pch-week-link{margin:.5rem 0 0}}

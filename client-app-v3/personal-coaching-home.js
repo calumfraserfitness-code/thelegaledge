@@ -116,6 +116,7 @@
    '<section class="panel pch-next"><p class="eyebrow">'+(home.start?'YOUR FIRST WEEK':action.route==='training'?'NEXT SESSION':action.route==='checkin'?'WEEKLY CHECK-IN':'THIS WEEK')+'</p><h2>'+esc(action.title)+'</h2>'+
    (home.count?'<p class="pch-completion"><strong>'+home.completed+' of '+home.count+'</strong> planned sessions complete</p><progress value="'+home.completed+'" max="'+home.count+'" aria-label="Planned sessions complete"></progress>':'')+
    '<button type="button" class="btn primary" data-pch-next>'+esc(action.label)+'</button>'+
+   '<button type="button" class="btn ghost pch-week-link" data-pch-planner>Weekly planner</button>'+
    (home.dueLabel?'<p class="pch-due">Check-in due '+esc(home.dueLabel)+'</p>':'')+'</section>'+
    (meals.length?'<section class="panel pch-meals"><h2>'+(home.start?'First day’s meals':'Today’s meals')+'</h2><ul>'+meals.map(({meal,key})=>'<li><button type="button" class="pch-meal-link" data-pch-meals="'+esc(key||'')+'">'+esc(meal.name)+' <span aria-hidden="true">›</span></button></li>').join('')+
     '</ul><button type="button" class="btn ghost" data-pch-meals>View meals & portions</button></section>':'')+'</div>'+coachingMarkup(home,client)+'<div data-pch-weigh-in hidden></div>';
@@ -127,6 +128,10 @@
    if(action.route==='checkin')state.checkinWeek=null;
    if(action.route==='training'){state.selectedSessionId=action.session||null;state.trainingCategory=action.category||'weights';}
    renderClient();
+  };
+  root.querySelector('[data-pch-planner]').onclick=()=>{
+   if(!active())return;
+   state.clientView='planner';renderClient();
   };
   root.querySelectorAll('[data-pch-meals]').forEach(button=>button.onclick=()=>{
    if(!active())return;

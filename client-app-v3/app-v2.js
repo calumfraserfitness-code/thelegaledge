@@ -958,7 +958,7 @@ function nutritionUnit(amount, unit) {
   const raw = `${amount}${unit ? ` ${unit}` : ''}`;
   if (!Number.isFinite(n)) return raw;
   const us = (state.foodUnits || (state.client?.weight_unit === 'lbs' ? 'us' : 'metric')) === 'us';
-  const rounded = value => Number(value.toFixed(1));
+  const rounded = value => value>0&&value<0.005?'under 0.01':Number(value.toFixed(value>0&&value<0.1?2:1));
   if (us) {
     if (u === 'g') return `${rounded(n / 28.349523125)} oz`;
     if (u === 'kg') return `${rounded(n * 35.27396195)} oz`;

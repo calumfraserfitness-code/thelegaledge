@@ -55,6 +55,21 @@ async function tick(){await new Promise(r=>setTimeout(r,0));}
  assert(freshFamily.querySelector('[data-dn-variant-summary]').textContent.includes('48g carbs'));
  freshFamily.querySelector('[data-dn-library-recipe]').click();assert(doc.querySelector('.dn-recipe-title').textContent.includes('banana'),'Recipe action follows selected variant');doc.querySelector('#dnClose').click();
  run(`state.data.mealAssignments=state.data.mealAssignments.filter(a=>!a.id.startsWith('fruit-'));`);
+ run(`state.data.sessions.push({id:'planner-fixture',week_id:state.data.weeks[0].id,training_type:'weights',
+  session_date:state.data.weeks[0].week_start,title:'Planner fixture session',status:'planned'});
+  state.clientView='today';renderClient();`);
+ doc.querySelector('[data-pch-planner]').click();await tick();
+ assert.equal(doc.querySelector('#clientMain h1').textContent,'Weekly planner');
+ assert(doc.querySelector('[data-flex-meals]'),'Dated menus are accessible in the planner');
+ assert(!doc.querySelector('#flexTiming').open,'Timing controls stay collapsed until requested');
+ doc.querySelector('#flexTiming').open=true;
+ const timing=doc.querySelector('[data-cw-session="planner-fixture"]');
+ timing.elements.scheduled_time.value='07:30';
+ timing.dispatchEvent(new dom.window.Event('submit',{bubbles:true,cancelable:true}));await tick();
+ assert.equal(doc.querySelector('[data-cw-session="planner-fixture"] [data-schedule-status]').textContent,'Session timing saved.');
+ assert.match(doc.querySelector('#clientMain').textContent,/07:30/);
+ doc.querySelector('[data-flex-meals]').click();await tick();
+ assert.equal(run('state.clientView'),'nutrition');
  run('state.clientView="today";renderClient();');
  doc.querySelector('[data-pch-meals="breakfast-1"]').click();
  await tick();
