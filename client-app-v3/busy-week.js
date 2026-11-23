@@ -24,7 +24,7 @@
  function guideSessions(selectedWeek){
   if(!selectedWeek||!selectedWeek.published&&!state.preview)return [];
   return (state.data.sessions||[]).filter(s=>s.week_id===selectedWeek.id&&(!s.client_id||s.client_id===state.client.id)&&
-   ['weights','resistance','cardio'].includes(s.training_type)&&['planned','completed'].includes(s.status));
+   ['weights','resistance','cardio'].includes(s.training_type)&&['planned','completed'].includes(s.status)&&s.source_system!=='client_manual_cardio');
  }
  function guide(selectedWeek,settings){
   const workouts=guideSessions(selectedWeek),pending=workouts.filter(s=>s.status==='planned');
@@ -39,13 +39,19 @@
   };
   const foodNote=(state.data.coachingGuidance||[]).filter(g=>g.client_id===state.client.id&&g.published&&g.category==='eating_out'&&g.body?.trim())
    .sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at)))[0];
-  const menuIds=new Set((state.data.nutritionDays||[]).filter(day=>day.week_id===selectedWeek.id).map(day=>day.nutrition_plan_id));
-  const quickMenu=(state.data.nutritionPlans||[]).find(menu=>menuIds.has(menu.id)&&menu.is_active!==false&&
-   (!menu.client_id||menu.client_id===state.client.id)&&(menu.day_type==='Busy Day'||/\b(?:busy|deadline) day\b/i.test(menu.name||'')));
-  const meal=quickMenu&&typeof mealsForNutritionPlan==='function'?mealsForNutritionPlan(quickMenu).find(item=>item.name&&/lunch|dinner|main meal/i.test(item.meal_type||'')):null;
+  const plannedDays=(state.data.nutritionDays||[]).filter(day=>day.week_id===selectedWeek.id);
+  const plans=(state.data.nutritionPlans||[]).filter(menu=>plannedDays.some(day=>day.nutrition_plan_id===menu.id)&&
+   menu.is_active!==false&&(!menu.client_id||menu.client_id===state.client.id));
+  const today=localCoachingDate();
+  const menu=plans.find(p=>p.day_type==='Busy Day'||/\b(?:busy|deadline) day\b/i.test(p.name||''))||
+   plans.find(p=>plannedDays.some(day=>day.nutrition_plan_id===p.id&&day.nutrition_date===today))||plans[0];
+  const meal=menu&&typeof mealsForNutritionPlan==='function'?mealsForNutritionPlan(menu)
+   .find(item=>item.name&&/lunch|dinner|main meal/i.test(item.meal_type||item.timing||'')):null;
+  const mealDate=menu&&(plannedDays.find(day=>day.nutrition_plan_id===menu.id&&day.nutrition_date===today)||
+   plannedDays.find(day=>day.nutrition_plan_id===menu.id))?.nutrition_date;
   return {pending,busy:choice(1,plan?.heavy_sessions),packed:choice(2,plan?.crisis_sessions),
-   busyNote:plan?.heavy_notes?.trim(),packedNote:plan?.crisis_notes?.trim(),
-   food:plan?.office_food?.trim()||foodNote?.body?.trim()||(meal?'Start with '+meal.name+' from your assigned busy-day meals. Decide when you’ll prep or pack it.':'Pick an easy meal from your plan and decide ahead of time what you’ll prep, pack or order.')};
+   busyNote:plan?.heavy_notes?.trim(),packedNote:plan?.crisis_notes?.trim(),mealDate,
+   food:plan?.office_food?.trim()||foodNote?.body?.trim()||(meal?'Plan when you’ll prep or pack '+meal.name+' from your menu.':'Pick an easy meal from your plan and decide what you’ll prep, pack or order.')};
  }
  function mount(){
   if(typeof document==='undefined'||!['training','planner'].includes(state.clientView))return;
@@ -61,8 +67,12 @@
    const prompt=guide(selectedWeek,c.settings);
    const review=c.record?.mode==='review'&&c.record.week_start===selectedWeek.week_start;
    const names=items=>items.map(s=>esc(s.title)).join(' · ');
-   const row=(title,items,note)=>'<div><h3>'+title+'</h3><p>'+(items.length?'Prioritise <strong>'+names(items)+'</strong>.':'Let the remaining sessions go for this week.')+'</p>'+
-    (items.length&&note?'<details><summary>Coach’s workout advice</summary><p class="cw-lines">'+esc(note)+'</p></details>':'')+'</div>';
+   const keep=items=>items.length?'<p><strong>Keep</strong> '+names(items)+'</p>':'<p>Let the remaining sessions go this week.</p>';
+   const row=(title,items,note)=>{
+    const dropped=prompt.pending.filter(s=>!items.includes(s));
+    return '<div><h3>'+title+'</h3>'+keep(items)+(dropped.length?'<p><strong>Skip this week</strong> '+names(dropped)+'</p>':'')+
+     (note?'<details><summary>Calum’s workout advice</summary><p class="cw-lines">'+esc(note)+'</p></details>':'')+'</div>';
+   };
    const reduction=items=>prompt.pending.length-items.length;
    const dropLabel=items=>'Drop '+reduction(items)+' '+(reduction(items)===1?'session':'sessions');
    const training=review?'<p>Pause any affected training. Ask Calum to review your plan before picking it back up.</p>':
@@ -75,7 +85,7 @@
     (prompt.pending.length&&!review?'<p>Pick days that fit. Leave the rest and get back to your usual plan next week.</p>':'')+
     '<h3>Keep meals simple</h3><p class="cw-lines">'+esc(prompt.food)+'</p><button type="button" class="btn ghost small" data-bw-meals>Open my meal plan</button>'+
     (canRestore?'<button type="button" class="btn ghost small" data-bw-restore>Restore original workout</button>':'')+'</div>';
-   box.querySelector('[data-bw-meals]').onclick=()=>{if(active())go('nutrition');};
+   box.querySelector('[data-bw-meals]').onclick=()=>{if(!active())return;if(prompt.mealDate&&window.openDailyNutritionDate){state.clientView='nutrition';window.openDailyNutritionDate(prompt.mealDate);}else go('nutrition');};
    box.querySelector('[data-bw-restore]')?.addEventListener('click',async e=>{
     const button=e.currentTarget;if(!active()||state.preview||button.disabled)return;
     const session=state.data.sessions.find(s=>s.id===swap.session_id);setBusy(button,true);

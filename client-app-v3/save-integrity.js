@@ -18,6 +18,7 @@
   event.preventDefault();const form=event.target;if(form.dataset.saving==='true')return;
   const client={...state.client},user=state.user?.id,role=state.role,view=state.clientView,tab=state.clientTab,fd=new FormData(form),date=coach?fd.get('entry_date'):localCoachingDate();
   let patch;try{patch=patchFrom(form,client);if(!/^\d{4}-\d{2}-\d{2}$/.test(date||''))throw Error('Choose a valid date.');}catch(error){return toast(error.message,'error');}
+  const fromToday=!coach&&form.id==='todayProgressForm';
   const active=()=>state.client?.id===client.id&&state.user?.id===user&&state.role===role;
   const visible=()=>active()&&form.isConnected&&(coach?state.clientTab===tab:state.clientView===view);
   let status=form.querySelector('[data-progress-save-status]');if(!status){status=document.createElement('p');status.dataset.progressSaveStatus='';status.className='muted wide';status.setAttribute('role','status');status.setAttribute('aria-live','polite');form.append(status);}status.textContent='Saving progress…';
@@ -27,7 +28,28 @@
    const rows=state.preview?[{...previous,...patch,id:previous?.id||'preview-progress-'+Date.now(),client_id:client.id,entry_date:date}]:await query('Save progress',db.rpc('save_progress_entry',{p_client:client.id,p_date:date,p_values:patch}));
    if(rows.length!==1||rows[0].client_id!==client.id||rows[0].entry_date!==date)throw Error('Save was not confirmed. Your entries are still here; retry.');
    if(!active())return;const saved=rows[0],index=state.data.progress.findIndex(p=>p.entry_date===date);if(index<0)state.data.progress.push(saved);else state.data.progress[index]=saved;
-   toast(state.preview?'Sample progress updated locally':'Progress saved');if(visible()){(coach?coachProgress:clientProgress)();const refreshed=$(coach?'#coachProgressForm':'#progressForm');if(refreshed){const confirmed=document.createElement('p');confirmed.dataset.progressSaveStatus='';confirmed.className='muted wide';confirmed.setAttribute('role','status');confirmed.textContent=state.preview?'Sample progress updated locally.':'Progress saved.';refreshed.append(confirmed);}}
+   const confirmed=state.preview?'Sample progress updated locally.':'Progress saved.';
+   toast(state.preview?'Sample progress updated locally':'Progress saved');
+   if(visible()){
+    if(fromToday){
+     for(const field of form.querySelectorAll('input')){
+      if(field.value===fd.get(field.name))field.value='';
+     }
+     status.textContent=confirmed;
+     window.WeighInRoutine?.mount();
+    }else{
+     (coach?coachProgress:clientProgress)();
+     const refreshed=$(coach?'#coachProgressForm':'#progressForm');
+     if(refreshed){
+      const feedback=document.createElement('p');
+      feedback.dataset.progressSaveStatus='';
+      feedback.className='muted wide';
+      feedback.setAttribute('role','status');
+      feedback.textContent=confirmed;
+      refreshed.append(feedback);
+     }
+    }
+   }
   }catch(error){if(active()){if(visible())status.textContent='Not saved. Your entries are still here—please retry.';toast(error.message,'error');}}
   finally{delete form.dataset.saving;setBusy(event.submitter,false);}
  }

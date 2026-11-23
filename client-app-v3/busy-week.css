@@ -9,3 +9,7 @@
 .bw-simple-choices{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,14rem),1fr));gap:.65rem}
 .bw-simple-choices>div{padding:.7rem;background:#f5f8fc;border:1px solid #d9e2ec;border-radius:.65rem}
 .bw-simple button+button{margin-inline-start:.5rem}
+
+.bw-simple-choices strong{display:block;color:#20364e}
+.bw-simple-choices>div{padding:.85rem}
+.bw-simple [data-bw-meals]{min-height:44px}

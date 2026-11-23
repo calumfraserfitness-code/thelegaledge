@@ -1,1 +1,10 @@
 .simple-lift-log .set-log-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-items:start;padding:14px 0;border-bottom:1px solid var(--line,#d9e1e8)}.simple-lift-log .set-log-row>b,.simple-lift-log .last-set,.simple-lift-log .lift-target,.simple-lift-log .lift-effort{grid-column:1/-1}.simple-lift-log .last-set{font-size:14px;color:var(--text,#10283e);margin:0}.simple-lift-log .lift-target{font-size:12px;color:var(--muted,#526579)}.simple-lift-log label{min-width:0}.simple-lift-log input{width:100%;min-height:48px;font-size:18px;box-sizing:border-box}.simple-lift-log .lift-effort{margin:0}.simple-lift-log .lift-effort summary{font-size:12px;padding:4px 0}.bw-optional>summary{cursor:pointer;font-weight:600;padding:8px 0}.bw-optional .bw-system{border:0!important;padding:0!important;box-shadow:none}.bw-optional>p{color:var(--muted,#526579);font-size:14px}
+
+.lift-prescription{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.lift-prescription>div:nth-child(4){grid-column:1/-1}
+.simple-lift-log .set-log-row{padding:12px;border:1px solid #dce4ec;border-radius:.7rem;background:#f7f9fc;margin-bottom:.6rem}
+.simple-lift-log .set-save-status{font-size:.88rem;margin:.45rem 0}
+.simple-lift-log>button,.cardio-entry-form>button{min-height:44px}
+.cardio-essentials{display:grid;gap:.65rem;grid-template-columns:minmax(0,1.45fr) minmax(0,1fr);align-items:end}
+.cardio-essentials input{min-height:44px;font-size:1rem}
+@media(max-width:440px){.cardio-essentials{grid-template-columns:1fr}.simple-lift-log>button,.cardio-entry-form>button{width:100%}}

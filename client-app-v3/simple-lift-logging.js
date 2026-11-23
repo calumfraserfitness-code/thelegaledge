@@ -8,6 +8,17 @@
   const template=document.createElement('template');template.innerHTML=html;
   const form=template.content.querySelector('form[data-exercise-log]');if(!form)return html;
   form.classList.add('simple-lift-log');
+  const title=template.content.querySelector('.exercise-title');
+  const demonstration=title?.querySelector('a');
+  if(demonstration)demonstration.textContent='Watch demo';
+  title?.querySelector('.pill')?.remove();
+  const prescription=template.content.querySelector('.prescription-grid');
+  if(prescription){
+   prescription.classList.add('lift-prescription');
+   const intensity=prescription.lastElementChild;
+   if(intensity?.querySelector('strong')?.textContent==='—')intensity.remove();
+  }
+  if(form.querySelector('.last-set'))template.content.querySelector('.exercise-card > .previous')?.remove();
   for(let parent=form.parentElement;parent;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
   const unit=state.client?.weight_unit==='lbs'?'lb':'kg';
   const choice=typeof currentExerciseChoice==='function'?currentExerciseChoice(ex):ex.name;
@@ -25,7 +36,11 @@
    row.querySelector('b')?.after(note);
    const target=document.createElement('small');target.className='lift-target';target.textContent='Target: '+(targets.length===Number(ex.sets)?targets[set-1]||ex.reps:ex.reps||'As prescribed')+' reps';note.after(target);
    const weightLabel=load.closest('label'),repLabel=reps.closest('label');row.append(weightLabel,repLabel);
-   load.setAttribute('inputmode','decimal');reps.setAttribute('inputmode','numeric');load.placeholder='Weight';reps.placeholder='Reps';
+   load.setAttribute('inputmode','decimal');reps.setAttribute('inputmode','numeric');
+   load.placeholder='—';reps.placeholder='—';
+   if(weightLabel.firstChild?.nodeType===3)weightLabel.firstChild.textContent='Weight ('+unit+')';
+   load.setAttribute('aria-label','Set '+set+' weight ('+unit+')');
+   reps.setAttribute('aria-label','Set '+set+' reps');
    const rir=row.querySelector('input[name^="rir_"]')?.closest('label');if(rir){const detail=document.createElement('details');detail.className='lift-effort';const summary=document.createElement('summary');summary.textContent='Effort (optional)';detail.append(summary,rir);row.append(detail);}
   });
   form.querySelector('button[type="submit"],button.btn.primary')?.replaceChildren(document.createTextNode('Save sets'));

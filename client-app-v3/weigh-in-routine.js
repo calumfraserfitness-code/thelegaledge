@@ -7,16 +7,17 @@
  function read(){try{return state.client&&M?.plan(state.client,state.data,{now:new Date(),preview:state.preview});}catch{return null;}}
  function date(value){try{return fmt(value);}catch{return value;}}
  function remove(host){host?.querySelectorAll('[data-weighin-routine]').forEach(node=>node.remove());}
- function markup(plan,coach){
+ function markup(plan,mode){
+  const coach=mode==='coach',today=mode==='today';
   const count=Number(plan.count)||0,target=Number(plan.target)||3;
-  return '<div class="wir-heading"><div><span class="eyebrow">'+(coach?'CLIENT WEIGH-INS':'YOUR WEIGH-IN ROUTINE')+'</span><h2>At least '+target+' weigh-ins each week</h2></div><strong class="wir-count">'+esc(count)+'<small> recorded this week</small></strong></div><p>'+(target===2?'Aim for 2–3 mornings. Tuesday, Friday and Sunday are ideal. Log each reading in Progress whenever you weigh.':'Use separate days spread through the week, including one Saturday or Sunday. For example: '+esc(plan.example||'Tuesday, Thursday and Saturday')+'. Choose days that suit you.')+'</p><div class="wir-status" aria-label="This week’s weigh-in progress"><span>'+esc(count)+' / '+esc(target)+' minimum</span><span>Weekend: '+(plan.weekendDone?'recorded':'to do')+'</span><span>Days spread through week: '+(plan.spreadDone?'recorded':'in progress')+'</span></div><div class="wir-footer"><small>'+esc(date(plan.weekStart))+' – '+esc(date(plan.weekEnd))+' · '+(plan.complete?'Weekly routine recorded.':'Only saved readings count. Multiple entries on one day count once.')+'</small><button type="button" class="btn ghost small" data-weighin-log>'+ (coach?'Open weight log':'Log a weigh-in')+'</button></div>';
+  return '<div class="wir-heading"><div><span class="eyebrow">'+(coach?'CLIENT WEIGH-INS':'YOUR WEIGH-IN ROUTINE')+'</span><h2>At least '+target+' weigh-ins each week</h2></div><strong class="wir-count">'+esc(count)+'<small> recorded this week</small></strong></div><p>'+(target===2?'Aim for 2–3 mornings. Tuesday, Friday and Sunday are ideal. Log each reading whenever you weigh.':'Use separate days spread through the week, including one Saturday or Sunday. For example: '+esc(plan.example||'Tuesday, Thursday and Saturday')+'. Choose days that suit you.')+'</p><div class="wir-status" aria-label="This week’s weigh-in progress"><span>'+esc(count)+' / '+esc(target)+' minimum</span><span>Weekend: '+(plan.weekendDone?'recorded':'to do')+'</span><span>Days spread through week: '+(plan.spreadDone?'recorded':'in progress')+'</span></div><div class="wir-footer"><small>'+esc(date(plan.weekStart))+' – '+esc(date(plan.weekEnd))+' · '+(plan.complete?'Weekly routine recorded.':'Only saved readings count. Multiple entries on one day count once.')+'</small>'+(today?'':'<button type="button" class="btn ghost small" data-weighin-log>'+(coach?'Open weight log':'Log a weigh-in')+'</button>')+'</div>';
  }
  function focusWeight(host){const input=host?.querySelector('form input[name="weight_display"]');if(input){input.focus();input.scrollIntoView?.({block:'center',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});}}
  function mountCard(host,plan,mode,place){
   if(!host)return;if(!plan){remove(host);return;}
   const key=owner();let card=host.querySelector('[data-weighin-routine]');
   if(!card){card=document.createElement('section');card.dataset.weighinRoutine=mode;card.className='panel weighin-routine';card.setAttribute('aria-label',mode==='coach'?'Client weigh-in routine':'Your weekly weigh-in routine');place(card);}
-  const signature=JSON.stringify([key,mode,plan]);if(card.dataset.signature===signature)return;card.dataset.signature=signature;card.innerHTML=markup(plan,mode==='coach');
+  const signature=JSON.stringify([key,mode,plan]);if(card.dataset.signature===signature)return;card.dataset.signature=signature;card.innerHTML=markup(plan,mode);
   card.querySelector('[data-weighin-log]').onclick=async()=>{
    if(!card.isConnected||owner()!==key)return;
    if(mode==='coach'){
@@ -29,9 +30,45 @@
    }
   };
  }
+ function todayMount(slot,plan){
+  if(!slot)return;
+  slot.hidden=!plan;
+  if(!plan){remove(slot);return;}
+  const key=owner();
+  let card=slot.querySelector('[data-weighin-routine="today"]');
+  if(card&&card.dataset.owner!==key){card.remove();card=null;}
+  if(!card){
+   card=document.createElement('section');
+   card.className='panel weighin-routine';
+   card.dataset.weighinRoutine='today';
+   card.dataset.owner=key;
+   card.setAttribute('aria-label','Your weekly weigh-in routine');
+   card.innerHTML='<div data-weighin-summary></div>'+
+    '<button type="button" class="btn ghost small" data-weighin-log aria-controls="todayProgressForm" aria-expanded="false">Log a weigh-in</button>'+
+    '<form id="todayProgressForm" class="checkin-form" hidden><div class="panel-head wide"><h3>Log progress</h3></div>'+
+    clientProgressFields()+'<button type="submit" class="btn primary wide">Save progress</button></form>';
+   const button=card.querySelector('[data-weighin-log]'),form=card.querySelector('form');
+   const active=()=>card.isConnected&&owner()===key&&state.clientView==='today'&&clientSurface();
+   button.onclick=()=>{
+    if(!active()||form.dataset.saving==='true')return;
+    form.hidden=!form.hidden;
+    button.setAttribute('aria-expanded',String(!form.hidden));
+    button.textContent=form.hidden?'Log a weigh-in':'Hide weigh-in form';
+    if(!form.hidden)focusWeight(card);
+   };
+   form.onsubmit=event=>{if(active())return submitProgress(event);event.preventDefault();};
+   slot.append(card);
+  }
+  const signature=JSON.stringify(plan);
+  if(card.dataset.signature===signature)return;
+  card.dataset.signature=signature;
+  card.querySelector('[data-weighin-summary]').innerHTML=markup(plan,'today');
+ }
  function clientMount(plan){
   const host=document.querySelector('#clientMain');if(!host||!clientSurface())return;
-  if(state.clientView==='progress'){
+  if(state.clientView==='today'){
+   todayMount(host.querySelector('#personalCoachingHome [data-pch-weigh-in]'),plan);
+  }else if(state.clientView==='progress'){
    const form=host.querySelector('#progressForm');if(!form){remove(host);return;}
    mountCard(host,plan,'client',card=>form.before(card));
   }else if(state.clientView==='checkin'){

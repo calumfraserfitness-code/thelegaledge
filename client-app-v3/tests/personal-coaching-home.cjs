@@ -25,9 +25,17 @@ S.data.sessions=[
  S.data.coachingCalls=[{client_id:'peer',status:'scheduled',scheduled_at:new Date(+now+3600000).toISOString(),join_url:'https://meet.google.com/peer'},
   {client_id:'client',status:'cancelled',scheduled_at:new Date(+now+3600000).toISOString(),join_url:'https://meet.google.com/cancelled'},
   {client_id:'client',status:'scheduled',scheduled_at:new Date(+now+7200000).toISOString(),join_url:'https://meet.google.com/abc-defg-hij'}];
- S.data.checkins=[{client_id:'client',period_start:period}];
+ const approved={client_id:'client',approved_at:now.toISOString(),starts_on:date,expires_on:date,
+  description:'1. Keep two sessions\n2. Pack lunch'};
+ S.data.checkins=[{client_id:'client',period_start:period,reviewed_at:new Date(+now-3600000).toISOString(),focus_next_week:'Book a slot'}];
+ assert.equal(home.nextAgreedAction(client,S.data,[approved],date),'Keep two sessions');
+ assert.equal(home.nextAgreedAction(client,S.data,[{...approved,completed_at:date},{...approved,client_id:'peer'}],date),'Book a slot');
+ w.CoachingFollowThrough={approvedActions:async()=>[approved]};
+
  w.clientToday();
  const root=$('#personalCoachingHome');
+ await tick();
+ assert.equal($('[data-pch-video]').nextElementSibling.querySelector('.pch-agreed p').textContent,'Keep two sessions');
  assert.equal(root.querySelector('h1').textContent,'Hi, Katherine');
  assert.equal(root.querySelectorAll('.pch-plan > section').length,1);
  assert.equal(root.querySelector('.pch-next h2').textContent,'Assigned cardio');

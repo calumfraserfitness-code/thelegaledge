@@ -12,11 +12,11 @@ exerciseCard=function(ex,loggable=false){
  if(!loggable)return html;
  const history=(state.data.exerciseLogs||[]).filter(r=>r.training_session_id!==state.selectedSessionId&&(r.program_exercise_id===ex.id||(ex.exercise_bank_id&&r.exercise_bank_id===ex.exercise_bank_id))).sort((a,b)=>String(b.performed_at).localeCompare(String(a.performed_at)));
  html=html.replace(/<b>Set (\d+)<\/b>/g,(match,n)=>{const previous=history.find(r=>r.set_number===Number(n));const detail=previous?(previous.duration_seconds!=null?previous.duration_seconds+' seconds':[(previous.reps!=null?previous.reps+' reps':''),(previous.load!=null?previous.load+' '+(previous.load_unit||'kg'):'')].filter(Boolean).join(' · ')):'No previous set';return match+'<small class="last-set">Last: '+esc(detail)+(previous?' · '+esc(fmt(previous.performed_at)):'')+'</small>';});
- return html.replace('<button class="btn primary small">Save','<p class="set-save-status" role="status" aria-live="polite">Your entries save when you leave a field.</p><button class="btn primary small">Save');
+ return html.replace('<button class="btn primary small">Save','<p class="set-save-status" role="status" aria-live="polite">Sets autosave after you enter reps or time.</p><button class="btn primary small">Save');
 };
 const polishTraining=clientTraining;
 clientTraining=function(){
- polishTraining();const client=state.client,session=state.data.sessions.find(r=>r.id===state.selectedSessionId);
+ polishTraining();const client=state.client,user=state.user?.id,session=state.data.sessions.find(r=>r.id===state.selectedSessionId);
  if(!client||!session)return;
  document.querySelectorAll('#clientMain form[data-exercise-log]').forEach(form=>{
  const exercise=exercisesForSession(session).find(r=>r.id===form.dataset.exerciseLog);if(!exercise)return;
@@ -24,17 +24,18 @@ clientTraining=function(){
  form.addEventListener('change',event=>{
  if(!event.target.matches('input'))return;const set=Number(event.target.name.split('_').pop());let rows;
  const status=form.querySelector('.set-save-status');
+ const active=()=>state.client?.id===client.id&&state.user?.id===user;
  try{rows=workoutSetRows(exercise,session,new FormData(form),client).filter(r=>r.set_number===set&&(r.reps!==null||r.duration_seconds!==null));}catch(error){if(status)status.textContent=error.message;return;}
  if(!rows.length){if(status)status.textContent='Enter actual reps or seconds to save this set.';return;}
  if(status)status.textContent='Saving…';pending++;if(manual)manual.disabled=true;
  chain=chain.catch(()=>{}).then(async()=>{
  try{
  const saved=state.preview?rows.map(r=>({...r,id:'sample-'+session.id+'-'+exercise.id+'-'+r.set_number})):await query('Autosave workout set',db.from('exercise_set_logs').upsert(rows,{onConflict:'client_id,training_session_id,program_exercise_id,set_number'}).select());
- if(saved.length!==rows.length)throw Error('Save was not confirmed.');
- if(state.client?.id!==client.id)return;
+ if(saved.length!==rows.length||saved.some(r=>r.client_id!==client.id||r.training_session_id!==session.id||r.program_exercise_id!==exercise.id||r.set_number!==set))throw Error('Save was not confirmed.');
+ if(!active())return;
  const keys=new Set(saved.map(r=>r.training_session_id+'|'+r.program_exercise_id+'|'+r.set_number));state.data.exerciseLogs=[...saved,...(state.data.exerciseLogs||[]).filter(r=>!keys.has(r.training_session_id+'|'+r.program_exercise_id+'|'+r.set_number))];
- if(status&&form.isConnected)status.textContent='Saved ✓';
- }catch(error){toast('Workout set not saved. Return to Training and retry. '+error.message,'error');if(status&&form.isConnected)status.textContent='Not saved. Use Save workout sets to retry. '+error.message;}finally{pending--;if(manual&&pending===0)manual.disabled=false;}
+ if(status&&form.isConnected)status.textContent='Set '+set+' saved.';
+ }catch(error){if(active()&&status&&form.isConnected)status.textContent='Set '+set+' didn’t save. Use Save sets to retry.';}finally{pending--;if(manual&&pending===0)manual.disabled=false;}
  });
  });
  });
