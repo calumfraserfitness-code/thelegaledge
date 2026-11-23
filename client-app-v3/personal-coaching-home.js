@@ -56,7 +56,7 @@
   const text=nextAgreedAction(client,state.data,rows,root.dataset.localDate);
   if(slot.dataset.value===text)return;
   slot.dataset.value=text;slot.hidden=!text;
-  slot.innerHTML=text?'<section class="pch-agreed"><h2>Your agreed next step</h2><p>'+esc(text)+'</p></section>':'';
+  slot.innerHTML=text?'<section class="pch-agreed"><h3>Your agreed next step</h3><p>'+esc(text)+'</p></section>':'';
  }
  async function refreshAgreedAction(root,client){
   const account=state.user?.id,followThrough=window.CoachingFollowThrough;
@@ -67,28 +67,38 @@
   }catch{ /* Keep any previously shown published action available. */ }
  }
  function coachingMarkup(home,client){
-  const {goal,targets,upcoming}=home;
-  if(!goal&&!targets.length&&!upcoming)return '';
+  const {goal,targets,upcoming}=home,zone=client.timezone||'Europe/Dublin';
+  const locale=String(client.market_region||'').toLowerCase()==='us'?'en-US':'en-GB';
   const targetRows=targets.map(g=>{
    const pounds=g.metric==='weight_kg'&&client.weight_unit==='lbs';
-   const value=g.target==null||g.target===''?null:Number(g.target)*(pounds?2.2046226218:1);
-   const unit=pounds?'lb':String(g.unit||'');
-   const target=value!==null&&Number.isFinite(value)?'<strong>'+esc(value.toLocaleString(undefined,{maximumFractionDigits:1})+(unit?' '+unit:''))+'</strong>':'';
-   return '<li><span>'+esc(g.title)+'</span>'+target+'</li>';
+   const factor=pounds?2.2046226218:1,unit=pounds?'lb':String(g.unit||'').trim();
+   const value=g.target==null||g.target===''?null:Number(g.target)*factor;
+   const format=n=>n.toLocaleString(locale,{maximumFractionDigits:1});
+   const target=value!==null&&Number.isFinite(value)?'<strong class="pch-target-number">'+esc(format(value))+
+    (unit?' <small>'+esc(unit)+'</small>':'')+'</strong>':'';
+   const current=typeof coachingGoalValue==='function'?coachingGoalValue(g):null;
+   const recorded=target&&typeof current==='number'&&Number.isFinite(current)?'<small class="pch-recorded">Recorded '+esc(format(current*factor)+(unit?' '+unit:''))+'</small>':'';
+   const by=/^\d{4}-\d{2}-\d{2}$/.test(g.target_date||'')?'<small class="pch-target-date">By '+esc(fmt(g.target_date,{day:'numeric',month:'short',year:'numeric'}))+'</small>':'';
+   return '<li><span>'+esc(g.title)+'</span>'+target+recorded+by+'</li>';
   });
-  const goals=goal||targetRows.length?'<div class="pch-goals-summary"><h3>Agreed goals</h3>'+
-   (goal.length>220?'<details><summary>Read your agreed goal</summary><p>'+esc(goal)+'</p></details>':goal?'<p>'+esc(goal)+'</p>':'')+
-   (targetRows.length?'<ul>'+targetRows.slice(0,2).join('')+'</ul>':'')+
-   (targetRows.length>2?'<details><summary>More agreed targets</summary><ul>'+targetRows.slice(2).join('')+'</ul></details>':'')+'</div>':'';
-  let call='';
+  const goalContent=(goal?'<p class="pch-goal-text">'+esc(goal)+'</p>':'')+
+   (targetRows.length?'<ul class="pch-targets" aria-label="Agreed targets">'+targetRows.join('')+'</ul>':'');
+  let call='<p class="pch-call-empty">No call scheduled</p>';
   if(upcoming){
-   const date=new Intl.DateTimeFormat('en-GB',{weekday:'short',day:'numeric',month:'short',hour:'numeric',minute:'2-digit',
-    timeZone:client.timezone||'Europe/Dublin',timeZoneName:'short'}).format(new Date(upcoming.scheduled_at));
+   const stamp=new Date(upcoming.scheduled_at);
+   const date=new Intl.DateTimeFormat(locale,{weekday:'long',day:'numeric',month:'short',timeZone:zone}).format(stamp);
+   const clock=new Intl.DateTimeFormat(locale,{hour:'numeric',minute:'2-digit',timeZone:zone,timeZoneName:'short'}).format(stamp);
    const join=typeof coachingJoinUrl==='function'?coachingJoinUrl(upcoming.join_url):'';
-   call='<div class="pch-call-summary"><h3>Next coaching call</h3><time datetime="'+esc(upcoming.scheduled_at)+'">'+esc(date)+'</time>'+
-    (join?'<a class="btn ghost small" target="_blank" rel="noopener noreferrer" href="'+esc(join)+'">Join call</a>':'')+'</div>';
+   const duration=Number(upcoming.duration_minutes);
+   call='<time datetime="'+esc(upcoming.scheduled_at)+'"><strong>'+esc(date)+'</strong><span>'+esc(clock)+
+    (Number.isFinite(duration)&&duration>0?' · '+esc(duration)+' min':'')+'</span></time>'+
+    (join?'<a class="btn primary small" target="_blank" rel="noopener noreferrer" href="'+esc(join)+'">Join call</a>':
+     '<p class="pch-call-empty">Join link pending</p>');
   }
-  return '<section class="panel pch-coaching"><h2>Your coaching</h2><div class="pch-coaching-grid">'+goals+call+'</div></section>';
+  return '<section class="panel pch-coaching" aria-label="Your goals and coaching calls"><div class="pch-coaching-grid">'+
+   '<div class="pch-goals-summary">'+(goalContent?'<h2>Agreed goals</h2>'+goalContent:'')+'<div data-pch-agreed hidden></div></div>'+
+   '<div class="pch-call-summary"><h2>Next coaching call</h2>'+call+
+   '<button type="button" class="text-btn" data-pch-calls>Call details & notes</button></div></div></section>';
  }
  function eligible(){return !!state.client&&['client','coach'].includes(state.role)&&state.clientView==='today'&&
   state.client.onboarding_status==='complete'&&(state.preview||state.client.plan_status==='published');}
@@ -112,14 +122,14 @@
    .filter(({meal})=>String(meal?.name||'').trim()).slice(0,3);
   const dateLabel=fmt(home.date,{weekday:'long',day:'numeric',month:'long'});
   root.innerHTML='<header class="pch-heading"><p>'+esc(dateLabel)+'</p><h1>'+esc(name?'Hi, '+name:'Today')+'</h1></header>'+
-   '<div data-pch-video hidden></div><div data-pch-agreed hidden></div><div class="pch-plan">'+
+   '<div data-pch-video hidden></div>'+coachingMarkup(home,client)+'<div class="pch-plan">'+
    '<section class="panel pch-next"><p class="eyebrow">'+(home.start?'YOUR FIRST WEEK':action.route==='training'?'NEXT SESSION':action.route==='checkin'?'WEEKLY CHECK-IN':'THIS WEEK')+'</p><h2>'+esc(action.title)+'</h2>'+
    (home.count?'<p class="pch-completion"><strong>'+home.completed+' of '+home.count+'</strong> planned sessions complete</p><progress value="'+home.completed+'" max="'+home.count+'" aria-label="Planned sessions complete"></progress>':'')+
    '<button type="button" class="btn primary" data-pch-next>'+esc(action.label)+'</button>'+
    '<button type="button" class="btn ghost pch-week-link" data-pch-planner>Weekly planner</button>'+
    (home.dueLabel?'<p class="pch-due">Check-in due '+esc(home.dueLabel)+'</p>':'')+'</section>'+
    (meals.length?'<section class="panel pch-meals"><h2>'+(home.start?'First day’s meals':'Today’s meals')+'</h2><ul>'+meals.map(({meal,key})=>'<li><button type="button" class="pch-meal-link" data-pch-meals="'+esc(key||'')+'">'+esc(meal.name)+' <span aria-hidden="true">›</span></button></li>').join('')+
-    '</ul><button type="button" class="btn ghost" data-pch-meals>View meals & portions</button></section>':'')+'</div>'+coachingMarkup(home,client)+'<div data-pch-weigh-in hidden></div>';
+    '</ul><button type="button" class="btn ghost" data-pch-meals>View meals & portions</button></section>':'')+'</div>'+'<div data-pch-weigh-in hidden></div>';
   host.replaceChildren(root);
   const active=()=>root.isConnected&&eligible()&&state.client===client&&state.user?.id===user&&state.role===role;
   root.querySelector('[data-pch-next]').onclick=()=>{
@@ -128,6 +138,15 @@
    if(action.route==='checkin')state.checkinWeek=null;
    if(action.route==='training'){state.selectedSessionId=action.session||null;state.trainingCategory=action.category||'weights';}
    renderClient();
+  };
+  root.querySelector('[data-pch-calls]').onclick=async()=>{
+   if(!active())return;
+   state.clientView='support';
+   await renderClient();
+   if(state.client===client&&state.user?.id===user&&state.clientView==='support'){
+    const calls=$('#coachingCalls');
+    if(calls){calls.tabIndex=-1;calls.focus();}
+   }
   };
   root.querySelector('[data-pch-planner]').onclick=()=>{
    if(!active())return;
