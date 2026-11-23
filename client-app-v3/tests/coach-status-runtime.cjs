@@ -55,6 +55,22 @@ async function until(check,label){for(let n=0;n<200;n++){if(check())return;await
  await until(()=>$('[data-rc-event]'),'fresh review after save');$('[data-rc-event]').click();$('[data-rc-finish]').click();await until(()=>$('.rc-calls')?.textContent.includes('Reviewed'),'finished call receipt');
  const oldDetails=$('#coachRoadmap .cr-details');$('#coachRoadmap [data-cr-refresh]').click();await until(()=>$('#coachRoadmap .cr-details')&&$('#coachRoadmap .cr-details')!==oldDetails&&$('#coachRoadmap .rc-review'),'refreshed expanded details');assert($('#coachRoadmap .cr-details').open,'refresh preserves the open detail view');assert.equal(w.document.querySelectorAll('#coachRoadmap .rc-review').length,1);assert.equal(store.tables.coach_client_roadmaps[0].revision,3,'refresh does not write the plan');
  w.eval('state.clientTab="overview";renderClientWorkspace()');await until(()=>$('#coachRoadmap .cr-current h3')?.textContent==='Changed synthetic priority','private save/reload');assert($('#coachRoadmap').textContent.includes('Synthetic specific target'));const settled=w.document.querySelectorAll('*').length;await new Promise(r=>setTimeout(r,70));assert.equal(w.document.querySelectorAll('*').length,settled,'roadmap/mobile observers settle');assert.deepEqual(errors,[]);
+ const reviewId='40000000-0000-4000-8000-000000000001';
+ store.tables.checkins.push({id:reviewId,client_id:ids.client,submitted_at:new Date().toISOString(),source_system:'client_weekly_v3',
+  energy:8,sleep:6,stress:4,next_week_availability:'Book Tuesday training',original_answers:{'Strength sessions completed':0,'Days following the food plan':5,'Food this week':'Pack lunch'}});
+ store.tables.client_files.push({id:'audit-voice',client_id:ids.client,file_type:'checkin_audio',notes:'Weekly check-in '+reviewId});
+ let scrollTarget;w.HTMLElement.prototype.scrollIntoView=function(){if(this.dataset.checkinCard||this.dataset.coachReview)scrollTarget=this;};
+ w.eval('state.client=null;state.coachView="reviews";renderCoach()');
+ await until(()=>w.document.querySelector('[data-review-checkin="'+reviewId+'"]'),'check-in queue row');
+ const row=$('[data-review-checkin="'+reviewId+'"]');
+ assert.match(row.closest('article').textContent,/0 strength sessions.*5 \/ 7 food-plan days/s);
+ row.click();
+ await until(()=>scrollTarget?.dataset.checkinCard===reviewId,'full answer card opened at the top');
+ assert(scrollTarget.open);
+ assert.match(scrollTarget.textContent,/Pack lunch/);
+ assert.match(scrollTarget.textContent,/Book Tuesday training/);
+ const voice=scrollTarget.querySelector('[data-play-checkin-audio="audit-voice"]'),reply=scrollTarget.querySelector('[data-coach-review]');
+ assert(voice&&reply&&voice.compareDocumentPosition(reply)&w.Node.DOCUMENT_POSITION_FOLLOWING,'Voice note precedes the coach reply');
  w.eval('state.role="client";state.clientView="today";show("#clientApp");renderClient()');await tick();assert(!$('#clientApp #coachRoadmap'));assert(!$('#clientApp').textContent.includes('Changed synthetic priority'));
  console.log('PASS actual runtime/SDK synthetic login, on-demand status, private roadmap save/reload, mobile navigation label, client invisibility and settled combined observers.');
  await w.eval('db.auth.dispose()');w.close();

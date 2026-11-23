@@ -31,11 +31,11 @@ async function until(check,label){for(let n=0;n<200;n++){if(check())return;await
  await until(()=>$('#personalCoachingHome'),'simplified Today');
  assert.equal(w.document.querySelectorAll('#personalCoachingHome > section').length,1);
  assert(!$('#homeQuickLog')&&!$('#clientWeeklyRecap')&&!$('#cvLatest')&&!$('.priority-grid'));
- $('[data-pch-route="support"]').click();await until(()=>$('#clientWeeklyRecap')?.textContent.includes('Fixture approved weekly win'),'approved recap in Coach');
+ ($('[data-pch-route="support"]')||$('[data-client-view="support"]')).click();await until(()=>$('#clientWeeklyRecap')?.textContent.includes('Fixture approved weekly win'),'approved recap in Coach');
  assert(!$('#clientWeeklyRecap').textContent.includes('PRIVATE UNPUBLISHED RECAP'));
  $('[data-client-view="today"]').click();await until(()=>$('#personalCoachingHome'),'return to Today');
  assert(!$('#clientWeeklyRecap'),'Recap stays in Coach');
- $('[data-pch-route="progress"]').click();await until(()=>$('#progressForm'),'actual native progress form');
+ ($('[data-pch-route="progress"]')||$('[data-client-view="progress"]')).click();await until(()=>$('#progressForm'),'actual native progress form');
  assert($('[data-weighin-routine]'),'Weigh-in details are available in Progress');
  assert($('#recoveryTrends .rt-card svg'),'A genuine saved fixture reading is plotted');
  assert(!$('#clientApp').textContent.includes('Synthetic coach review decision'));
