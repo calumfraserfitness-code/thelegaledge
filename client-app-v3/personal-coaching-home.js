@@ -33,7 +33,35 @@
   const dueLabel=due&&!start&&!saved&&action.route!=='checkin'?new Intl.DateTimeFormat('en-GB',{
    weekday:'short',day:'numeric',month:'short',hour:'numeric',minute:'2-digit',timeZone:client.timezone||'Europe/Dublin'
   }).format(due):'';
-  return {date,action,start,mealDate,menu,count:counted.length,completed:counted.filter(complete).length,dueLabel};
+  const goal=String(client.goal_summary||'').trim();
+  const targets=owned(data.coachingGoals,client).filter(g=>g.status==='active');
+  const upcoming=owned(data.coachingCalls,client).filter(c=>c.status==='scheduled'&&Date.parse(c.scheduled_at)>=+now)
+   .sort((a,b)=>Date.parse(a.scheduled_at)-Date.parse(b.scheduled_at))[0];
+  return {date,action,start,mealDate,menu,count:counted.length,completed:counted.filter(complete).length,dueLabel,goal,targets,upcoming};
+ }
+ function coachingMarkup(home,client){
+  const {goal,targets,upcoming}=home;
+  if(!goal&&!targets.length&&!upcoming)return '';
+  const targetRows=targets.map(g=>{
+   const pounds=g.metric==='weight_kg'&&client.weight_unit==='lbs';
+   const value=g.target==null||g.target===''?null:Number(g.target)*(pounds?2.2046226218:1);
+   const unit=pounds?'lb':String(g.unit||'');
+   const target=value!==null&&Number.isFinite(value)?'<strong>'+esc(value.toLocaleString(undefined,{maximumFractionDigits:1})+(unit?' '+unit:''))+'</strong>':'';
+   return '<li><span>'+esc(g.title)+'</span>'+target+'</li>';
+  });
+  const goals=goal||targetRows.length?'<div class="pch-goals-summary"><h3>Agreed goals</h3>'+
+   (goal.length>220?'<details><summary>Read your agreed goal</summary><p>'+esc(goal)+'</p></details>':goal?'<p>'+esc(goal)+'</p>':'')+
+   (targetRows.length?'<ul>'+targetRows.slice(0,2).join('')+'</ul>':'')+
+   (targetRows.length>2?'<details><summary>More agreed targets</summary><ul>'+targetRows.slice(2).join('')+'</ul></details>':'')+'</div>':'';
+  let call='';
+  if(upcoming){
+   const date=new Intl.DateTimeFormat('en-GB',{weekday:'short',day:'numeric',month:'short',hour:'numeric',minute:'2-digit',
+    timeZone:client.timezone||'Europe/Dublin',timeZoneName:'short'}).format(new Date(upcoming.scheduled_at));
+   const join=typeof coachingJoinUrl==='function'?coachingJoinUrl(upcoming.join_url):'';
+   call='<div class="pch-call-summary"><h3>Next coaching call</h3><time datetime="'+esc(upcoming.scheduled_at)+'">'+esc(date)+'</time>'+
+    (join?'<a class="btn ghost small" target="_blank" rel="noopener noreferrer" href="'+esc(join)+'">Join call</a>':'')+'</div>';
+  }
+  return '<section class="panel pch-coaching"><h2>Your coaching</h2><div class="pch-coaching-grid">'+goals+call+'</div></section>';
  }
  function eligible(){return !!state.client&&['client','coach'].includes(state.role)&&state.clientView==='today'&&
   state.client.onboarding_status==='complete'&&(state.preview||state.client.plan_status==='published');}
@@ -62,7 +90,7 @@
    '<button type="button" class="btn primary" data-pch-next>'+esc(action.label)+'</button>'+
    (home.dueLabel?'<p class="pch-due">Check-in due '+esc(home.dueLabel)+'</p>':'')+'</section>'+
    (meals.length?'<section class="panel pch-meals"><h2>'+(home.start?'First day’s meals':'Today’s meals')+'</h2><ul>'+meals.map(meal=>'<li>'+esc(meal)+'</li>').join('')+
-    '</ul><button type="button" class="btn ghost" data-pch-meals>View meals & portions</button></section>':'')+'</div>';
+    '</ul><button type="button" class="btn ghost" data-pch-meals>View meals & portions</button></section>':'')+'</div>'+coachingMarkup(home,client);
   host.replaceChildren(root);
   const active=()=>root.isConnected&&eligible()&&state.client===client&&state.user?.id===user&&state.role===role;
   root.querySelector('[data-pch-next]').onclick=()=>{
@@ -105,11 +133,16 @@
    const weeks=await query('This week',db.from('program_weeks').select('*').eq('client_id',client.id).eq('published',true).gte('week_start',earliest).lte('week_start',anchor).order('week_start',{ascending:false}));
    const ids=weeks.map(w=>w.id);
    const sessions=ids.length?await query('This week’s sessions',db.from('training_sessions').select('*').in('week_id',ids)):[];
+   const calls=await query('Upcoming coaching calls',db.from('client_coaching_calls').select('*').eq('client_id',client.id)
+    .eq('status','scheduled').gte('scheduled_at',new Date().toISOString()).order('scheduled_at',{ascending:true}).limit(30)).catch(()=>null);
    if(!active()||data!==state.data||loadSequence!==clientDataLoadSequence)return;
    const current=data.weeks.filter(w=>w.published&&w.week_start>=earliest&&w.week_start<=anchor);
    const currentIds=new Set(current.map(w=>w.id));
    const snapshot=rows=>JSON.stringify([...rows].sort((a,b)=>a.id.localeCompare(b.id)));
-   const changed=snapshot(weeks)!==snapshot(current)||snapshot(sessions)!==snapshot(data.sessions.filter(s=>currentIds.has(s.week_id)));
+   const plannedCalls=(data.coachingCalls||[]).filter(c=>c.status==='scheduled'&&Date.parse(c.scheduled_at)>=Date.now())
+    .sort((a,b)=>Date.parse(a.scheduled_at)-Date.parse(b.scheduled_at)).slice(0,30);
+   const changed=snapshot(weeks)!==snapshot(current)||snapshot(sessions)!==snapshot(data.sessions.filter(s=>currentIds.has(s.week_id)))||
+    (calls&&snapshot(calls)!==snapshot(plannedCalls));
    if(changed){
     if(!(await loadClientData(client.id)))return;
     root.dataset.refreshWeek='true';

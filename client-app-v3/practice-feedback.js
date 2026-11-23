@@ -33,8 +33,21 @@
   const play=()=>{if(active())window.ClientCheckinVideo.open(v);};
   if(slot){
    const title=String(v.title||'').replace(/^Video check-in\s*·?\s*/i,'').trim()||'Weekly feedback';
-   box.innerHTML='<div><h2>Coach feedback</h2><p>'+esc(title)+' · '+esc(fmt(v.recorded))+'</p></div><button type="button" class="btn primary" data-pch-watch>Watch feedback</button>';
-   target.append(box);box.querySelector('[data-pch-watch]').onclick=play;return;
+   box.innerHTML='<button type="button" class="pch-video-preview" data-pch-watch aria-label="Watch latest coach video">'+
+    '<img alt="" hidden><span aria-hidden="true">▶</span></button>'+
+    '<div class="pch-video-copy"><h2>Latest coach video</h2><p>'+esc(title)+' · '+esc(fmt(v.recorded))+'</p>'+
+    '<button type="button" class="btn primary" data-pch-watch>Watch feedback</button></div>';
+   target.append(box);box.querySelectorAll('[data-pch-watch]').forEach(button=>button.onclick=play);
+   const image=box.querySelector('img');
+   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),8000);
+   fetch('https://www.loom.com/v1/oembed?url='+encodeURIComponent(v.url),{signal:controller.signal,credentials:'omit',referrerPolicy:'no-referrer'})
+    .then(r=>r.ok?r.json():null).then(data=>{
+     if(!active()||!data?.thumbnail_url)return;
+     const url=new URL(data.thumbnail_url);
+     if(url.protocol!=='https:'||!/(^|\.)loom\.com$/i.test(url.hostname))return;
+     image.onload=()=>{if(active())image.hidden=false;};image.src=url.href;
+    }).catch(()=>{}).finally(()=>clearTimeout(timer));
+   return;
   }
   box.innerHTML='<span class="eyebrow">YOUR LATEST COACH VIDEO</span><h2>Your latest feedback</h2><p>'+esc(v.title)+' · '+esc(fmt(v.recorded))+'</p><button type="button" class="feedback-thumbnail" hidden aria-label="Play your coach feedback"><img alt="Preview of your coach’s feedback"><span>▶ Watch feedback</span></button><div class="cv-player"><iframe src="'+esc(v.embed)+'" title="Your latest coach feedback" loading="eager" allow="fullscreen" allowfullscreen></iframe></div><a class="feedback-fallback" href="'+esc(v.url)+'" target="_blank" rel="noopener noreferrer">Open in Loom ↗</a><p data-feedback-status class="muted">Play the video above. If it does not load, open it in Loom.</p>';target.prepend(box);
   box.querySelector('.feedback-thumbnail').onclick=play;box.querySelector('.feedback-fallback').onclick=e=>{if(!active())e.preventDefault();};

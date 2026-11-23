@@ -20,6 +20,7 @@ const dom=new JSDOM(fs.readFileSync(path.join(root,'index.html'),'utf8'),{url:'h
    let response;const headers=Object.fromEntries(new Headers(options.headers||{}));let body;try{body=JSON.parse(options.body||'{}');}catch{body={};}
    await routeApi({request:()=>({url:()=>url.href,method:()=>options.method||'GET',headers:()=>headers,postDataJSON:()=>body}),fulfill:async result=>{response=new Response(result.body,{status:result.status,headers:result.headers});}},store);return response;
   }
+  if(url.hostname==='www.loom.com'&&url.pathname==='/v1/oembed')return new Response(JSON.stringify({thumbnail_url:'https://cdn.loom.com/test-preview.jpg'}),{headers:{'Content-Type':'application/json'}});
   if(url.hostname==='localhost'&&url.pathname==='/playbook/content.json')return new Response(fs.readFileSync(path.join(root,'playbook/content.json')),{headers:{'Content-Type':'application/json'}});
   return new Response(null,{status:204});
  };
@@ -33,6 +34,8 @@ async function until(check,label){for(let n=0;n<200;n++){if(check())return;await
  await until(()=>$('#personalCoachingHome'),'simplified Today');
  await until(()=>$('[data-pch-video] [data-pch-watch]'),'published Loom feedback on Today');
  assert.match($('[data-pch-video]').textContent,/Training feedback/);
+ const thumbnail=$('.pch-video-preview img');await until(()=>thumbnail.src.includes('test-preview.jpg'),'Loom thumbnail');
+ thumbnail.dispatchEvent(new w.Event('load'));assert(!thumbnail.hidden);
  assert(!$('#personalCoachingHome iframe'),'The player loads only when requested');
  $('[data-pch-watch]').click();
  assert.equal($('.cv-dialog iframe')?.getAttribute('src'),'https://www.loom.com/embed/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
