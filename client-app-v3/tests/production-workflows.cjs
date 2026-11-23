@@ -24,4 +24,15 @@ assert.equal(read("todayCoachingModel('2026-11-01').checkin"),null);
 read("state.client.id='own';state.data.checkins=[{id:'peer-checkin',client_id:'peer',period_start:'2026-09-28'},{id:'own-checkin',client_id:'own',period_start:'2026-09-28'}]");
 assert.equal(read("todayCoachingModel('2026-10-01').checkin.id"),'own-checkin','Today’s review source belongs to the current client');
 assert.equal(read("reviewFacts({energy:null,stress:0,workload:8,support_needed:'Call please'})"),'Stress 0/10 · Workload 8/10 · Support requested');
+read(`state.client.id='own';state.client.weight_unit='kg';state.data.checkins=[{id:'coaching-audit',client_id:'own',submitted_at:'2026-11-23',
+ source_system:'client_weekly_v3',energy:8,sleep:6,stress:4,average_steps:0,next_week_availability:'Book both lifts',
+ challenges:'Lift improved',wins:'Saved legacy win',support_needed:'Help with Friday',
+ original_answers:{'Strength sessions completed':0,'Days following the food plan':5,'Training progress and barriers':'Lift improved','Food this week':'Packed lunch','Weigh-in status':'I haven’t weighed this week'}
+ }]`);
+const coachCard=read('checkinCard(state.data.checkins[0],true)');
+for(const text of ['Didn’t weigh this week','0 strength sessions','5 / 7 food-plan days','4/5','3/5','2/5','Saved legacy win','Help with Friday','Book both lifts','Packed lunch']){
+ if(text.endsWith('sessions')||text.endsWith('days'))assert(read('reviewActivity(state.data.checkins[0])').includes(text));
+ else assert(coachCard.includes(text),text+' should appear in the full coach review');
+}
+assert.equal(coachCard.match(/Lift improved/g).length,1);
 console.log('PASS: client timezone dates, exact dated menus, own published activities, blank and zero step readings, normalized wearable data, unpublished-week suppression and factual review labels.');

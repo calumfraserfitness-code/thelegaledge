@@ -1189,12 +1189,26 @@ async function saveNutritionTargets(event) {
 }
 
 function answersFor(checkin) {
-  if (checkin.original_answers && Object.keys(checkin.original_answers).length) return flattenCheckinAnswers(checkin.original_answers);
-  return [
-    ['Biggest win', checkin.wins], ['Challenges', checkin.challenges],
-    ['Training feedback', checkin.training_summary], ['Nutrition feedback', checkin.food_summary],
-    ['Support needed', checkin.support_needed], ['Workload pressure (1–10)', checkin.workload], ['Average sleep hours', checkin.sleep_hours], ['Deadlines, travel and barriers', checkin.busy_week], ['Next week’s training windows', checkin.next_week_availability], ['Anything else', checkin.client_notes]
-  ].filter(([, value]) => value);
+  const answers = flattenCheckinAnswers(checkin.original_answers || {});
+  const saved = [
+    ['Biggest win',checkin.wins,'Win this week'],
+    ['Training progress and barriers',checkin.challenges,'Challenges','What changed or got in the way'],
+    ['Training feedback',checkin.training_summary],
+    ['Food this week',checkin.food_summary,'Nutrition feedback'],
+    ['Support needed',checkin.support_needed,'Help from Calum'],
+    ['Workload pressure (1–10)',checkin.workload,'Workload'],
+    ['Average sleep hours',checkin.sleep_hours],
+    ['Deadlines, travel and barriers',checkin.busy_week],
+    ['Next week’s commitment',checkin.next_week_availability,'Next week’s training windows'],
+    ['Anything else',checkin.client_notes]
+  ];
+  const normalize = label => label.toLowerCase().replaceAll('’', "'");
+  for(const [label,value,...aliases] of saved){
+    if(value==null||value==='')continue;
+    const labels=[label,...aliases].map(normalize);
+    if(!answers.some(([question,answer])=>labels.includes(normalize(question))&&answer===String(value)))answers.push([label,String(value)]);
+  }
+  return answers;
 }
 
 function flattenCheckinAnswers(value, prefix = '') {
@@ -1207,6 +1221,12 @@ function flattenCheckinAnswers(value, prefix = '') {
 function checkinCard(checkin, coach = false) {
   if(!coach&&checkin.client_id&&checkin.client_id!==state.client?.id)return '';
   const answers = answersFor(checkin), appFeedback = coach || Boolean(checkin.reviewed_at && checkin.review_channel !== 'whatsapp');
+  const submitted=checkin.original_answers||{};
+  const strength=submitted['Strength sessions completed'],foodDays=submitted['Days following the food plan'];
+  const weight=submitted['Weigh-in status']==='I haven’t weighed this week'&&checkin.weight_kg==null?'Didn’t weigh this week':displayWeight(checkin.weight_kg);
+  const detail=(label,value)=>'<div class="detail"><label>'+label+'</label>'+esc(value)+'</div>';
+  const percentage=value=>value==null?'—':value+'%';
+  const rating=value=>value==null?'—':checkin.source_system==='client_weekly_v3'&&strength!=null&&Number(value)%2===0?Number(value)/2+'/5':value+'/10';
   const prior=coach&&checkin.period_start?(state.data.checkins||[]).filter(row=>row.client_id===checkin.client_id&&row.period_start<checkin.period_start)
     .sort((a,b)=>b.period_start.localeCompare(a.period_start))[0]:null;
   const compare=prior?[
@@ -1216,10 +1236,14 @@ function checkinCard(checkin, coach = false) {
     return typeof before==='number'&&typeof after==='number'?[label+' '+before+' → '+after]:[];
   }):[];
 
-  return `<details class="checkin-card rich-checkin" ${checkin === state.data.checkins[0] ? 'open' : ''}><summary><div><span class="eyebrow">WEEK ${checkin.week_number || '—'}</span><h3>${esc(checkin.original_date_text || fmt(checkin.submitted_at))}</h3></div><div class="score">${checkin.week_score ?? '—'}/10</div></summary>
-    <div class="detail-list"><div class="detail"><label>Weight</label>${displayWeight(checkin.weight_kg)}</div><div class="detail"><label>Energy</label>${checkin.energy ?? '—'}/10</div><div class="detail"><label>Sleep</label>${checkin.sleep ?? '—'}/10</div><div class="detail"><label>Stress</label>${checkin.stress ?? '—'}/10</div><div class="detail"><label>Training · self-reported</label>${checkin.training_adherence == null ? '—' : checkin.training_adherence + '%'}</div><div class="detail"><label>Nutrition · self-reported</label>${checkin.nutrition_adherence == null ? '—' : checkin.nutrition_adherence + '%'}</div><div class="detail"><label>Average steps</label>${checkin.average_steps != null ? Number(checkin.average_steps).toLocaleString() : '—'}</div></div>
+  return `<details class="checkin-card rich-checkin" data-checkin-card="${esc(checkin.id)}" ${checkin === state.data.checkins[0] ? 'open' : ''}><summary><div><span class="eyebrow">WEEK ${checkin.week_number || '—'}</span><h3>${esc(checkin.original_date_text || fmt(checkin.submitted_at))}</h3></div><div class="score">${checkin.week_score ?? '—'}/10</div></summary>
+    <div class="detail-list">${detail('Weight',weight)}${detail('Energy',rating(checkin.energy))}${detail('Sleep',rating(checkin.sleep))}${detail('Stress',rating(checkin.stress))}
+    ${strength!=null?detail('Strength sessions',strength):detail('Training · self-reported',percentage(checkin.training_adherence))}
+    ${foodDays!=null?detail('Days following the food plan',foodDays+' / 7'):detail('Nutrition · self-reported',percentage(checkin.nutrition_adherence))}
+    ${checkin.average_steps!=null?detail('Average steps',Number(checkin.average_steps).toLocaleString()):''}</div>
     ${compare.length?'<p class="checkin-comparison"><strong>Since the previous check-in</strong> · '+esc(compare.join(' · '))+'</p>':''}
     <div class="original-answers">${answers.length ? answers.map(([question, answer]) => `<div class="answer-block"><h4>${esc(question)}</h4><p>${esc(answer)}</p></div>`).join('') : '<p class="source-gap">No written response was submitted for this week.</p>'}</div>
+    <div data-checkin-voice></div>
     ${!coach && checkin.reviewed_at && checkin.review_channel === 'whatsapp' ? '<div class="coach-note"><b>Reviewed via WhatsApp</b><p>Your coach replied in WhatsApp. Open that conversation for the response.</p></div>' : ''}
     ${appFeedback && safeMediaUrl(checkin.voice_note_url) ? `<a class="loom-card" href="${esc(safeMediaUrl(checkin.voice_note_url))}" target="_blank" rel="noopener"><span>▶</span><div><b>Weekly check-in video</b><small>Open coach review</small></div></a>` : ''}
     ${!coach && appFeedback && checkin.focus_next_week ? `<div class="coach-note"><b>Agreed action points</b><p>${esc(checkin.focus_next_week)}</p></div>` : ''}

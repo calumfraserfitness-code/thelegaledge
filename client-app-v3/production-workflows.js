@@ -53,9 +53,18 @@ function reviewFacts(c) {
   if(c.support_needed)parts.push('Support requested');
   return parts.join(' · ') || 'Open the submitted answers';
 }
+function reviewActivity(checkin){
+  const strength=checkin.original_answers?.['Strength sessions completed'], food=checkin.original_answers?.['Days following the food plan'];
+  const counts=[];
+  if(finiteRecorded(strength))counts.push(strength+' strength sessions');
+  else if(finiteRecorded(checkin.training_adherence))counts.push('Training '+checkin.training_adherence+'%');
+  if(finiteRecorded(food))counts.push(food+' / 7 food-plan days');
+  else if(finiteRecorded(checkin.nutrition_adherence))counts.push('Nutrition '+checkin.nutrition_adherence+'%');
+  return counts.join(' · ')||'Open full check-in';
+}
 async function loadReviewQueue(page = 0) {
   if(state.preview){const records=state.sampleClientData?.size?[...state.sampleClientData].flatMap(([id,data])=>(data.checkins||[]).map(c=>({...c,client_id:id}))):(state.data.checkins||[]).map(c=>({...c,client_id:c.client_id || state.clients[0]?.id}));state.reviewRows=records.filter(c=>!c.reviewed_at);state.reviewCount=state.reviewRows.length;return;}
-  const result=await db.from('checkins').select('id,client_id,submitted_at,period_start,weight_kg,week_number,energy,sleep,stress,workload,training_adherence,nutrition_adherence,busy_week,support_needed,coach_response,reviewed_at,source_system',{count:'exact'}).is('reviewed_at',null).order('submitted_at',{ascending:false}).order('id',{ascending:false}).range(page*50,page*50+49);
+  const result=await db.from('checkins').select('id,client_id,submitted_at,period_start,weight_kg,week_number,energy,sleep,stress,workload,training_adherence,nutrition_adherence,busy_week,support_needed,coach_response,reviewed_at,source_system,original_answers',{count:'exact'}).is('reviewed_at',null).order('submitted_at',{ascending:false}).order('id',{ascending:false}).range(page*50,page*50+49);
   if(result.error)throw new Error('Review queue: '+result.error.message);
   state.reviewRows=result.data || [];state.reviewCount=result.count ?? state.reviewRows.length;state.reviewPage=page;
 }
@@ -63,7 +72,7 @@ async function renderReviewQueue(page = 0) {
   $('#coachMain').innerHTML=pageHead('COACH OPERATIONS','Client check-ins')+'<section class="panel" role="status">Loading submitted check-ins…</section>';
   try {
     await loadReviewQueue(page);if(state.coachView!=='reviews' || state.client)return;
-    $('#coachMain').innerHTML=pageHead('COACH OPERATIONS','Client check-ins','<button class="btn ghost" id="refreshReviewQueue">Refresh</button>')+`<section class="panel"><p>${state.reviewCount} submitted check-ins awaiting a completed coach review. Historical records stay attached to their original week.</p>${state.reviewRows.map(c=>{const client=state.clients.find(x=>x.id===c.client_id);const corporate=(typeof firmState!=='undefined'&&firmState.loaded?firmState.participants:state.corporateMemberships || []).some(m=>m.client_id===c.client_id);return `<article class="pw-review-row"><div><h3>${esc(client?.display_name || 'Client')}</h3><small>${corporate?'Firm-sponsored':'1-to-1 client'} · ${fmt(c.submitted_at)}${c.week_number?` · Week ${c.week_number}`:''}</small><p>${esc(reviewFacts(c))}</p><small>Training ${c.training_adherence == null?'not recorded':c.training_adherence+'%'} · Nutrition ${c.nutrition_adherence == null?'not recorded':c.nutrition_adherence+'%'}${c.coach_response?' · Response drafted':''}</small></div><button class="btn primary" data-review-checkin="${esc(c.id)}" data-review-client="${esc(c.client_id)}">Review answers</button></article>`;}).join('') || '<div class="empty">No submitted check-ins require review. This does not mean every client has checked in.</div>'}<div class="pw-inline">${page>0?'<button class="btn ghost" id="previousReviews">Previous 50</button>':''}${(page+1)*50<state.reviewCount?'<button class="btn ghost" id="nextReviews">Next 50</button>':''}</div></section>`;
+    $('#coachMain').innerHTML=pageHead('COACH OPERATIONS','Client check-ins','<button class="btn ghost" id="refreshReviewQueue">Refresh</button>')+`<section class="panel"><p>${state.reviewCount} submitted check-ins awaiting a completed coach review. Historical records stay attached to their original week.</p>${state.reviewRows.map(c=>{const client=state.clients.find(x=>x.id===c.client_id);const corporate=(typeof firmState!=='undefined'&&firmState.loaded?firmState.participants:state.corporateMemberships || []).some(m=>m.client_id===c.client_id);return `<article class="pw-review-row"><div><h3>${esc(client?.display_name || 'Client')}</h3><small>${corporate?'Firm-sponsored':'1-to-1 client'} · ${fmt(c.submitted_at)}${c.week_number?` · Week ${c.week_number}`:''}</small><p>${esc(reviewFacts(c))}</p><small>${esc(reviewActivity(c))}${c.coach_response?' · Response drafted':''}</small></div><button class="btn primary" data-review-checkin="${esc(c.id)}" data-review-client="${esc(c.client_id)}">Review answers</button></article>`;}).join('') || '<div class="empty">No submitted check-ins require review. This does not mean every client has checked in.</div>'}<div class="pw-inline">${page>0?'<button class="btn ghost" id="previousReviews">Previous 50</button>':''}${(page+1)*50<state.reviewCount?'<button class="btn ghost" id="nextReviews">Next 50</button>':''}</div></section>`;
     $('#refreshReviewQueue').onclick=()=>renderReviewQueue(0);
     $('#previousReviews')&&($('#previousReviews').onclick=()=>renderReviewQueue(page-1));$('#nextReviews')&&($('#nextReviews').onclick=()=>renderReviewQueue(page+1));
     $$('[data-review-checkin]').forEach(b=>b.onclick=()=>openQueuedReview(b));
@@ -74,10 +83,15 @@ async function openQueuedReview(button) {
   setBusy(button,true);
   try {
     state.client=client;state.clientTab='check-ins';
-    if(!state.preview)await loadClientData(client.id);else state.data=state.sampleClientData?.get(client.id)||state.data;
-    renderCoach();
-    const form=$(`[data-coach-review="${button.dataset.reviewCheckin}"]`);if(form){form.closest('details').open=true;form.scrollIntoView({block:'center',behavior:'smooth'});}
-  }catch(error){state.client=null;toast(error.message,'error');renderReviewQueue();}
+    if(!state.preview){if(await loadClientData(client.id)===false||state.client?.id!==client.id)return;}
+    else state.data=state.sampleClientData?.get(client.id)||state.data;
+    await renderCoach();
+    if(state.client?.id!==client.id||state.clientTab!=='check-ins')return;
+    const card=[...document.querySelectorAll('#clientWorkspaceBody [data-checkin-card]')].find(item=>item.dataset.checkinCard===button.dataset.reviewCheckin);
+    if(card){card.open=true;card.scrollIntoView({block:'start',behavior:'smooth'});}
+    else toast('This check-in could not be opened. Refresh saved entries and try again.','error');
+  }catch(error){if(state.client?.id!==client.id)return;state.client=null;toast(error.message,'error');renderReviewQueue();}
+  finally{if(button.isConnected)setBusy(button,false);}
 }
 const beforeReviewCoachRender=renderCoach;
 renderCoach=function(){if(!state.client&&state.coachView==='reviews'){$$('#coachNav button').forEach(b=>b.classList.toggle('active',b.dataset.coachView==='reviews'));$('.sidebar')?.classList.remove('open');return renderReviewQueue();}return beforeReviewCoachRender();};
