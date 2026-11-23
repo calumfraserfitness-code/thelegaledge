@@ -4,6 +4,7 @@ const $=s=>w.document.querySelector(s), tick=()=>new Promise(resolve=>setImmedia
 const client={id:'client',display_name:'Katherine <safe>',onboarding_status:'complete',plan_status:'published',
  timezone:'Europe/Dublin',checkin_day:1,checkin_due_time:'09:00',goal_summary:'Build strength and keep a regular meal routine',weight_unit:'lbs'};
 let routed=0;
+const longGoal='Build strength and keep a regular meal routine. '+('Plan workouts around work and bring lunch on office days. '.repeat(5)).trim();
 Object.assign(w,{$,esc:v=>String(v??'').replaceAll('<','&lt;').replaceAll('>','&gt;'),fmt:v=>v,
  state:{client,role:'client',clientView:'today',user:{id:'account'},data:{weeks:[],sessions:[],checkins:[]}},
  renderClient(){routed++;},mealsForNutritionPlan:plan=>plan.meals,
@@ -32,6 +33,7 @@ S.data.sessions=[
  assert.equal(home.nextAgreedAction(client,S.data,[{...approved,completed_at:date},{...approved,client_id:'peer'}],date),'Book a slot');
  w.CoachingFollowThrough={approvedActions:async()=>[approved]};
 
+ client.goal_summary=longGoal;
  w.clientToday();
  const root=$('#personalCoachingHome');
  await tick();
@@ -42,11 +44,14 @@ S.data.sessions=[
  assert(!root.querySelector('nav'),'Today does not repeat the app navigation');
  assert.equal(root.querySelector('progress').value,1);
  assert.equal(root.querySelector('progress').max,2);
- assert.match(root.querySelector('.pch-coaching').textContent,/Build strength and keep a regular meal routine/);
+ assert.equal(root.querySelector('.pch-goal-text').textContent,longGoal,'The full goal is visible without a disclosure');
+ assert.equal(root.querySelector('.pch-goal-text').closest('details'),null);
  assert(!root.textContent.includes('Peer session'));
  assert.match(root.querySelector('.pch-coaching').textContent,/154.3 lb/);
  assert(!root.textContent.includes('Private peer goal'));
  assert.equal(root.querySelector('.pch-call-summary a').href,'https://meet.google.com/abc-defg-hij');
+ assert(root.querySelector('.pch-call-summary time strong').textContent);
+ assert.equal(root.querySelector('[data-pch-calls]').textContent,'Call details & notes');
  $('#clientMain').insertAdjacentHTML('beforeend','<section id="lateWidget">Legacy card</section><p id="coachingConnectionStatus">Offline</p>');
  await tick();
  assert(!$('#lateWidget'),'Late widgets cannot reappear on Today');
@@ -57,6 +62,10 @@ S.data.sessions=[
  assert.equal(routed,1);
  S.clientView='today';S.user.id='different';root.querySelector('[data-pch-next]').click();
  assert.equal(routed,1,'Old account shortcuts cannot navigate');
+ S.user.id='account';await root.querySelector('[data-pch-calls]').onclick();
+ assert.equal(S.clientView,'support','Call details routes to the coaching workspace');
+ S.clientView='today';S.data.coachingCalls=[];w.clientToday();
+ assert.equal($('.pch-call-empty').textContent,'No call scheduled');
  S.user.id='account';client.onboarding_status='pending_legal';w.clientToday();
  assert($('#legalGate')&&!$('#personalCoachingHome'));
  client.onboarding_status='complete';client.plan_status='draft';w.clientToday();
