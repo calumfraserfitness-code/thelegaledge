@@ -2,13 +2,13 @@ const fs=require('node:fs'),assert=require('node:assert/strict'),{JSDOM}=require
 const dom=new JSDOM('<main id="clientMain"></main>',{runScripts:'outside-only',pretendToBeVisual:true}),w=dom.window;
 const $=s=>w.document.querySelector(s), tick=()=>new Promise(resolve=>setImmediate(resolve));
 const client={id:'client',display_name:'Katherine <safe>',onboarding_status:'complete',plan_status:'published',
- timezone:'Europe/Dublin',checkin_day:1,checkin_due_time:'09:00',goal_summary:'Private goal details in Progress'};
+ timezone:'Europe/Dublin',checkin_day:1,checkin_due_time:'09:00',goal_summary:'Build strength and keep a regular meal routine',weight_unit:'lbs'};
 let routed=0;
 Object.assign(w,{$,esc:v=>String(v??'').replaceAll('<','&lt;').replaceAll('>','&gt;'),fmt:v=>v,
  state:{client,role:'client',clientView:'today',user:{id:'account'},data:{weeks:[],sessions:[],checkins:[]}},
  renderClient(){routed++;},mealsForNutritionPlan:plan=>plan.meals,
  clientToday(){$('#clientMain').innerHTML='<form id="legalGate">Consent</form>';},
- openDailyNutritionDate(date){w.selectedMealDate=date;}
+ openDailyNutritionDate(date){w.selectedMealDate=date;},coachingJoinUrl:url=>url?.startsWith('https://meet.google.com/')?url:''
 });
 for(const name of ['checkin-status-model.js','personal-coaching-home.js'])w.eval(fs.readFileSync(require.resolve('../'+name),'utf8'));
 const M=w.CheckinStatus,S=w.state,home=w.PersonalCoachingHome;
@@ -20,6 +20,11 @@ S.data.sessions=[
  {id:'peer',week_id:'published',client_id:'peer',title:'Peer session',status:'planned',session_date:period}
 ];
 (async()=>{
+ S.data.coachingGoals=[{client_id:'client',status:'active',title:'Weight milestone',metric:'weight_kg',target:70,unit:'kg'},
+  {client_id:'peer',status:'active',title:'Private peer goal',target:2}];
+ S.data.coachingCalls=[{client_id:'peer',status:'scheduled',scheduled_at:new Date(+now+3600000).toISOString(),join_url:'https://meet.google.com/peer'},
+  {client_id:'client',status:'cancelled',scheduled_at:new Date(+now+3600000).toISOString(),join_url:'https://meet.google.com/cancelled'},
+  {client_id:'client',status:'scheduled',scheduled_at:new Date(+now+7200000).toISOString(),join_url:'https://meet.google.com/abc-defg-hij'}];
  S.data.checkins=[{client_id:'client',period_start:period}];
  w.clientToday();
  const root=$('#personalCoachingHome');
@@ -29,8 +34,11 @@ S.data.sessions=[
  assert(!root.querySelector('nav'),'Today does not repeat the app navigation');
  assert.equal(root.querySelector('progress').value,1);
  assert.equal(root.querySelector('progress').max,2);
- assert(!root.textContent.includes('Private goal details'));
+ assert.match(root.querySelector('.pch-coaching').textContent,/Build strength and keep a regular meal routine/);
  assert(!root.textContent.includes('Peer session'));
+ assert.match(root.querySelector('.pch-coaching').textContent,/154.3 lb/);
+ assert(!root.textContent.includes('Private peer goal'));
+ assert.equal(root.querySelector('.pch-call-summary a').href,'https://meet.google.com/abc-defg-hij');
  $('#clientMain').insertAdjacentHTML('beforeend','<section id="lateWidget">Legacy card</section><p id="coachingConnectionStatus">Offline</p>');
  await tick();
  assert(!$('#lateWidget'),'Late widgets cannot reappear on Today');
