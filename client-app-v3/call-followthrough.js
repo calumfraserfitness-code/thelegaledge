@@ -3,6 +3,11 @@
  'use strict';
  const safeSource=v=>{try{const u=new URL(v);return u.protocol==='https:'&&u.hostname==='fathom.video'?u.href:null;}catch{return null;}};
  const stamp=v=>window.CheckinStatus.stamp(v,state.client?.timezone||'Europe/Dublin');
+ async function approvedActions(id,date){
+  const rows=await query('Agreed call actions',db.from('client_weekly_focus').select('id,client_id,description,starts_on,expires_on,completed_at,approved_at').eq('client_id',id).is('archived_at',null).not('approved_at','is',null).lte('starts_on',date).gte('expires_on',date).order('approved_at',{ascending:false}).limit(100));
+  if(rows.some(r=>r.client_id!==id))throw Error('Action ownership could not be verified.');
+  return rows.filter(r=>r.approved_at&&r.starts_on<=date&&r.expires_on>=date);
+ }
  function clientMount(){
   if(!state.client||!['client','coach'].includes(state.role)||!['today','support'].includes(state.clientView)||state.preview)return;
   const host=$('#clientMain');if(!host)return;const id=state.client.id,user=state.user?.id,role=state.role,view=state.clientView;
@@ -12,9 +17,7 @@
   const recap=(state.data.coachingGuidance||[]).filter(r=>r.client_id===id&&r.published&&/^Call recap · \d{4}-\d{2}-\d{2}$/.test(r.title)).sort((a,b)=>b.title.localeCompare(a.title))[0];
   async function load(){try{
    let date;try{date=window.CheckinStatus.localDate(new Date(),state.client.timezone||'Europe/Dublin');}catch{throw Error('Your timezone needs coach setup.');}
-   const savedRows=await query('Agreed call actions',db.from('client_weekly_focus').select('id,client_id,description,starts_on,expires_on,completed_at,approved_at').eq('client_id',id).is('archived_at',null).not('approved_at','is',null).lte('starts_on',date).gte('expires_on',date).order('approved_at',{ascending:false}).limit(100));if(!active())return;
-   if(savedRows.some(r=>r.client_id!==id))throw Error('Action ownership could not be verified.');
-   const rows=savedRows.filter(r=>r.approved_at);
+   const rows=await approvedActions(id,date);if(!active())return;
    const next=rows.find(r=>!r.completed_at);
    if(!recap&&(view==='today'?!next:!rows.length)){box.remove();return;}
    box.hidden=false;
@@ -55,5 +58,5 @@
  const support=clientCoachingSupport;clientCoachingSupport=function(){const r=support();clientMount();return r;};
  if(window.LegalEdgePriorities){const home=window.LegalEdgePriorities.home;window.LegalEdgePriorities.home=function(){const r=home();clientMount();return r;};}
  const overview=coachOverview;coachOverview=function(){const r=overview();coachMount();return r;};
- window.CoachingFollowThrough={clientMount,coachMount};
+ window.CoachingFollowThrough={clientMount,coachMount,approvedActions};
 })();

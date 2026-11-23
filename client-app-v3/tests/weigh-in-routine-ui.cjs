@@ -5,18 +5,25 @@ function setup(){
  const state={user:{id:'user-a'},role:'client',preview:false,client:{id:'client-a',track_weight:true},clientView:'today',clientTab:'overview',data:{}};
  const plan={weekStart:'2026-11-02',weekEnd:'2026-11-08',recordedDays:[],count:0,target:3,weekendDone:false,spreadDone:false,complete:false,example:'Tuesday, Thursday and Saturday'};
  let routes=0,coachRoutes=0,playerClicks=0;
- function today(){w.document.querySelector('#clientMain').innerHTML='<div id="personalCoachingHome"><section class="pch-next">Next training action</section><section id="video"><button>Play</button></section><details data-pch-secondary><summary>Plan & progress</summary></details></div>';w.document.querySelector('#video button').onclick=()=>playerClicks++;}
+ function today(){w.document.querySelector('#clientMain').innerHTML='<div id="personalCoachingHome"><section class="pch-next">Next training action</section><section id="video"><button>Play</button></section><details data-pch-secondary><summary>Plan & progress</summary></details><div data-pch-weigh-in hidden></div></div>';w.document.querySelector('#video button').onclick=()=>playerClicks++;}
  function progress(){w.document.querySelector('#clientMain').innerHTML='<form id="progressForm"><input name="weight_display"><input name="waist_cm"><button>Save progress</button></form><section id="strength">Strength progress</section>';}
  function checkin(){w.document.querySelector('#clientMain').innerHTML='<form id="checkinForm"><p id="checkinWeightHelp">Latest saved weigh-in</p><input name="weight_display"><textarea name="support_needed"></textarea></form>';}
  function coachOverview(){w.document.querySelector('#clientWorkspaceBody').innerHTML='<section class="client-saved-summary">Latest weight</section><form><textarea name="coach_notes">My draft</textarea></form>';}
  function coachProgress(){w.document.querySelector('#clientWorkspaceBody').innerHTML='<section class="data-entry-panel"><form id="coachProgressForm"><input name="weight_display"><button>Save progress</button></form></section>';}
- Object.assign(w,{state,esc:s=>String(s??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'),fmt:s=>s,matchMedia:()=>({matches:true}),WeighInRoutineModel:{plan:c=>c.track_weight===false?null:plan},clientToday:today,clientProgress:progress,clientCheckin:checkin,coachOverview,coachProgress,renderClient(){routes++;({today:w.clientToday,progress:w.clientProgress,checkin:w.clientCheckin}[state.clientView]||(()=>{}))();},renderClientWorkspace(){coachRoutes++;(state.clientTab==='progress'?w.coachProgress:w.coachOverview)();}});
+ Object.assign(w,{state,clientProgressFields:()=>'<input name="weight_display"><input name="waist_cm">',esc:s=>String(s??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'),fmt:s=>s,matchMedia:()=>({matches:true}),WeighInRoutineModel:{plan:c=>c.track_weight===false?null:plan},clientToday:today,clientProgress:progress,clientCheckin:checkin,coachOverview,coachProgress,renderClient(){routes++;({today:w.clientToday,progress:w.clientProgress,checkin:w.clientCheckin}[state.clientView]||(()=>{}))();},renderClientWorkspace(){coachRoutes++;(state.clientTab==='progress'?w.coachProgress:w.coachOverview)();}});
  w.HTMLElement.prototype.scrollIntoView=function(){};
  vm.runInContext(fs.readFileSync(__dirname+'/../weigh-in-routine.js','utf8'),dom.getInternalVMContext());
  return {dom,w,state,plan,routes:()=>routes,coachRoutes:()=>coachRoutes,playerClicks:()=>playerClicks};
 }
 (async()=>{
- let h=setup();h.w.clientToday();assert(!h.w.document.querySelector('[data-weighin-routine]'),'Today stays clear of weigh-in detail');
+ let h=setup();h.w.clientToday();
+ const homeCard=h.w.document.querySelector('[data-weighin-routine="today"]'),homeForm=homeCard.querySelector('form');
+ assert(homeForm.hidden,'The form stays folded on initial load');
+ homeCard.querySelector('[data-weighin-log]').click();assert(!homeForm.hidden);assert.equal(h.w.document.activeElement,homeForm.elements.weight_display);assert.equal(h.routes(),0,'Today opens the form inline');
+ h.plan.count=1;homeForm.elements.weight_display.value='79.4';h.w.WeighInRoutine.mount();
+ assert(homeCard.textContent.includes('1 / 3 minimum'));assert.equal(homeForm.elements.weight_display.value,'79.4');
+ h.state.client.track_weight=false;h.w.WeighInRoutine.mount();assert(!h.w.document.querySelector('[data-weighin-routine]'));
+ h.state.client.track_weight=true;h.plan.count=0;
  h.state.clientView='progress';h.w.clientProgress();let card=h.w.document.querySelector('[data-weighin-routine]');
  assert(card,'Weigh-in expectation is visible in Progress');assert(card.textContent.includes('At least 3 weigh-ins each week'));assert(card.textContent.includes('including one Saturday or Sunday'));assert(card.textContent.includes('Tuesday, Thursday and Saturday'));assert(card.textContent.includes('Choose days that suit you'),'Example days remain flexible');assert.equal(card.parentElement.id,'clientMain');
  const original=card;h.w.WeighInRoutine.mount();assert.equal(h.w.document.querySelector('[data-weighin-routine]'),original);assert.equal(h.w.document.querySelectorAll('[data-weighin-routine]').length,1,'Repeated mounts never duplicate the target');

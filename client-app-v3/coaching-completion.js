@@ -5,10 +5,28 @@ function workoutSetRows(exercise,session,formData,client){
  return Array.from({length:Math.max(1,Number(exercise.sets||1))},(_,i)=>{const set=i+1,reps=value('reps_'+set),load=value('load_'+set),rir=value('rir_'+set),duration=value('duration_'+set);if(reps!==null&&!Number.isInteger(reps))throw Error('Reps must be whole numbers.');if(duration!==null&&(!Number.isInteger(duration)||duration<1||duration>86400))throw Error('Enter actual seconds from 1 to 86400.');if(rir!==null&&rir>10)throw Error('RIR must be between zero and ten.');return {client_id:client.id,training_session_id:session.id,program_exercise_id:exercise.id,exercise_bank_id:exercise.exercise_bank_id||null,performed_at:new Date().toISOString(),set_number:set,reps,load,load_unit:client.weight_unit==='lbs'?'lb':'kg',rir,duration_seconds:duration,completed:reps!==null||load!==null||duration!==null};}).filter(r=>r.completed);
 }
 saveExerciseLog=async function(event){
- event.preventDefault();const client=state.client,session=state.data.sessions.find(s=>s.id===state.selectedSessionId),exercise=state.data.exercises.find(e=>e.id===event.target.dataset.exerciseLog);let rows;
- try{if(!session||!exercisesForSession(session).some(e=>e.id===exercise?.id))throw Error('This exercise is not part of the selected workout.');rows=workoutSetRows(exercise,session,new FormData(event.target),client);if(!rows.length)throw Error('Enter your actual reps or seconds before saving.');}catch(e){return toast(e.message,'error');}
- const form=event.target,user=state.user?.id;if(form.dataset.saving==='true')return;form.dataset.saving='true';setBusy(event.submitter,true);
- try{const saved=state.preview?rows.map(r=>({...r,id:'sample-'+session.id+'-'+exercise.id+'-'+r.set_number})):await query('Save workout sets',db.from('exercise_set_logs').upsert(rows,{onConflict:'client_id,training_session_id,program_exercise_id,set_number'}).select());if(saved.length!==rows.length||rows.some(row=>!saved.some(s=>s.client_id===row.client_id&&s.training_session_id===row.training_session_id&&s.program_exercise_id===row.program_exercise_id&&s.set_number===row.set_number)))throw Error('All workout sets were not confirmed. Your entries are still here; retry.');if(state.client?.id!==client.id||state.user?.id!==user)return;const keys=new Set(saved.map(r=>r.training_session_id+'|'+r.program_exercise_id+'|'+r.set_number));state.data.exerciseLogs=[...saved,...state.data.exerciseLogs.filter(r=>!keys.has(r.training_session_id+'|'+r.program_exercise_id+'|'+r.set_number))];toast(state.preview?'Actual sample sets saved':'Workout sets saved');if(form.isConnected&&state.selectedSessionId===session.id)clientTraining();}catch(e){if(state.client?.id===client.id&&state.user?.id===user)toast(e.message,'error');}finally{delete form.dataset.saving;setBusy(event.submitter,false);}
+ event.preventDefault();const client=state.client,session=state.data.sessions.find(s=>s.id===state.selectedSessionId),exercise=session&&exercisesForSession(session).find(e=>e.id===event.target.dataset.exerciseLog);let rows;
+ try{if(!exercise)throw Error('This exercise is not part of the selected workout.');rows=workoutSetRows(exercise,session,new FormData(event.target),client);if(!rows.length)throw Error('Enter your actual reps or seconds before saving.');}catch(e){return toast(e.message,'error');}
+ const form=event.target,user=state.user?.id;
+ if(form.dataset.saving==='true')return;
+ const status=form.querySelector('.set-save-status');
+ const inputs=Array.from(form.querySelectorAll('input:not(:disabled)'));
+ form.dataset.saving='true';setBusy(event.submitter,true);
+ inputs.forEach(input=>input.disabled=true);
+ if(status)status.textContent='Saving sets…';
+ const active=()=>state.client?.id===client.id&&state.user?.id===user;
+ try{
+  const saved=state.preview?rows.map(r=>({...r,id:'sample-'+session.id+'-'+exercise.id+'-'+r.set_number})):
+   await query('Save workout sets',db.from('exercise_set_logs').upsert(rows,{onConflict:'client_id,training_session_id,program_exercise_id,set_number'}).select());
+  if(saved.length!==rows.length||rows.some(row=>!saved.some(s=>s.client_id===row.client_id&&s.training_session_id===row.training_session_id&&s.program_exercise_id===row.program_exercise_id&&s.set_number===row.set_number)))throw Error('All workout sets were not confirmed. Your entries are still here; retry.');
+  if(!active())return;
+  const keys=new Set(saved.map(r=>r.training_session_id+'|'+r.program_exercise_id+'|'+r.set_number));
+  state.data.exerciseLogs=[...saved,...state.data.exerciseLogs.filter(r=>!keys.has(r.training_session_id+'|'+r.program_exercise_id+'|'+r.set_number))];
+  toast(state.preview?'Actual sample sets saved':'Workout sets saved');
+  if(status)status.textContent='Sets saved.';
+  const swap=form.closest('.exercise-card')?.querySelector('[data-exercise-choice]');if(swap)swap.disabled=true;
+ }catch(e){if(active()){if(status)status.textContent='Sets didn’t save. Your entries are still here. Try again.';toast(e.message,'error');}}
+ finally{delete form.dataset.saving;inputs.forEach(input=>input.disabled=false);setBusy(event.submitter,false);}
 };
 const completionExerciseCard=exerciseCard;
 exerciseCard=function(ex,loggable=false){

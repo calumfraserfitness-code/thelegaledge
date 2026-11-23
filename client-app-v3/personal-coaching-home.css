@@ -130,3 +130,20 @@
 .pch-call-summary time{display:block;margin-bottom:.45rem}
 .pch-call-summary .btn{min-height:44px}
 @media(max-width:520px){.pch-video-card{grid-template-columns:1fr}.pch-video-preview{max-height:11rem}}
+
+.pch-heading{
+ display:grid;align-content:center;min-height:clamp(7.5rem,15vw,10rem);
+ padding:clamp(1.1rem,4vw,2rem);border-radius:1rem;color:#fff;
+ background-color:#111b2b;
+ background-image:linear-gradient(90deg,#111b2b 0%,#111b2be8 27%,#111b2b18 76%),url('./assets/today-training.webp');
+ background-position:right center;background-size:cover;background-repeat:no-repeat;
+}
+.pch-heading p{color:#f2ddb3}
+.pch-heading h1{color:#fff;text-wrap:balance;max-width:65%;overflow-wrap:anywhere}
+.pch-agreed{border-inline-start:4px solid #ae853e;border-radius:.7rem;background:#f6f1e6;padding:.8rem 1rem}
+.pch-agreed h2{font-size:.86rem;color:#715426;margin:0 0 .22rem}
+.pch-agreed p{margin:0;font-weight:650;overflow-wrap:anywhere}
+.pch-meals li{padding:0}
+.pch-meal-link{display:flex;align-items:center;justify-content:space-between;gap:.6rem;text-align:left;color:#172b42;
+ width:100%;min-height:44px;padding:.5rem .2rem;background:none;border:0;font:inherit;cursor:pointer}
+.pch-meal-link span{font-size:1.2em;color:#88632a}

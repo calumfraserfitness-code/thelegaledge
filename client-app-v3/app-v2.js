@@ -1591,17 +1591,17 @@ function cardioLogForm(session) {
   const list='cardio-activities-'+(session?.id||'extra');
   let date;try{date=window.CheckinStatus.localDate(new Date(),state.client?.timezone||'Europe/Dublin');}catch{date=iso(new Date());}
   return `<form class="cardio-entry-form" data-cardio-id="${session?.id||''}">
-    <label>What did you do?<input name="activity" list="${esc(list)}" maxlength="80" value="${esc(suggested)}" placeholder="Choose or type an activity" required><datalist id="${esc(list)}">${opts.map(x=>`<option value="${x}">`).join('')}</datalist></label>
-    <label>Time completed (minutes)<input name="duration" type="number" inputmode="numeric" min="1" max="1440" step="1" value="${esc(actual.duration_minutes??'')}" placeholder="e.g. 25" required></label>
-    ${own?'<label>Date completed<input name="session_date" type="date" required value="'+date+'"></label>':''}
-    <details class="cardio-more"><summary>Add more details (optional)</summary><div class="cardio-extra-fields">
+    <div class="cardio-essentials"><label>Activity<input name="activity" list="${esc(list)}" maxlength="80" value="${esc(suggested)}" placeholder="Choose or type an activity" required><datalist id="${esc(list)}">${opts.map(x=>`<option value="${x}">`).join('')}</datalist></label>
+    <label>Minutes completed<input name="duration" type="number" inputmode="numeric" min="1" max="1440" step="1" value="${esc(actual.duration_minutes??'')}" placeholder="e.g. 25" required></label></div>
+    <details class="cardio-more"><summary>${own?'Change date or add details':'Add distance, effort or notes'}</summary><div class="cardio-extra-fields">
+      ${own?'<label>Date completed<input name="session_date" type="date" required value="'+date+'"></label>':''}
       <label>Distance (km)<input name="distance" type="number" inputmode="decimal" min="0" max="1000" step="0.01" value="${esc(actual.distance_km??'')}"></label>
       <label>Average heart rate (bpm)<input name="heart_rate" type="number" inputmode="numeric" min="30" max="240" value="${esc(actual.heart_rate??'')}"></label>
       <label>Effort (1–10)<input name="rpe" type="number" inputmode="numeric" min="1" max="10" value="${esc(actual.rpe??'')}"></label>
       <label>Notes<textarea name="notes" rows="2" maxlength="2000" placeholder="Anything you want Calum to know">${esc(actual.notes||'')}</textarea></label>
     </div></details>
     <button type="submit" class="btn primary">${actual.duration_minutes?'Update saved cardio':'Save cardio'}</button>
-    <p class="muted">${own?'Saves this as an extra completed session.':'Saving marks this session complete. You do not need a separate tick.'}</p>
+    <p class="muted">${own?'Adds an extra session.':'Saving marks this session complete.'}</p>
     <p data-cardio-status role="status" aria-live="polite"></p>
   </form>`;
 }
@@ -1804,9 +1804,13 @@ async function submitCheckin(event) {
   finally { setBusy(event.submitter, false); }
 }
 
+function clientProgressFields() {
+  return `<label class="field">Weight (${state.client.weight_unit === 'lbs' ? 'lb' : 'kg'})<input name="weight_display" type="number" step="0.1" inputmode="decimal"></label><label class="field">Waist (cm)<input name="waist_cm" type="number" step="0.1" inputmode="decimal"></label>`;
+}
+
 function clientProgress() {
   const photos = state.data.files.filter((file) => file.file_type === 'progress_photo');
-  $('#clientMain').innerHTML = clientHeader('', 'Progress', '') + progressDashboardMarkup() + `<form id="progressForm" class="panel checkin-form"><div class="panel-head wide"><h3>Log progress</h3></div><label class="field">Weight (${state.client.weight_unit === 'lbs' ? 'lb' : 'kg'})<input name="weight_display" type="number" step="0.1" inputmode="decimal"></label><label class="field">Waist (cm)<input name="waist_cm" type="number" step="0.1" inputmode="decimal"></label><button class="btn primary wide">Save progress</button></form><section class="panel"><div class="panel-head"><div><h3>Progress photos</h3><span class="sub">Private front, side and back photos by week</span></div><span class="pill">${photos.length} PHOTOS</span></div><form id="photoForm" class="photo-form"><label>View<select name="photo_view"><option>front</option><option>side</option><option>back</option></select></label><label>Week<input name="week_number" type="number" min="1" value="${currentWeek()?.week_number || ''}"></label><label>Photo<input name="photo" type="file" accept="image/jpeg,image/png,image/webp" required></label><button class="btn primary">Upload photo</button></form><div class="photo-grid">${photos.map((photo) => `<article class="progress-photo" data-photo-path="${esc(photo.storage_path)}"><div class="photo-placeholder">Loading private photo…</div><b>Week ${photo.week_number || '—'} · ${title(photo.photo_view || 'photo')}</b><span>${fmt(photo.created_at)}</span></article>`).join('') || '<div class="empty">No progress photos yet.</div>'}</div></section>`;
+  $('#clientMain').innerHTML = clientHeader('', 'Progress', '') + progressDashboardMarkup() + `<form id="progressForm" class="panel checkin-form"><div class="panel-head wide"><h3>Log progress</h3></div>${clientProgressFields()}<button class="btn primary wide">Save progress</button></form><section class="panel"><div class="panel-head"><div><h3>Progress photos</h3><span class="sub">Private front, side and back photos by week</span></div><span class="pill">${photos.length} PHOTOS</span></div><form id="photoForm" class="photo-form"><label>View<select name="photo_view"><option>front</option><option>side</option><option>back</option></select></label><label>Week<input name="week_number" type="number" min="1" value="${currentWeek()?.week_number || ''}"></label><label>Photo<input name="photo" type="file" accept="image/jpeg,image/png,image/webp" required></label><button class="btn primary">Upload photo</button></form><div class="photo-grid">${photos.map((photo) => `<article class="progress-photo" data-photo-path="${esc(photo.storage_path)}"><div class="photo-placeholder">Loading private photo…</div><b>Week ${photo.week_number || '—'} · ${title(photo.photo_view || 'photo')}</b><span>${fmt(photo.created_at)}</span></article>`).join('') || '<div class="empty">No progress photos yet.</div>'}</div></section>`;
   bindProgressRange(clientProgress);
   $('#progressForm').onsubmit = submitProgress;
   $('#photoForm').onsubmit = uploadProgressPhoto;

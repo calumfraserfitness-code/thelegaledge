@@ -11,9 +11,9 @@ const plan=[
  session('peer','Peer workout','weights',{client_id:'peer'})
 ];
 const state={user:{id:'user'},role:'client',client:{id:'client',onboarding_status:'complete',plan_status:'published'},clientView:'training',
- data:{weeks:[planWeek],sessions:plan,programs:[],nutritionDays:[{week_id:'week',nutrition_plan_id:'quick'}],nutritionPlans:[{id:'quick',client_id:'client',day_type:'Busy Day'}],coachingGuidance:[{client_id:'peer',published:true,category:'eating_out',body:'Private meal'}]}};
+ data:{weeks:[planWeek],sessions:plan,programs:[],nutritionDays:[{week_id:'week',nutrition_plan_id:'quick',nutrition_date:'2026-10-12'}],nutritionPlans:[{id:'quick',client_id:'client',day_type:'Busy Day'}],coachingGuidance:[{client_id:'peer',published:true,category:'eating_out',body:'Private meal'}]}};
 let settings={published:true,heavy_day_a:'day-b',heavy_sessions:3,crisis_sessions:2,office_food:'Pack the lunch you agreed with Calum.'};
-let saved=null,lastView;
+let saved=null,lastView,mealDate;
 function table(name){
  let client;
  return {select(){return this;},eq(field,value){if(field==='client_id')client=value;return this;},then(resolve){
@@ -25,7 +25,7 @@ const $=s=>w.document.querySelector(s),tick=()=>new Promise(r=>setTimeout(r,0));
 Object.assign(w,{state,$,esc:s=>String(s??'').replace(/</g,'&lt;'),fmt:s=>s,localCoachingDate:()=> '2026-10-12',
  db:{from:table,rpc(){throw Error('The guide should not write changes');}},query:async(_,promise)=>(await promise).data,
  clientTrainingWeek:()=>state.data.weeks[0],mealsForNutritionPlan:()=>[{name:'Assigned packed lunch',meal_type:'Lunch'}],
- renderClient(){lastView=state.clientView;},
+ renderClient(){lastView=state.clientView;},openDailyNutritionDate(date){mealDate=date;lastView=state.clientView;},
  clientPlanner(){state.clientView='planner';$('#clientMain').innerHTML='<section class="client-page-head">Schedule</section>';},
  clientTraining(){state.clientView='training';$('#clientMain').innerHTML='<div class="training-category-tabs">Training</div>';},
  clientCheckin(){state.clientView='checkin';$('#clientMain').innerHTML='Check-in';},
@@ -40,9 +40,10 @@ for(const file of ['busy-week-model.js','busy-week.js'])vm.runInContext(fs.readF
  assert.match(card.textContent,/Drop 2 sessions.*Full body B · Full body A/s);
  assert.match(card.textContent,/Drop 3 sessions.*Full body B/s);
  assert.match(card.textContent,/Pack the lunch you agreed/);
- assert.doesNotMatch(card.textContent,/Peer workout|Private meal|Optional run/);
+ assert.doesNotMatch(card.textContent,/Peer workout|Private meal/);
+ assert.match(card.textContent,/Skip this week Easy cycle · Optional run/);
  assert.equal($('#bwWeekForm'),null);
- card.querySelector('[data-bw-meals]').click();assert.equal(lastView,'nutrition');
+ card.querySelector('[data-bw-meals]').click();assert.equal(lastView,'nutrition');assert.equal(mealDate,'2026-10-12');
  assert.equal(state.data.sessions[1].status,'planned');
  settings=null;await w.loadClientData('client');w.clientPlanner();await tick();
  card=$('#bwOptional');assert.match(card.textContent,/Drop 1 session/);assert.match(card.textContent,/Drop 2 sessions/);assert.match(card.textContent,/Assigned packed lunch/);
