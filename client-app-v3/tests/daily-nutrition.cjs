@@ -31,3 +31,9 @@ assert.equal(M.comparable(meals[1],{calories:1100,protein_g:42}),false);
 assert.equal(M.comparable(meals[1],{calories:null,protein_g:42}),false);
 assert.equal(M.snapshot({name:'Real meal',calories:null}).calories,null);
 console.log('PASS: assigned menus preserved, dated slot replacement, chosen vs eaten totals, portion scaling, unknown values, deleted-menu history and target precedence.');
+
+const recipeModel=require('../daily-nutrition-model.js');
+assert.equal(recipeModel.recipeFamily({name:'Greek Yogurt Fruit Cup · strawberries'}),'greek yogurt fruit cup');
+const sanitized=recipeModel.slots([{name:'New meal',meal_type:'Snack'},{name:'Banana bites',meal_type:'Snack',ingredients:[{name:'Banana'}]}]);
+assert.equal(sanitized.length,1);
+assert.equal(sanitized[0].key,'snacks-2','Placeholder filtering preserves existing meal-slot keys');
