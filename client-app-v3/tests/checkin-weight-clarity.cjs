@@ -25,12 +25,13 @@ function event(){return {preventDefault(){},target:form(),submitter:w.$('#checki
  w.state.data.checkins=[];w.clientCheckin();form().elements.weight_display.value='180';savedWeight=180/2.2046226218;await w.submitAtomicCoachingCheckin(event());assert(Math.abs(sent.at(-1).payload.answers.weight_kg-savedWeight)<0.000001,'lb entry is converted once');assert(toasts.at(-1).includes('weight included'));assert(w.$('[data-checkin-weight-receipt]').textContent.includes('180.0 lb'));
  w.state.data.checkins=[];w.clientCheckin();form().elements.weight_display.value='175';already=true;await w.submitAtomicCoachingCheckin(event());assert(toasts.at(-1).includes('no new answers saved'),'Duplicate submission cannot imply the new form answers replaced a saved check-in');
  w.state.data.checkins=[];already=false;w.clientCheckin();
- form().innerHTML+='<input name="strength_sessions_completed" value="0"><input name="nutrition_days_on_plan" value="5"><input name="next_week_availability" value="Train on Monday">';
+ form().innerHTML+='<input name="weight_not_recorded" value="yes"><input name="strength_sessions_completed" value="0"><input name="nutrition_days_on_plan" value="5"><input name="next_week_availability" value="Train on Monday">';
  form().dataset.quickView='true';
  form().checkinGoalSnapshot='Two assigned sessions';
  await w.submitAtomicCoachingCheckin(event());
  const tracked=sent.at(-1).payload.answers;
  assert.equal(tracked.original_answers['Strength sessions completed'],0);
+ assert.equal(tracked.original_answers['Weigh-in status'],'I haven’t weighed this week');
  assert.equal(tracked.original_answers['Days following the food plan'],5);
  assert.equal(tracked.original_answers['Agreed goals at check-in'],'Two assigned sessions');
  assert.equal(tracked.original_answers['Next week’s commitment'],'Train on Monday');

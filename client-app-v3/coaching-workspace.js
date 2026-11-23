@@ -123,6 +123,7 @@ async function submitAtomicCoachingCheckin(event){
   const strength=fd.get('strength_sessions_completed'),foodDays=fd.get('nutrition_days_on_plan');
   if(foodDays!==null&&foodDays!==''&&Number.isInteger(Number(foodDays))&&Number(foodDays)>=0&&Number(foodDays)<=7)answers.nutrition_adherence=Math.round(100*Number(foodDays)/7);
   answers.original_answers={
+   ...(fd.has('weight_not_recorded')?{'Weigh-in status':'I haven’t weighed this week'}:{}),
    ...(event.target.checkinGoalSnapshot?{'Agreed goals at check-in':event.target.checkinGoalSnapshot}:{}),
    ...(strength!==null&&strength!==''?{'Strength sessions completed':Number(strength)}:{}),
    ...(answers.nutrition_adherence!=null?{'Days following the food plan':Number(foodDays)}:{}),
