@@ -4,6 +4,8 @@ const root=path.resolve(__dirname,'..'),browser=fs.readFileSync(path.join(root,'
 const fixtureCode=browser.slice(browser.indexOf('const ids='),browser.indexOf('async function checkNoOverflow'));
 const {fixture,routeApi,ids}=new Function('crypto','Buffer',fixtureCode+';return {fixture,routeApi,ids};')(crypto,Buffer),store=fixture(),errors=[];
 const model=require('../weekly-recap-model.js'),payload=model.build(store.tables.clients[0],{},{});payload.biggest_win='Fixture approved weekly win';payload.focus='Keep the agreed two sessions';
+store.tables.client_coaching_guidance=[{id:'today-feedback',client_id:ids.client,published:true,title:'Video check-in · Training feedback',
+ body:'https://www.loom.com/share/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\nRecorded: 2026-11-20',created_at:'2026-11-20T12:00:00Z'}];
 store.tables.client_weekly_recaps=[{client_id:ids.client,coach_id:ids.coach,week_start:payload.period_start,revision:1,payload,body:'Fixture approved weekly recap',published_at:new Date().toISOString()}];
 store.tables.checkins=[{id:'synthetic-recovery-checkin',client_id:ids.client,period_start:payload.period_start,submitted_at:new Date().toISOString(),sleep:8,stress:4,energy:7,sleep_hours:7,source_system:'client_weekly_v3'}];
 store.tables.coach_weekly_recap_drafts=[{client_id:ids.client,coach_id:ids.coach,week_start:payload.period_start,revision:2,payload:{...payload,focus:'PRIVATE UNPUBLISHED RECAP'},body:'PRIVATE UNPUBLISHED RECAP'}];
@@ -29,8 +31,13 @@ async function until(check,label){for(let n=0;n<200;n++){if(check())return;await
  await until(()=>w.legalEdgeRuntimeReady&&$('#loginForm')?.onsubmit,'ready login');
  $('#email').value='client@fixture.invalid';$('#password').value='Synthetic-fixture-password-only';await $('#loginForm').onsubmit({preventDefault(){},submitter:$('#loginForm button[type=submit]')});
  await until(()=>$('#personalCoachingHome'),'simplified Today');
- assert.equal(w.document.querySelectorAll('#personalCoachingHome > section').length,1);
- assert(!$('#homeQuickLog')&&!$('#clientWeeklyRecap')&&!$('#cvLatest')&&!$('.priority-grid'));
+ await until(()=>$('[data-pch-video] [data-pch-watch]'),'published Loom feedback on Today');
+ assert.match($('[data-pch-video]').textContent,/Training feedback/);
+ assert(!$('#personalCoachingHome iframe'),'The player loads only when requested');
+ $('[data-pch-watch]').click();
+ assert.equal($('.cv-dialog iframe')?.getAttribute('src'),'https://www.loom.com/embed/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
+ $('[data-cv-close]').click();
+ assert(!$('#homeQuickLog')&&!$('#clientWeeklyRecap')&&!$('.priority-grid')&&!$('#personalCoachingHome nav'));
  ($('[data-pch-route="support"]')||$('[data-client-view="support"]')).click();await until(()=>$('#clientWeeklyRecap')?.textContent.includes('Fixture approved weekly win'),'approved recap in Coach');
  assert(!$('#clientWeeklyRecap').textContent.includes('PRIVATE UNPUBLISHED RECAP'));
  $('[data-client-view="today"]').click();await until(()=>$('#personalCoachingHome'),'return to Today');

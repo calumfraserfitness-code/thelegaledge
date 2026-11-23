@@ -1,13 +1,24 @@
-.pch-home{display:grid;gap:clamp(.85rem,3vw,1.35rem);max-width:46rem;margin:0 auto}
-.pch-heading h1{margin:.4rem 0;font-size:clamp(1.7rem,4vw,2.35rem);line-height:1.15;letter-spacing:-.035em}
-.pch-home>.pch-next{margin:0;padding:clamp(1.15rem,4vw,1.7rem);background:var(--navy,#111b29);color:#fff;border-radius:1rem}
-.pch-home .pch-next .eyebrow{margin:0;color:#e7cf9b}
-.pch-home .pch-next h2{margin:.4rem 0 1rem;line-height:1.25;overflow-wrap:anywhere}
-.pch-home .pch-next .btn.primary{min-height:46px;background:#e8cc91;color:#111b29;border-color:#e8cc91}
-.pch-shortcuts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.55rem}
-.pch-shortcuts .btn{min-height:46px;background:#fff;border-color:#cdd7e2}
+.pch-home{display:grid;gap:clamp(.8rem,3vw,1.2rem);max-width:58rem;margin:0 auto}
+.pch-heading p{margin:0;color:#526174;font-size:.9rem}
+.pch-heading h1{margin:.35rem 0;font-size:clamp(1.9rem,5vw,2.8rem);line-height:1.1;letter-spacing:-.035em}
+.pch-plan{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,19rem),1fr));gap:clamp(.8rem,3vw,1.2rem)}
+.pch-plan>.panel,.pch-video-card{margin:0;padding:clamp(1rem,3.5vw,1.5rem);border-radius:1rem}
+.pch-next{background:#142237;color:#fff}
+.pch-next .eyebrow{margin:0;color:#e7cf9b}
+.pch-next h2,.pch-video-card h2,.pch-meals h2{margin:.3rem 0 .6rem;line-height:1.2;overflow-wrap:anywhere}
+.pch-next .btn.primary{background:#e8cc91;color:#142237;border-color:#e8cc91}
+.pch-next .btn,.pch-video-card .btn,.pch-meals .btn{min-height:44px}
+.pch-completion,.pch-due{font-size:.9rem;color:#e5eaf1}
+.pch-completion{margin:.8rem 0 .4rem}
+.pch-next progress{display:block;width:100%;height:.45rem;margin-bottom:1rem;accent-color:#e8cc91}
+.pch-due{margin:.75rem 0 0}
+.pch-video-card{border:1px solid #e6d7b5;background:#faf6ed;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+.pch-video-card h2{margin-top:0;font-size:1.15rem}
+.pch-video-card p{margin:0;color:#49576a;overflow-wrap:anywhere}
+.pch-meals ul{list-style:none;padding:0;margin:.5rem 0 1rem}
+.pch-meals li{padding:.55rem 0;border-bottom:1px solid #e2e8ef;overflow-wrap:anywhere}
 .pch-home button:focus-visible{outline-offset:4px}
-@media(max-width:480px){.pch-home .pch-next .btn{width:100%}}
+@media(max-width:480px){.pch-next .btn,.pch-video-card .btn,.pch-meals .btn{width:100%}}
 .checkin-extra{border:1px solid var(--line,#ded8cd);border-radius:12px;padding:14px;margin:18px 0}
 .checkin-extra>summary{cursor:pointer;font-weight:700;min-height:44px;display:flex;align-items:center}
 .checkin-extra>section{margin-top:16px}

@@ -6,7 +6,7 @@ const client={id:'client',display_name:'Katherine <safe>',onboarding_status:'com
 let routed=0;
 Object.assign(w,{$,esc:v=>String(v??'').replaceAll('<','&lt;').replaceAll('>','&gt;'),fmt:v=>v,
  state:{client,role:'client',clientView:'today',user:{id:'account'},data:{weeks:[],sessions:[],checkins:[]}},
- renderClient(){routed++;},
+ renderClient(){routed++;},mealsForNutritionPlan:plan=>plan.meals,
  clientToday(){$('#clientMain').innerHTML='<form id="legalGate">Consent</form>';},
  openDailyNutritionDate(date){w.selectedMealDate=date;}
 });
@@ -15,7 +15,7 @@ const M=w.CheckinStatus,S=w.state,home=w.PersonalCoachingHome;
 const now=new Date(),period=M.week(client,now),date=M.localDate(now,client.timezone);
 S.data.weeks=[{id:'published',client_id:'client',week_start:period,published:true}];
 S.data.sessions=[
- {id:'done',week_id:'published',title:'Completed session',status:'completed',session_date:period},
+ {id:'done',week_id:'published',title:'Completed session',training_type:'weights',status:'completed',session_date:period},
  {id:'action',week_id:'published',title:'Assigned cardio',status:'planned',session_date:period,training_type:'cardio'},
  {id:'peer',week_id:'published',client_id:'peer',title:'Peer session',status:'planned',session_date:period}
 ];
@@ -24,9 +24,11 @@ S.data.sessions=[
  w.clientToday();
  const root=$('#personalCoachingHome');
  assert.equal(root.querySelector('h1').textContent,'Hi, Katherine');
- assert.equal(root.querySelectorAll(':scope > section').length,1);
+ assert.equal(root.querySelectorAll('.pch-plan > section').length,1);
  assert.equal(root.querySelector('.pch-next h2').textContent,'Assigned cardio');
- assert(!root.querySelector('[data-pch-route=training]'),'The primary route appears only once');
+ assert(!root.querySelector('nav'),'Today does not repeat the app navigation');
+ assert.equal(root.querySelector('progress').value,1);
+ assert.equal(root.querySelector('progress').max,2);
  assert(!root.textContent.includes('Private goal details'));
  assert(!root.textContent.includes('Peer session'));
  $('#clientMain').insertAdjacentHTML('beforeend','<section id="lateWidget">Legacy card</section><p id="coachingConnectionStatus">Offline</p>');
@@ -51,11 +53,13 @@ S.data.sessions=[
  firstMonday.setUTCDate(firstMonday.getUTCDate()+7-((firstMonday.getUTCDay()+6)%7));
  client.start_date=firstMonday.toISOString().slice(0,10);
  S.data.weeks=[{id:'upcoming',client_id:'client',week_start:client.start_date,published:true}];
- S.data.nutritionDays=[{week_id:'upcoming',nutrition_plan_id:'menu'}];
+ S.data.nutritionDays=[{week_id:'upcoming',nutrition_date:client.start_date,nutrition_plan_id:'menu'}];
+ S.data.nutritionPlans=[{id:'menu',client_id:'client',meals:[{name:'Assigned breakfast'}]}];
  w.clientToday();
  assert.match($('.pch-next h2').textContent,/Your first week starts/);
  assert(! $('[data-pch-route=checkin]'));
- $('[data-pch-route=nutrition]').click();
+ assert.match($('.pch-meals').textContent,/Assigned breakfast/);
+ $('[data-pch-meals]').click();
  assert.equal(S.clientView,'nutrition');
  assert.equal(w.selectedMealDate,client.start_date);
  console.log('PASS simple Today, one next action, retained navigation, late-widget removal and plan/owner gates.');
