@@ -5,6 +5,7 @@ vm.runInContext(fs.readFileSync(path.join(root,'app-v2.js'),'utf8').split('\nbin
 vm.runInContext(fs.readFileSync(path.join(root,'plan-experience.js'),'utf8'),ctx);
 vm.runInContext(fs.readFileSync(path.join(root,'coaching-workspace.js'),'utf8'),ctx);
 vm.runInContext(fs.readFileSync(path.join(root,'production-workflows.js'),'utf8'),ctx);
+vm.runInContext(fs.readFileSync(path.join(root,'checkin-status-model.js'),'utf8'),ctx);
 const read=s=>vm.runInContext(s,ctx);
 assert.equal(read("localCoachingDate(new Date('2026-10-01T00:30:00Z'),'America/New_York')"),'2026-09-30');
 assert.equal(read("localCoachingDate(new Date('2026-10-01T00:30:00Z'),'Europe/Dublin')"),'2026-10-01');
@@ -30,7 +31,7 @@ read(`state.client.id='own';state.client.weight_unit='kg';state.data.checkins=[{
  original_answers:{'Strength sessions completed':0,'Days following the food plan':5,'Training progress and barriers':'Lift improved','Food this week':'Packed lunch','Weigh-in status':'I haven’t weighed this week'}
  }]`);
 const coachCard=read('checkinCard(state.data.checkins[0],true)');
-for(const text of ['Didn’t weigh this week','0 strength sessions','5 / 7 food-plan days','4/5','3/5','2/5','Saved legacy win','Help with Friday','Book both lifts','Packed lunch']){
+for(const text of ['Submitted 23 Nov 2026','Didn’t weigh this week','0 strength sessions','5 / 7 food-plan days','4/5','3/5','2/5','Saved legacy win','Help with Friday','Book both lifts','Packed lunch']){
  if(text.endsWith('sessions')||text.endsWith('days'))assert(read('reviewActivity(state.data.checkins[0])').includes(text));
  else assert(coachCard.includes(text),text+' should appear in the full coach review');
 }

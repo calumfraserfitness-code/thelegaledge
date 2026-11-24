@@ -36,13 +36,14 @@
   if(rows.length){const title=document.createElement('h3');title.textContent='Check-in call coverage';coverage.append(title);}
   for(const [index,row] of rows.entries()){
    const client=state.clients.find(c=>c.id===row.client_id);
-   const article=document.createElement('article'),name=document.createElement('strong'),button=document.createElement('button');
+   const article=document.createElement('article'),summary=document.createElement('div'),name=document.createElement('strong'),date=document.createElement('small'),button=document.createElement('button');
    article.className='home-checkin-row';name.textContent=client.display_name;
    button.className='btn ghost small';button.type='button';button.textContent='Review';
    button.setAttribute('aria-label','Review check-in for '+client.display_name);
    button.dataset.homeCheckinClient=row.client_id;button.dataset.checkinId=row.id;
    button.onclick=async()=>{if(!eligible()||state.user?.id!==user||!button.isConnected)return;state.client=client;state.clientTab='check-ins';try{if(await loadClientData(client.id)===false)return;if(state.role==='coach'&&state.user?.id===user&&state.client?.id===client.id){renderCoach();const form=Array.from(document.querySelectorAll('[data-coach-review]')).find(f=>f.dataset.coachReview===row.id);if(form){const details=form.closest('details');if(details)details.open=true;form.scrollIntoView?.({block:'center'});}}}catch(e){if(state.user?.id===user)toast(e.message,'error');}};
-   article.append(name,button);if(index<3)list.append(article);
+   date.className='sub';date.textContent=window.CheckinStatus.submissionLabel(row);
+   summary.append(name,date);article.append(summary,button);if(index<3)list.append(article);
    const record=document.createElement('article'),label=document.createElement('p');
    label.textContent=client.display_name+' · Submitted '+window.CheckinStatus.stamp(row.submitted_at,'Europe/Dublin');
    record.className='home-checkin-row';record.append(label);coverage.append(record);

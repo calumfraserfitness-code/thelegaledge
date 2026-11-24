@@ -1236,7 +1236,7 @@ function checkinCard(checkin, coach = false) {
     return typeof before==='number'&&typeof after==='number'?[label+' '+before+' → '+after]:[];
   }):[];
 
-  return `<details class="checkin-card rich-checkin" data-checkin-card="${esc(checkin.id)}" ${checkin === state.data.checkins[0] ? 'open' : ''}><summary><div><span class="eyebrow">WEEK ${checkin.week_number || '—'}</span><h3>${esc(checkin.original_date_text || fmt(checkin.submitted_at))}</h3></div><div class="score">${checkin.week_score ?? '—'}/10</div></summary>
+  return `<details class="checkin-card rich-checkin" data-checkin-card="${esc(checkin.id)}" ${checkin === state.data.checkins[0] ? 'open' : ''}><summary><div><span class="eyebrow">WEEK ${checkin.week_number || '—'}</span><h3>${esc(coach ? window.CheckinStatus.submissionLabel(checkin) : checkin.original_date_text || fmt(checkin.submitted_at))}</h3></div><div class="score">${checkin.week_score ?? '—'}/10</div></summary>
     <div class="detail-list">${detail('Weight',weight)}${detail('Energy',rating(checkin.energy))}${detail('Sleep',rating(checkin.sleep))}${detail('Stress',rating(checkin.stress))}
     ${strength!=null?detail('Strength sessions',strength):detail('Training · self-reported',percentage(checkin.training_adherence))}
     ${foodDays!=null?detail('Days following the food plan',foodDays+' / 7'):detail('Nutrition · self-reported',percentage(checkin.nutrition_adherence))}
