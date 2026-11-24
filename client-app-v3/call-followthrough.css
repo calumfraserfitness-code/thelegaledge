@@ -5,3 +5,12 @@
 .coaching-points strong{display:block;color:#172e46;font-size:.92rem}
 .cf-checklist-count{margin:1rem 0 0}
 .cw-goal-summary{margin-top:1rem}
+
+.cf-call-notes{margin-top:1rem;padding-top:.85rem;border-top:1px solid #dce4ee}
+.cf-call-notes summary{cursor:pointer;font-weight:650}
+.cf-call-notes summary span{margin-inline-start:.5rem;color:#53647a;font-size:.85rem;font-weight:400}
+.cf-followup:not(.cf-coach) .cf-checklist-count{margin:0;color:#47576a;font-size:.85rem;white-space:nowrap}
+.cw-goals.cw-goals-compact{grid-template-columns:repeat(auto-fit,minmax(min(100%,10rem),1fr));gap:.65rem}
+.cw-goals-compact article{display:grid;align-content:start;gap:.4rem;padding:.8rem}
+.cw-goals-compact h3{font-size:1rem;margin:0}
+.cw-goals-compact small{margin:0}
