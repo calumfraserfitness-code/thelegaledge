@@ -6,12 +6,13 @@ const client={id:'client',display_name:'Katherine <safe>',onboarding_status:'com
 let routed=0;
 const longGoal='Build strength and keep a regular meal routine. '+('Plan workouts around work and bring lunch on office days. '.repeat(5)).trim();
 Object.assign(w,{$,esc:v=>String(v??'').replaceAll('<','&lt;').replaceAll('>','&gt;'),fmt:v=>v,
+ coachingGoalValue:goal=>goal.metric==='weight_kg'?75:null,coachingGoalPercent:(goal,current)=>current===75?50:null,
  state:{client,role:'client',clientView:'today',user:{id:'account'},data:{weeks:[],sessions:[],checkins:[]}},
- renderClient(){routed++;},mealsForNutritionPlan:plan=>plan.meals,
+ clientCoachingSupport(){},coachOverview(){},renderClient(){routed++;},mealsForNutritionPlan:plan=>plan.meals,
  clientToday(){$('#clientMain').innerHTML='<form id="legalGate">Consent</form>';},
  openDailyNutritionDate(date){w.selectedMealDate=date;},coachingJoinUrl:url=>url?.startsWith('https://meet.google.com/')?url:''
 });
-for(const name of ['checkin-status-model.js','personal-coaching-home.js'])w.eval(fs.readFileSync(require.resolve('../'+name),'utf8'));
+for(const name of ['checkin-status-model.js','call-followthrough.js','personal-coaching-home.js'])w.eval(fs.readFileSync(require.resolve('../'+name),'utf8'));
 const M=w.CheckinStatus,S=w.state,home=w.PersonalCoachingHome;
 const now=new Date(),period=M.week(client,now),date=M.localDate(now,client.timezone);
 S.data.weeks=[{id:'published',client_id:'client',week_start:period,published:true}];
@@ -21,7 +22,7 @@ S.data.sessions=[
  {id:'peer',week_id:'published',client_id:'peer',title:'Peer session',status:'planned',session_date:period}
 ];
 (async()=>{
- S.data.coachingGoals=[{client_id:'client',status:'active',title:'Weight milestone',metric:'weight_kg',target:70,unit:'kg'},
+ S.data.coachingGoals=[{client_id:'client',status:'active',title:'Weight milestone',metric:'weight_kg',target:70,baseline:80,unit:'kg'},
   {client_id:'peer',status:'active',title:'Private peer goal',target:2}];
  S.data.coachingCalls=[{client_id:'peer',status:'scheduled',scheduled_at:new Date(+now+3600000).toISOString(),join_url:'https://meet.google.com/peer'},
   {client_id:'client',status:'cancelled',scheduled_at:new Date(+now+3600000).toISOString(),join_url:'https://meet.google.com/cancelled'},
@@ -42,9 +43,11 @@ S.data.sessions=[
  assert.equal(root.querySelectorAll('.pch-plan > section').length,1);
  assert.equal(root.querySelector('.pch-next h2').textContent,'Assigned cardio');
  assert(!root.querySelector('nav'),'Today does not repeat the app navigation');
- assert.equal(root.querySelector('progress').value,1);
- assert.equal(root.querySelector('progress').max,2);
- assert.equal(root.querySelector('.pch-goal-text').textContent,longGoal,'The full goal is visible without a disclosure');
+ assert.equal(root.querySelector('.pch-next progress').value,1);
+ assert.equal(root.querySelector('.pch-next progress').max,2);
+ assert.equal(root.querySelector('.pch-targets progress').value,50);
+ assert.match(root.querySelector('.pch-targets').textContent,/11 lb to first milestone/);
+ assert.equal([...root.querySelectorAll('.pch-goal-text li')].map(li=>li.textContent).join(' '),longGoal,'Legacy paragraphs display as readable points');
  assert.equal(root.querySelector('.pch-goal-text').closest('details'),null);
  assert(!root.textContent.includes('Peer session'));
  assert.match(root.querySelector('.pch-coaching').textContent,/154.3 lb/);

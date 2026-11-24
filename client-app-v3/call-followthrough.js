@@ -1,4 +1,20 @@
 /* Private call evidence for coach; only explicitly approved actions for clients. */
+
+function coachingTextMarkup(value) {
+ const lines=String(value||'').split(/\r?\n/).map(line=>line.trim()).filter(Boolean);
+ const segmenter=typeof Intl.Segmenter==='function'?new Intl.Segmenter('en',{granularity:'sentence'}):null;
+ const items=lines.flatMap(line=>{
+  const clean=line.replace(/^(?:[-*•]+|\d+[.)])\s+/,'');
+  return segmenter?Array.from(segmenter.segment(clean), part=>part.segment.trim()).filter(Boolean):clean.replace(/([.!?])\s+(?=[A-Z])/g,'$1\n').split('\n');
+ });
+ if(!items.length)return '';
+ const labelled=text=>/^([\p{L}][\p{L} &/’'-]{0,30})\s*(?:·|:)\s+(.+)$/u.exec(text);
+ const item=text=>{const m=labelled(text);return m?'<strong>'+esc(m[1].trim())+'</strong> <span>'+esc(m[2])+'</span>':esc(text);};
+ return items.length===1&&!labelled(items[0])
+  ?'<p class="coaching-text">'+item(items[0])+'</p>'
+  :'<ul class="coaching-points">'+items.map(text=>'<li>'+item(text)+'</li>').join('')+'</ul>';
+}
+
 (function(){
  'use strict';
  const safeSource=v=>{try{const u=new URL(v);return u.protocol==='https:'&&u.hostname==='fathom.video'?u.href:null;}catch{return null;}};
@@ -27,7 +43,7 @@
     box.querySelector('[data-cf-open-coach]').onclick=()=>{if(!active())return;state.clientView='support';renderClient();};return;
    }
    host.querySelectorAll('.cw-guidance article').forEach(article=>{if(/^Call recap · /.test(article.querySelector('h3')?.textContent||''))article.remove();});
-   box.innerHTML='<div class="panel-head"><div><span class="eyebrow">FROM OUR LATEST CALL</span><h2>Your agreed next steps</h2></div><button type="button" class="btn ghost small" data-cf-refresh>Refresh</button></div>'+(recap?'<p class="cf-date">Call · '+esc(recap.title.slice(13))+'</p><p class="cw-lines">'+esc(recap.body)+'</p>':'')+(rows.length?'<div class="cf-actions">'+rows.map(r=>'<label><input type="checkbox" data-cf-action="'+esc(r.id)+'" '+(r.completed_at?'checked ':'')+(!canComplete?'disabled':'')+'><span>'+esc(r.description)+'<small>'+ (r.completed_at?'Marked complete':'Agreed action')+' · review period ends '+esc(r.expires_on)+'</small></span></label>').join('')+'</div>':'')+(rows.length===100?'<p>Showing up to 100 actions. Ask your coach if anything appears missing.</p>':'')+'<p class="cf-status" role="status"></p><div class="cf-links"><button type="button" class="btn ghost" data-cf-route="training">Training</button><button type="button" class="btn ghost" data-cf-route="nutrition">Meals & food choices</button><button type="button" class="btn ghost" data-cf-route="progress">Progress</button></div>';
+   box.innerHTML='<div class="panel-head"><div><span class="eyebrow">FROM OUR LATEST CALL</span><h2>Your agreed next steps</h2></div><button type="button" class="btn ghost small" data-cf-refresh>Refresh</button></div>'+(recap?'<p class="cf-date">Call · '+esc(recap.title.slice(13))+'</p>'+coachingTextMarkup(recap.body):'')+(rows.length?'<p class="cf-checklist-count"><strong>'+rows.filter(r=>r.completed_at).length+' of '+rows.length+'</strong> agreed actions complete</p><div class="cf-actions">'+rows.map(r=>'<label><input type="checkbox" data-cf-action="'+esc(r.id)+'" '+(r.completed_at?'checked ':'')+(!canComplete?'disabled':'')+'><span>'+esc(r.description)+'<small>'+ (r.completed_at?'Marked complete':'Agreed action')+' · review period ends '+esc(r.expires_on)+'</small></span></label>').join('')+'</div>':'')+(rows.length===100?'<p>Showing up to 100 actions. Ask your coach if anything appears missing.</p>':'')+'<p class="cf-status" role="status"></p><div class="cf-links"><button type="button" class="btn ghost" data-cf-route="training">Training</button><button type="button" class="btn ghost" data-cf-route="nutrition">Meals & food choices</button><button type="button" class="btn ghost" data-cf-route="progress">Progress</button></div>';
    box.querySelector('[data-cf-refresh]').onclick=load;
    box.querySelectorAll('[data-cf-route]').forEach(b=>b.onclick=()=>{if(!active())return;state.clientView=b.dataset.cfRoute;renderClient();});
    box.querySelectorAll('[data-cf-action]').forEach(input=>input.onchange=async()=>{
