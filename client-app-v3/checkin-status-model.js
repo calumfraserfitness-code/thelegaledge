@@ -16,6 +16,13 @@
  }catch(_){return null;}}
  function timing(checkin,client){if(checkin.source_system&&!/^client_weekly_v[23]$/.test(checkin.source_system))return 'Imported time unverified';const deadline=due(client,checkin.period_start);if(!deadline)return 'Due day not set';const submitted=new Date(checkin.submitted_at);if(!Number.isFinite(+submitted))return 'Submission time unknown';if(submitted>deadline)return 'Late';return localDate(submitted,client.timezone||'Europe/Dublin')<localDate(deadline,client.timezone||'Europe/Dublin')?'Early':'On time';}
  function stamp(value,zone){try{return new Intl.DateTimeFormat('en-GB',{timeZone:zone,dateStyle:'medium',timeStyle:'medium'}).format(new Date(value))+' · '+zone;}catch(_){return 'Time unavailable';}}
+ function submissionLabel(checkin){
+  const originalDate=checkin.original_date_text?.trim();
+  if(originalDate&&!/^client_weekly_v[23]$/.test(checkin.source_system||''))return 'Recorded date '+originalDate;
+  if(!Number.isFinite(Date.parse(checkin.submitted_at)))return 'Submission date unavailable';
+  const date=new Intl.DateTimeFormat('en-IE',{day:'numeric',month:'short',year:'numeric',timeZone:'Europe/Dublin'});
+  return 'Submitted '+date.format(new Date(checkin.submitted_at));
+ }
  function delta(current,previous,key){return recorded(current?.[key])&&recorded(previous?.[key])?Number(current[key])-Number(previous[key]):null;}
- const model={recorded,localDate,week,weekLabel,due,timing,stamp,delta};root.CheckinStatus=model;if(typeof module!=='undefined')module.exports=model;
+ const model={recorded,localDate,week,weekLabel,due,timing,stamp,submissionLabel,delta};root.CheckinStatus=model;if(typeof module!=='undefined')module.exports=model;
 })(typeof window==='undefined'?globalThis:window);

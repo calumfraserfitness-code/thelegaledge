@@ -8,7 +8,8 @@
 .home-checkin-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:8px 0;border-top:1px solid var(--line,#e3e8ed)}
 .home-checkin-row:first-child{margin-top:12px}
 .home-checkin-row:last-child{padding-bottom:0}
-.home-checkin-row>strong,.home-checkin-row>p{overflow-wrap:anywhere}
+.home-checkin-row>div,.home-checkin-row>p{overflow-wrap:anywhere}
+.home-checkin-row .sub{font-size:13px}
 .home-checkin-row p{margin:0}
 .home-checkin-inbox [data-home-checkin-refresh]{margin-top:10px}
 #coachHomeFocus .home-client-directory .client-row{grid-template-columns:auto minmax(0,1fr) auto;gap:12px;min-height:52px;padding:8px 0}

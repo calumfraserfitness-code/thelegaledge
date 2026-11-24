@@ -5,4 +5,7 @@ assert.equal(M.week(ny,new Date('2026-10-12T00:30:00Z')),'2026-10-05');assert.eq
 const c={period_start:'2026-10-05',source_system:'client_weekly_v3'};
 assert.equal(M.timing({...c,submitted_at:'2026-10-08T14:00:00Z'},ny),'Early');assert.equal(M.timing({...c,submitted_at:'2026-10-10T03:59:00Z'},ny),'On time');assert.equal(M.timing({...c,submitted_at:'2026-10-10T04:00:00Z'},ny),'Late');assert.equal(M.timing({...c,source_system:'legacy_coach_ui',submitted_at:'2026-10-10T04:00:00Z'},ny),'Imported time unverified');
 assert.equal(M.due({...ny,checkin_day:null},c.period_start),null);assert.equal(M.due({...ny,checkin_due_time:'25:00:00'},c.period_start),null);assert.equal(M.delta({weight_kg:75},{weight_kg:null},'weight_kg'),null);assert.equal(M.delta({weight_kg:75},{weight_kg:76},'weight_kg'),-1);assert.equal(M.delta({training_adherence:0},{training_adherence:50},'training_adherence'),-50);
+assert.equal(M.submissionLabel({...c,submitted_at:'2026-10-09T23:30:00Z',original_date_text:'5 Oct 2026'}),'Submitted 10 Oct 2026');
+assert.equal(M.submissionLabel({source_system:'legacy_coach_ui',original_date_text:'9 Oct 2026'}),'Recorded date 9 Oct 2026');
+assert.equal(M.submissionLabel({period_start:'2026-10-05',submitted_at:null}),'Submission date unavailable');
 console.log('PASS: actual local deadlines, DST offsets, differing client weeks, early/on-time/late boundaries, imported timestamps and unknown-safe comparisons.');
