@@ -1,6 +1,10 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert'),path=require('path');
-const noop=()=>{},ctx=vm.createContext({state:{data:{checkins:[],progress:[],sessions:[]}},Date,Number,Math,Set,Intl,URLSearchParams,location:{search:''},document:{addEventListener:noop},loadClientData:noop,COACH_TABS:[],renderClientWorkspace:noop,renderClient:noop,clientPlanner:noop,clientProgress:noop,clientCheckin:noop,preferredHealthDays:()=>[],iso:d=>d.toISOString().slice(0,10),currentWeek:()=>({id:'w'})});
+const noop=()=>{},ctx=vm.createContext({state:{data:{checkins:[],progress:[],sessions:[]}},Date,Number,Math,Set,Intl,URLSearchParams,location:{search:''},document:{addEventListener:noop},loadClientData:noop,COACH_TABS:[],renderClientWorkspace:noop,renderClient:noop,clientPlanner:noop,clientProgress:noop,clientCheckin:noop,preferredHealthDays:()=>[],iso:d=>d.toISOString().slice(0,10),currentWeek:()=>({id:'w',published:true})});
 vm.runInContext(fs.readFileSync(path.join(__dirname,'../coaching-workspace.js'),'utf8'),ctx);
+const appSource=fs.readFileSync(path.join(__dirname,'../app-v2.js'),'utf8');
+const recapSource=fs.readFileSync(path.join(__dirname,'../call-followthrough.js'),'utf8');
+vm.runInContext(appSource.slice(appSource.indexOf('function progressData('),appSource.indexOf('function rangeEntries(')),ctx);
+vm.runInContext(recapSource.slice(recapSource.indexOf('function coachingTextMarkup('),recapSource.indexOf('(function(){')),ctx);
 assert.equal(vm.runInContext("recordedAverage([{steps:null},{steps:6000},{steps:''},{steps:8000}], 'steps')",ctx),7000);
 assert.equal(vm.runInContext("recordedAverage([{sleep_minutes:null}], 'sleep_minutes')",ctx),null);
 assert.equal(vm.runInContext('coachingGoalPercent({baseline:90,target:80},85)',ctx),50);

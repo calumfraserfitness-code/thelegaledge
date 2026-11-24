@@ -8,20 +8,20 @@ function coachingGoalValue(goal){
  const latest=state.data.checkins[0],week=currentWeek();
  switch(goal.metric){
  case 'steps':{const cutoff=iso(new Date(Date.now()-6*864e5));const manual=(state.data.steps||[]).filter(r=>r.entry_date>=cutoff&&r.entry_date<=iso(new Date()));return recordedAverage(recentHealthRows(),'steps')??recordedAverage(manual,'actual_steps')??(finiteRecorded(latest?.average_steps)?Number(latest.average_steps):null);}
- case 'weight_kg':{const rows=[...(state.data.progress||[]).map(r=>({...r,date:r.entry_date||r.created_at})),...(state.data.checkins||[]).map(r=>({...r,date:r.submitted_at}))].filter(r=>finiteRecorded(r.weight_kg)).sort((a,b)=>String(b.date).localeCompare(String(a.date)));return rows.length?Number(rows[0].weight_kg):null;}
- case 'weekly_sessions':return week?state.data.sessions.filter(s=>s.week_id===week.id&&s.status==='completed'&&['weights','resistance'].includes(s.training_type)).length:null;
+ case 'weight_kg':return progressData().current||null;
+ case 'weekly_sessions':return week&&(week.published||state.role==='coach'||state.preview)?state.data.sessions.filter(s=>s.week_id===week.id&&(!s.client_id||s.client_id===state.client.id)&&s.status==='completed'&&['weights','resistance'].includes(s.training_type)).length:null;
  case 'sleep_minutes':return recordedAverage(recentHealthRows(),'sleep_minutes')??(finiteRecorded(latest?.sleep_hours)?Number(latest.sleep_hours)*60:null);
  case 'nutrition_adherence':return finiteRecorded(latest?.nutrition_adherence)?Number(latest.nutrition_adherence):null;
  case 'energy':return finiteRecorded(latest?.energy)?Number(latest.energy):null;
  default:return finiteRecorded(goal.current_value)?Number(goal.current_value):null;
  }
 }
-function coachingGoalPercent(goal,value){if(!finiteRecorded(value))return null;const distance=Number(goal.target)-Number(goal.baseline);return distance===0?(Number(value)===Number(goal.target)?100:0):Math.max(0,Math.min(100,(Number(value)-Number(goal.baseline))/distance*100));}
+function coachingGoalPercent(goal,value){if(!finiteRecorded(value)||!finiteRecorded(goal.baseline)||!finiteRecorded(goal.target))return null;const distance=Number(goal.target)-Number(goal.baseline);return distance===0?(Number(value)===Number(goal.target)?100:0):Math.max(0,Math.min(100,(Number(value)-Number(goal.baseline))/distance*100));}
 function coachingGoalsMarkup(){
  const goals=(state.data.coachingGoals||[]).filter(g=>g.status!=='paused');
  const focus=(state.data.coachingGuidance||[]).filter(g=>g.published&&(!g.client_id||g.client_id===state.client.id)&&/^(Agreed focus|Previous focus) · /.test(g.title||'')),summary=state.client.goal_summary;
- const card=r=>'<article><h3>'+esc(r.title.replace(/^(Agreed focus|Previous focus) · /,''))+'</h3><p class="cw-lines">'+esc(r.body)+'</p></article>';
- const extra=(summary?'<p><b>Your overall goal:</b> '+esc(summary)+'</p>':'')+focus.filter(r=>r.title.startsWith('Agreed focus')).map(card).join('')+(focus.some(r=>r.title.startsWith('Previous focus'))?'<details><summary>Previous recording focus · check with Calum before applying</summary>'+focus.filter(r=>r.title.startsWith('Previous focus')).map(card).join('')+'</details>':'');
+ const card=r=>'<article><h3>'+esc(r.title.replace(/^(Agreed focus|Previous focus) · /,''))+'</h3>'+coachingTextMarkup(clientGoalText(r.body))+'</article>';
+ const extra=(summary?'<div class="cw-goal-summary"><h3>Agreed plan</h3>'+coachingTextMarkup(summary)+'</div>':'')+focus.filter(r=>r.title.startsWith('Agreed focus')).map(card).join('')+(focus.some(r=>r.title.startsWith('Previous focus'))?'<details><summary>Previous recording focus · check with Calum before applying</summary>'+focus.filter(r=>r.title.startsWith('Previous focus')).map(card).join('')+'</details>':'');
  let html=`<section class="panel"><div class="panel-head"><div><span class="eyebrow">PERSONAL GOALS</span><h2>Your agreed targets</h2><p>Progress uses your recorded data. Missing measurements stay blank.</p></div></div><div class="cw-goals">${goals.map(g=>{const value=coachingGoalValue(g),pct=coachingGoalPercent(g,value),factor=g.metric==='weight_kg'&&state.client.weight_unit==='lbs'?2.2046226218:1,unit=factor!==1?'lb':g.unit,display=n=>Number((Number(n)*factor).toFixed(1));return `<article><span class="pill">${esc(g.status)}</span><h3>${esc(g.title)}</h3><p>${esc(clientGoalText(g.reason))}</p><b>${value===null?'Awaiting data':display(value)} / ${esc(display(g.target))} ${esc(unit)}</b>${pct===null?'':`<progress value="${pct}" max="100" aria-label="${esc(g.title)} progress"></progress>`}<small>Baseline ${esc(display(g.baseline))} · target ${g.target_date?fmt(g.target_date):'date to agree'} · ${esc(coachingMetrics[g.metric])}</small></article>`;}).join('')||(focus.some(r=>r.title.startsWith('Agreed focus'))?'':'<p>A measurable target needs review with Calum.</p>')}</div></section>`;
  return html.replace('</div></section>','</div>'+extra+'</section>');
 }

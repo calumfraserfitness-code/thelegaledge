@@ -77,11 +77,16 @@
    const target=value!==null&&Number.isFinite(value)?'<strong class="pch-target-number">'+esc(format(value))+
     (unit?' <small>'+esc(unit)+'</small>':'')+'</strong>':'';
    const current=typeof coachingGoalValue==='function'?coachingGoalValue(g):null;
-   const recorded=target&&typeof current==='number'&&Number.isFinite(current)?'<small class="pch-recorded">Recorded '+esc(format(current*factor)+(unit?' '+unit:''))+'</small>':'';
+   const hasCurrent=typeof current==='number'&&Number.isFinite(current);
+   const recorded=target?'<small class="pch-recorded">'+(hasCurrent?'Latest '+esc(format(current*factor)+(unit?' '+unit:'')):'Waiting for a saved measurement')+'</small>':'';
+   const percent=typeof coachingGoalPercent==='function'?coachingGoalPercent(g,current):null;
+   const progress=percent==null?'':'<progress value="'+percent+'" max="100" aria-label="'+esc(g.title)+' progress"></progress>';
+   const remaining=hasCurrent&&target&&g.metric==='weight_kg'&&Number(g.baseline)>Number(g.target)&&current>Number(g.target)
+    ?'<small class="pch-recorded">'+esc(format((current-Number(g.target))*factor)+' '+unit)+' to first milestone</small>':'';
    const by=/^\d{4}-\d{2}-\d{2}$/.test(g.target_date||'')?'<small class="pch-target-date">By '+esc(fmt(g.target_date,{day:'numeric',month:'short',year:'numeric'}))+'</small>':'';
-   return '<li><span>'+esc(g.title)+'</span>'+target+recorded+by+'</li>';
+   return '<li><span>'+esc(g.title)+'</span>'+target+recorded+remaining+progress+by+'</li>';
   });
-  const goalContent=(goal?'<p class="pch-goal-text">'+esc(goal)+'</p>':'')+
+  const goalContent=(goal?'<div class="pch-goal-text">'+coachingTextMarkup(goal)+'</div>':'')+
    (targetRows.length?'<ul class="pch-targets" aria-label="Agreed targets">'+targetRows.join('')+'</ul>':'');
   let call='<p class="pch-call-empty">No call scheduled</p>';
   if(upcoming){
@@ -125,6 +130,7 @@
    '<div data-pch-video hidden></div>'+coachingMarkup(home,client)+'<div class="pch-plan">'+
    '<section class="panel pch-next"><p class="eyebrow">'+(home.start?'YOUR FIRST WEEK':action.route==='training'?'NEXT SESSION':action.route==='checkin'?'WEEKLY CHECK-IN':'THIS WEEK')+'</p><h2>'+esc(action.title)+'</h2>'+
    (home.count?'<p class="pch-completion"><strong>'+home.completed+' of '+home.count+'</strong> planned sessions complete</p><progress value="'+home.completed+'" max="'+home.count+'" aria-label="Planned sessions complete"></progress>':'')+
+   (window.FlexibleCompletion?.recentSessionsMarkup?.(client,state.data,1)||'')+
    '<button type="button" class="btn primary" data-pch-next>'+esc(action.label)+'</button>'+
    '<button type="button" class="btn ghost pch-week-link" data-pch-planner>Weekly planner</button>'+
    (home.dueLabel?'<p class="pch-due">Check-in due '+esc(home.dueLabel)+'</p>':'')+'</section>'+

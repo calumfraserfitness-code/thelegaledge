@@ -164,3 +164,10 @@
 .flex-timing #cwTimingPanel{padding:0;border:0;box-shadow:none;margin:0}
 .flex-timing [data-schedule-status]{margin:0;grid-column:1/-1;font-size:.85rem}
 @media(max-width:480px){.pch-next .pch-week-link{margin:.5rem 0 0}}
+
+.pch-targets progress{width:100%;height:.65rem;accent-color:#254f72}
+.recent-sessions{margin:.85rem 0}
+.recent-sessions h3{font-size:1rem;margin:0 0 .4rem}
+.recent-sessions ul{list-style:none;padding:0;margin:0}
+.recent-sessions li{display:grid;gap:.2rem;padding:.4rem 0}
+.recent-sessions small,.recent-sessions p{color:#47576a;font-size:.85rem;margin:0}
