@@ -2,13 +2,14 @@
 
 function coachingTextMarkup(value) {
  const lines=String(value||'').split(/\r?\n/).map(line=>line.trim()).filter(Boolean);
+ const labelled=text=>/^([\p{L}][\p{L} &/’'-]{0,30})\s*(?:·|:)\s+(.+)$/u.exec(text);
  const segmenter=typeof Intl.Segmenter==='function'?new Intl.Segmenter('en',{granularity:'sentence'}):null;
  const items=lines.flatMap(line=>{
   const clean=line.replace(/^(?:[-*•]+|\d+[.)])\s+/,'');
+  if(labelled(clean))return [clean];
   return segmenter?Array.from(segmenter.segment(clean), part=>part.segment.trim()).filter(Boolean):clean.replace(/([.!?])\s+(?=[A-Z])/g,'$1\n').split('\n');
  });
  if(!items.length)return '';
- const labelled=text=>/^([\p{L}][\p{L} &/’'-]{0,30})\s*(?:·|:)\s+(.+)$/u.exec(text);
  const item=text=>{const m=labelled(text);return m?'<strong>'+esc(m[1].trim())+'</strong> <span>'+esc(m[2])+'</span>':esc(text);};
  return items.length===1&&!labelled(items[0])
   ?'<p class="coaching-text">'+item(items[0])+'</p>'
@@ -31,21 +32,32 @@ function coachingTextMarkup(value) {
   const anchor=host.querySelector('.priority-grid');if(anchor)anchor.before(box);else if(view==='support'&&host.querySelector('#coachContact'))host.querySelector('#coachContact').after(box);else host.append(box);
   const active=()=>box.isConnected&&state.user?.id===user&&state.role===role&&state.client?.id===id&&state.clientView===view;
   const recap=(state.data.coachingGuidance||[]).filter(r=>r.client_id===id&&r.published&&/^Call recap · \d{4}-\d{2}-\d{2}$/.test(r.title)).sort((a,b)=>b.title.localeCompare(a.title))[0];
+  if(view==='support'){
+   host.querySelector('#cfCallNotes')?.remove();
+   host.querySelectorAll('.cw-guidance article').forEach(article=>{
+    if(/^Call recap · /.test(article.querySelector('h3')?.textContent||''))article.remove();
+   });
+   if(recap?.body){
+    const calls=host.querySelector('#coachingCalls');
+    const notes='<details id="cfCallNotes" class="cf-call-notes'+(calls?'':' panel')+'"><summary>Latest call notes <span>'+esc(fmt(recap.title.slice(13)))+'</span></summary>'+coachingTextMarkup(recap.body)+'</details>';
+    if(calls)calls.insertAdjacentHTML('beforeend',notes);
+    else box.insertAdjacentHTML('afterend',notes);
+   }
+  }
   async function load(){try{
    let date;try{date=window.CheckinStatus.localDate(new Date(),state.client.timezone||'Europe/Dublin');}catch{throw Error('Your timezone needs coach setup.');}
    const rows=await approvedActions(id,date);if(!active())return;
    const next=rows.find(r=>!r.completed_at);
-   if(!recap&&(view==='today'?!next:!rows.length)){box.remove();return;}
+   if(view==='today'?!recap&&!next:!rows.length){box.remove();return;}
    box.hidden=false;
    const canComplete=state.role==='client'&&state.client.profile_id===user;
    if(view==='today'){
     box.innerHTML='<span class="eyebrow">YOUR COACHING</span><h2>'+(next?'Your next step':'Latest call recap')+'</h2><p>'+esc(next?.description||recap.title.slice(13))+'</p><button type="button" class="btn primary" data-cf-open-coach>'+(next?'View next steps':'Read recap')+'</button>';
     box.querySelector('[data-cf-open-coach]').onclick=()=>{if(!active())return;state.clientView='support';renderClient();};return;
    }
-   host.querySelectorAll('.cw-guidance article').forEach(article=>{if(/^Call recap · /.test(article.querySelector('h3')?.textContent||''))article.remove();});
-   box.innerHTML='<div class="panel-head"><div><span class="eyebrow">FROM OUR LATEST CALL</span><h2>Your agreed next steps</h2></div><button type="button" class="btn ghost small" data-cf-refresh>Refresh</button></div>'+(recap?'<p class="cf-date">Call · '+esc(recap.title.slice(13))+'</p>'+coachingTextMarkup(recap.body):'')+(rows.length?'<p class="cf-checklist-count"><strong>'+rows.filter(r=>r.completed_at).length+' of '+rows.length+'</strong> agreed actions complete</p><div class="cf-actions">'+rows.map(r=>'<label><input type="checkbox" data-cf-action="'+esc(r.id)+'" '+(r.completed_at?'checked ':'')+(!canComplete?'disabled':'')+'><span>'+esc(r.description)+'<small>'+ (r.completed_at?'Marked complete':'Agreed action')+' · review period ends '+esc(r.expires_on)+'</small></span></label>').join('')+'</div>':'')+(rows.length===100?'<p>Showing up to 100 actions. Ask your coach if anything appears missing.</p>':'')+'<p class="cf-status" role="status"></p><div class="cf-links"><button type="button" class="btn ghost" data-cf-route="training">Training</button><button type="button" class="btn ghost" data-cf-route="nutrition">Meals & food choices</button><button type="button" class="btn ghost" data-cf-route="progress">Progress</button></div>';
-   box.querySelector('[data-cf-refresh]').onclick=load;
-   box.querySelectorAll('[data-cf-route]').forEach(b=>b.onclick=()=>{if(!active())return;state.clientView=b.dataset.cfRoute;renderClient();});
+   box.innerHTML='<div class="panel-head"><h2>Agreed actions</h2><span class="cf-checklist-count">'+rows.filter(r=>r.completed_at).length+' of '+rows.length+' complete</span></div>'+
+    '<div class="cf-actions">'+rows.map(r=>'<label><input type="checkbox" data-cf-action="'+esc(r.id)+'" '+(r.completed_at?'checked ':'')+(!canComplete?'disabled':'')+'><span>'+esc(r.description)+'</span></label>').join('')+'</div>'+
+    (rows.length===100?'<p>Showing up to 100 actions.</p>':'')+'<p class="cf-status" role="status"></p>';
    box.querySelectorAll('[data-cf-action]').forEach(input=>input.onchange=async()=>{
     if(!active()||!canComplete)return;const checked=input.checked;input.disabled=true;const status=box.querySelector('[role=status]');status.textContent='Saving…';
     try{const r=await query('Save agreed action',db.rpc('complete_coaching_focus',{p_id:input.dataset.cfAction,p_complete:checked}));if(!active())return;if(r?.id!==input.dataset.cfAction||r.client_id!==id||Boolean(r.completed_at)!==checked)throw Error('The saved action was not confirmed. Refresh before retrying.');await load();}

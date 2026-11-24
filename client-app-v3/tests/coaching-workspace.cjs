@@ -21,6 +21,10 @@ ctx.state.data.coachingGoals=[{title:'Weight milestone',metric:'weight_kg',basel
 ctx.state.data.coachingGuidance=[{client_id:'client-a',published:true,title:'Agreed focus · Sleep routine',body:'Use a bedtime reminder'},{client_id:'client-b',published:true,title:'Agreed focus · Other client',body:'PRIVATE OTHER CLIENT'},{client_id:'client-a',published:false,title:'Agreed focus · Draft',body:'UNPUBLISHED DRAFT'},{client_id:'client-a',published:true,title:'Previous focus · Travel week',body:'Historical instruction'}];
 assert.equal(vm.runInContext("coachingGoalValue({metric:'weight_kg'})",ctx),89,'Latest check-in weight supersedes older progress record');
 const markup=vm.runInContext('coachingGoalsMarkup()',ctx);assert(markup.includes('196.2 / 187.4 lb'));assert(markup.includes('Sleep routine'));assert(markup.includes('Historical instruction'));assert(!markup.includes('PRIVATE OTHER CLIENT'));assert(!markup.includes('UNPUBLISHED DRAFT'));
+ctx.state.role='client';ctx.state.clientView='support';
+const compact=vm.runInContext('coachingGoalsMarkup()',ctx);assert(compact.includes('cw-goals-compact'));assert(compact.includes('196.2 / 187.4 lb'));assert(!compact.includes('Agreed plan'));assert(!compact.includes('class="pill"'));
+ctx.state.data.coachingGoals=[];assert(vm.runInContext('coachingGoalsMarkup()',ctx).includes('Build strength'));
+
 console.log('PASS: missing health readings excluded, decreasing goals, no-data goals, distinct strength-session counts and check-in metric fallback.');
 
 ctx.firmState={participants:Array.from({length:6},(_,i)=>({id:'member-'+i,client_id:'person-'+i,status:'active'})),consents:Array.from({length:6},(_,i)=>({participant_id:'member-'+i}))};
