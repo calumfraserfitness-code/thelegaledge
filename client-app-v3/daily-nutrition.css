@@ -64,3 +64,11 @@
 .dn-nutrition-details .dn-target-panel{margin-top:.8rem}
 .dn-optional-tracking .dn-daily-actions{flex-wrap:wrap;gap:.5rem;margin:.8rem 0}
 @media(max-width:430px){.dn-focus{padding:.85rem}.dn-page .dn-section-heading{gap:.65rem}.dn-page .dn-section-heading .btn{font-size:.8rem;padding:.5rem .65rem}.dn-page .dn-meal-actions .btn{flex:1}.dn-optional-tracking .dn-daily-actions .btn{width:100%}}
+
+/* Explicit client tracking preference restores the familiar log controls. */
+.dn-tracking-shortcuts{display:flex;gap:.6rem;flex-wrap:wrap;margin:.5rem 0}
+.dn-daily-tracking .dn-meal-estimate{margin:.4rem 0 0;font-weight:600;color:#334258}
+.dn-tracking-panel h2{font-size:1.1rem;margin:.25rem 0}
+.dn-tracking-panel>p{color:#697481;font-size:.9rem}
+.dn-daily-tracking .dn-meal-actions [data-dn-log]{margin-left:auto}
+@media(max-width:430px){.dn-tracking-shortcuts .btn{flex:1;min-height:44px}.dn-daily-tracking .dn-meal-actions [data-dn-log]{flex-basis:100%;margin-left:0}}

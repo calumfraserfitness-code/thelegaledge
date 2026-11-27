@@ -48,10 +48,30 @@ async function tick(){await new Promise(r=>setTimeout(r,0));}
  assert.match(doc.querySelector('.dn-focus').textContent,/Repeat your office breakfast/);
  assert.equal(doc.querySelectorAll('.dn-focus li').length,3);
  assert.doesNotMatch(doc.querySelector('.dn-focus').textContent,/PRIVATE PEER NUTRITION/);
- assert(!doc.querySelector('.dn-meals [data-dn-log]'),'Planned meals never show food logging controls');
+ assert(!doc.querySelector('.dn-meals [data-dn-log]'),'Meal-plan-first clients do not see daily logging controls');
  assert(!doc.querySelector('.dn-optional-tracking').open,'Optional diary starts closed');
  assert(doc.querySelector('#dnAnywhere').closest('.dn-optional-tracking'));
  assert(doc.querySelector('.dn-target-panel').closest('details'),'Targets are available on demand rather than the main task');
+ // Tracking mode is an explicit, private client preference, not based on needing to log.
+ run(`state.data.coachingGuidance.push({client_id:'peer',published:true,category:'meal_example',title:'Your food tracking routine',body:'Daily food tracking'},{client_id:state.client.id,published:false,category:'meal_example',title:'Your food tracking routine',body:'Daily food tracking'});renderClient();`);
+ assert(!doc.querySelector('.dn-meals [data-dn-log]'),'Other clients or unpublished guidance cannot activate tracking');
+ run(`state.data.coachingGuidance.find(g=>g.client_id===state.client.id&&g.title==='Your food tracking routine').published=true;renderClient();`);
+ assert(doc.querySelector('.dn-daily-tracking'),'Personalised tracking mode active');
+ assert(doc.querySelector('.dn-meals [data-dn-log]').textContent.includes('Log eaten'));
+ assert(doc.querySelector('.dn-meal-estimate').textContent.includes('400 kcal'));
+ assert(doc.querySelector('.dn-nutrition-details').open,'Daily target display is immediately available');
+ assert(doc.querySelector('.dn-tracking-panel')&&!doc.querySelector('.dn-optional-tracking'));
+ assert(doc.querySelector('#dnAnywhere').closest('.dn-tracking-shortcuts'));
+ assert(doc.querySelector('#dnQuickLog').closest('.dn-tracking-shortcuts'));
+ doc.querySelector('.dn-meals [data-dn-log]').click();await tick();
+ assert(doc.querySelector('.dn-meals .dn-status').textContent.includes('Logged'));
+ assert(doc.querySelector('.dn-intake strong').textContent.includes('400'));
+ assert.equal(doc.querySelectorAll('[data-dn-log="breakfast-1"]').length,1,'No duplicate controls');
+ doc.querySelector('.dn-meals [data-dn-log]').click();await tick();
+ assert(!doc.querySelector('.dn-meals .dn-eaten'),'Undo is directly available');
+ run(`state.data.coachingGuidance.find(g=>g.client_id===state.client.id&&g.title==='Your food tracking routine').published=false;renderClient();`);
+ assert(!doc.querySelector('.dn-meals [data-dn-log]'),'Other clients retain meal-plan first');
+
 
  doc.querySelector('#dnLibrary').click();assert(doc.querySelector('[role=dialog]').textContent.includes('Turkey rice bowl'),'Assigned optional recipes are selectable');doc.querySelector('[data-dn-filter="Breakfast"]').click();assert(!doc.querySelector('[role=dialog]').textContent.includes('Turkey rice bowl'),'Main meals never enter breakfast');doc.querySelector('[data-dn-filter="Dinner"]').click();assert(doc.querySelector('[role=dialog]').textContent.includes('Turkey rice bowl'),'Optional mains stay available for dinner');doc.querySelector('#dnClose').click();
  run(`state.data.mealAssignments.push(...[{id:'fruit-a',name:'Greek Yogurt Bowl · strawberries',calories:400,protein_g:30,carbs_g:45,fat_g:12,ingredients:[{name:'Strawberries',quantity:100,unit:'g'}]},{id:'fruit-b',name:'Greek Yogurt Bowl · banana',calories:420,protein_g:32,carbs_g:48,fat_g:13,ingredients:[{name:'Banana',quantity:80,unit:'g'}]}].map(meal=>({id:meal.id,client_id:state.client.id,nutrition_plan_id:null,historical:false,meal:{...meal,meal_type:'Breakfast'}})));`);
@@ -159,7 +179,7 @@ async function tick(){await new Promise(r=>setTimeout(r,0));}
  assert.equal(doc.querySelectorAll('.dn-eaten').length,1,'Returning to today reloads its saved meal');
  run(`state.client.onboarding_status='pending_legal';renderClient();`);await tick();await tick();assert.ok(!doc.querySelector('.dn-page'),'Consent gate retained');
  run(`state.preview=true;state.client.onboarding_status='complete';state.client.plan_status='published';state.clientView='checkin';renderClient();`);await tick();assert.equal(doc.querySelector('#clientNav [data-client-view=checkin]').getAttribute('aria-current'),'page');assert(!doc.querySelector('#dnProgressNav'),'Check-in has its own destination');
- run(`state.role='coach';$('#coachMain').innerHTML='<div id="clientWorkspaceBody"></div>';state.selectedNutritionPlanId='p';coachNutrition();`);assert(doc.querySelector('#coachDailyMenu'));assert(!doc.querySelector('#clientWorkspaceBody .nutrition-day-tabs'));assert(doc.querySelector('[data-plan-editor] [name=calories]'));assert(doc.querySelector('[data-meal-editor]'),'Existing personal recipe editor retained');
+ run(`state.role='coach';$('#coachMain').innerHTML='<div id="clientWorkspaceBody"></div>';state.selectedNutritionPlanId='p';coachNutrition();`);assert(doc.querySelector('#coachDailyMenu'));const trackingForm=doc.querySelector('#coachDailyTracking');assert(trackingForm);trackingForm.elements.mode.value='daily';trackingForm.dispatchEvent(new dom.window.Event('submit',{bubbles:true,cancelable:true}));await tick();assert.equal(doc.querySelector('#coachDailyTracking').elements.mode.value,'daily');const optionalForm=doc.querySelector('#coachDailyTracking');optionalForm.elements.mode.value='optional';optionalForm.dispatchEvent(new dom.window.Event('submit',{bubbles:true,cancelable:true}));await tick();assert.equal(doc.querySelector('#coachDailyTracking').elements.mode.value,'optional');assert(!doc.querySelector('#clientWorkspaceBody .nutrition-day-tabs'));assert(doc.querySelector('[data-plan-editor] [name=calories]'));assert(doc.querySelector('[data-meal-editor]'),'Existing personal recipe editor retained');
  doc.querySelector('#coachDailyAssign').click();await tick();assert.equal(run(`state.data.nutritionDays.find(d=>d.nutrition_date===localCoachingDate()).nutrition_plan_id`),'p');
  doc.querySelector('#coachDailyPreview').click();await tick();assert(doc.querySelector('.dn-page'));assert(doc.querySelector('[data-dn-date]')?.closest('details'),'Week selector is tucked inside another-day details');assert(!doc.querySelector('.dn-history').open);
  run('showAddClient()');const create=doc.querySelector('#addClientForm');assert(create.elements.start_onboarding.checked);assert.equal(create.elements.password.value.length,36);assert(!create.elements.start_weight_display.required);assert(!create.querySelector('[name=payment_url],[name=welcome_url]'));doc.querySelector('.modal-backdrop [data-close-modal]').click();
