@@ -33,7 +33,7 @@
   section.innerHTML='<h2>Progress this week</h2><div class="checkin-counts">'+
    '<label>Strength sessions completed<input name="strength_sessions_completed" type="number" min="0" max="28" step="1" inputmode="numeric" required>'+
    (lifts.length?'<small>'+recorded+' logged · '+lifts.length+' assigned. Include any you did outside the app.</small>':'<small>Include any sessions you did outside the app.</small>')+'</label>'+
-   '<label>Days you followed your food plan<input name="nutrition_days_on_plan" type="number" min="0" max="7" step="1" inputmode="numeric" required><small>Out of 7. Your best estimate is fine.</small></label></div>';
+   '<label>Days you broadly followed your food plan<input name="nutrition_days_on_plan" type="number" min="0" max="7" step="1" inputmode="numeric" required><small>Out of 7. An estimate is fine — no daily food logs needed.</small></label></div>';
   const previous=(state.data.checkins||[]).filter(r=>r.client_id===client.id&&r.period_start<period)
    .sort((a,b)=>b.period_start.localeCompare(a.period_start))[0];
   const values=previous?.original_answers||{};
