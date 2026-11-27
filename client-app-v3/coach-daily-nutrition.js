@@ -17,6 +17,28 @@
   $('#coachDailyMenu').onchange=e=>{state.selectedNutritionPlanId=e.target.value;coachNutrition();};
   $('#coachDailyDate').onchange=e=>{if(!e.target.value)return;date=e.target.value;const d=assigned(date);if(d)state.selectedNutritionPlanId=d.nutrition_plan_id;coachNutrition();};
   $('#coachDailyPreview').onclick=openClient;
+  const trackingTitle='Your food tracking routine',trackingCategory='meal_example';
+  const trackingRows=()=> (state.data.coachingGuidance||[]).filter(g=>g.client_id===state.client.id&&g.category===trackingCategory&&g.title===trackingTitle);
+  const tracking=document.createElement('form');tracking.className='coach-daily-controls';tracking.id='coachDailyTracking';
+  tracking.innerHTML=`<label>Food tracking experience<select name="mode"><option value="optional">Meal plan first · optional tracking</option><option value="daily" ${trackingRows().some(g=>g.published)?'selected':''}>Daily tracking · visible log controls</option></select></label><button class="btn ghost small">Save preference</button>`;
+  head.append(tracking);
+  tracking.onsubmit=async e=>{
+   e.preventDefault();
+   const clientId=state.client.id,userId=state.user?.id,mode=new FormData(tracking).get('mode'),published=mode==='daily',existing=trackingRows(),button=e.submitter||tracking.querySelector('button');
+   const active=()=>state.client?.id===clientId&&state.user?.id===userId&&state.role==='coach';
+   if(!active()||!['daily','optional'].includes(mode))return;
+   if(existing.some(g=>g.published)===published)return toast('Food tracking preference already saved');
+   const row={client_id:clientId,category:trackingCategory,title:trackingTitle,body:'Keep using food tracking if it helps you. Your logged food, meal plan and agreed targets remain separate.',published};
+   setBusy(button,true);
+   try{
+    const saved=state.preview?(existing.length?existing.map(g=>({...g,published})):[{...row,id:'sample-tracking-preference'}]):existing.length?await query('Save food tracking preference',db.from('client_coaching_guidance').update({published}).eq('client_id',clientId).eq('category',trackingCategory).eq('title',trackingTitle).select()):await query('Save food tracking preference',db.from('client_coaching_guidance').insert(row).select());
+    if(!Array.isArray(saved)||!saved.length)throw Error('Preference save was not confirmed.');
+    if(!active())return;
+    state.data.coachingGuidance=[...(state.data.coachingGuidance||[]).filter(g=>!(g.client_id===clientId&&g.category===trackingCategory&&g.title===trackingTitle)),...saved];
+    toast('Food tracking preference saved');coachNutrition();
+   }catch(err){if(active())toast(err.message,'error');}finally{setBusy(button,false);}
+  };
+
   $('#coachDailyAssign').onclick=e=>saveDates([date],e.target);
   $('#coachDailyRepeat').onclick=e=>{const end=iso(new Date(new Date(week.week_start+'T12:00:00Z').getTime()+6*864e5)),dates=[];for(let d=date;d<=end;d=iso(new Date(new Date(d+'T12:00:00Z').getTime()+864e5)))dates.push(d);saveDates(dates,e.target);};
   const editor=wrap.querySelector('[data-plan-editor]');if(editor){const details=document.createElement('details');details.className='coach-menu-details';details.innerHTML='<summary>Menu name & planning defaults</summary>';editor.prepend(details);for(const name of ['name','day_type','days_per_week']){const field=editor.elements.namedItem(name);if(field)details.append(field.closest('label'));}}
