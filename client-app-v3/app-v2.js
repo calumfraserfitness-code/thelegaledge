@@ -255,8 +255,8 @@ async function bootAccount() {
     if(employerAccess.length){state.role='employer';await renderEmployerPortal();return;}
     const client = await query('Client profile', db.from('clients').select('*').eq('profile_id', user.id).single());
     state.client = { ...client, display_name: state.profile.full_name, daily_steps_goal: safeStepGoal(client) };
-    await loadClientData(client.id);
-    state.hasPilot = (await query('Pilot membership', db.from('firm_participants').select('id').eq('client_id', client.id).neq('status', 'withdrawn').limit(1))).length > 0;
+    const [,pilotMembership] = await Promise.all([loadClientData(client.id),query('Pilot membership', db.from('firm_participants').select('id').eq('client_id', client.id).neq('status', 'withdrawn').limit(1))]);
+    state.hasPilot = pilotMembership.length > 0;
     $('#clientHello').textContent = state.client.display_name;
     show('#clientApp');
     renderClient();
