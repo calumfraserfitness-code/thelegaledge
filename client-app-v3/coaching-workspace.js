@@ -114,9 +114,8 @@ function bindClientScheduling(){
  });
 }
 const originalLoadCoachingClient=loadClientData;let coachingLoadSequence=0;
-loadClientData=async function(id){const request=++coachingLoadSequence,user=state.user?.id,role=state.role,active=()=>request===coachingLoadSequence&&state.client?.id===id&&state.user?.id===user&&state.role===role;if(await originalLoadCoachingClient(id)===false||!active())return false;
- const result=await Promise.all([['client_coaching_goals','coachingGoals','created_at'],['client_coaching_calls','coachingCalls','scheduled_at'],['client_coaching_guidance','coachingGuidance','created_at']].map(async([table,key,order])=>[key,await query('Personal coaching '+key,db.from(table).select('*').eq('client_id',id).order(order).limit(200))]));
- if(!active())return false;for(const[key,rows]of result)state.data[key]=rows;return true;
+loadClientData=async function(id){const request=++coachingLoadSequence,user=state.user?.id,role=state.role,active=()=>request===coachingLoadSequence&&state.client?.id===id&&state.user?.id===user&&state.role===role;const [loaded,result]=await Promise.all([originalLoadCoachingClient(id),Promise.all([['client_coaching_goals','coachingGoals','created_at'],['client_coaching_calls','coachingCalls','scheduled_at'],['client_coaching_guidance','coachingGuidance','created_at']].map(async([table,key,order])=>[key,await query('Personal coaching '+key,db.from(table).select('*').eq('client_id',id).order(order).limit(200))]))]);
+ if(loaded===false||!active())return false;for(const[key,rows]of result)state.data[key]=rows;return true;
 };
 COACH_TABS.push('goals','support');
 const originalCoachingWorkspace=renderClientWorkspace;

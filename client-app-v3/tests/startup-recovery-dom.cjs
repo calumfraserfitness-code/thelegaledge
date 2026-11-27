@@ -4,7 +4,7 @@ class Unavailable extends ResourceLoader{fetch(){return null;}}
 const dom=new JSDOM(html,{url:'https://legal-edge-client-app.vercel.app/',runScripts:'dangerously',resources:new Unavailable(),beforeParse(w){w.setTimeout=(fn,ms)=>{if(ms===15000)deadline=fn;return 1;};w.clearTimeout=()=>{};}});
 const doc=dom.window.document;
 assert(doc.querySelector('style').textContent.includes('.auth-page'),'Sign-in has styling without the downloaded stylesheet');
-assert.equal(doc.querySelector('link[href*="app-runtime.css"]').media,'print','Main stylesheet must not block first paint');
+assert.equal(doc.querySelector('link[href*="app-runtime.css"]').media,'','App styles must apply before rendering to avoid a broken-layout flash');
 assert(!doc.querySelector('#auth').classList.contains('hidden'));
 assert(doc.querySelector('#authMsg').textContent.includes('Loading secure sign-in'));
 assert(doc.querySelector('#startupRecovery').hidden);
