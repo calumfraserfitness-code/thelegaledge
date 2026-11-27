@@ -63,6 +63,15 @@ async function tick(){await new Promise(r=>setTimeout(r,0));}
  assert(doc.querySelector('.dn-tracking-panel')&&!doc.querySelector('.dn-optional-tracking'));
  assert(doc.querySelector('#dnAnywhere').closest('.dn-tracking-shortcuts'));
  assert(doc.querySelector('#dnQuickLog').closest('.dn-tracking-shortcuts'));
+ run(`state.data.coachingGuidance.push({client_id:'peer',published:true,category:'recovery',title:'Training display preference · simple logging'});renderClient();`);
+ assert(!run('simpleTrainingEnabled()'),'Another client’s training preference is isolated');
+ assert(!doc.querySelector('#dnQuickLog').closest('.dn-tracking-panel'));
+ run(`state.data.coachingGuidance.push({client_id:state.client.id,published:true,category:'recovery',title:'Training display preference · simple logging'});renderClient();`);
+ assert(run('simpleTrainingEnabled()'));
+ assert(doc.querySelector('#dnQuickLog').closest('.dn-tracking-panel'),'Prominent daily tracker uses existing food-entry path');
+ assert(doc.querySelector('.dn-tracking-panel').compareDocumentPosition(doc.querySelector('.dn-meals'))&dom.window.Node.DOCUMENT_POSITION_FOLLOWING);
+ assert.equal(doc.querySelector('#dnQuickLog').textContent,'Log food');
+ run(`state.data.coachingGuidance=state.data.coachingGuidance.filter(g=>g.title!=='Training display preference · simple logging');renderClient();`);
  doc.querySelector('.dn-meals [data-dn-log]').click();await tick();
  assert(doc.querySelector('.dn-meals .dn-status').textContent.includes('Logged'));
  assert(doc.querySelector('.dn-intake strong').textContent.includes('400'));

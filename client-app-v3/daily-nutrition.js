@@ -120,7 +120,7 @@
   if(owner!==ownerKey())reset();
   const prior=host().querySelector('.dn-page');
   const keepOpen=selector=>prior?.dataset.dnOwner===owner&&prior.querySelector(selector)?.open===true;
-  const dailyTracking=dailyTrackingEnabled(),trackingOpen=keepOpen('.dn-optional-tracking'),datesOpen=keepOpen('.dn-history'),unitsOpen=keepOpen('.dn-page-units');
+  const dailyTracking=dailyTrackingEnabled(),trackingFirst=dailyTracking&&typeof simpleTrainingEnabled==='function'&&simpleTrainingEnabled(),trackingOpen=keepOpen('.dn-optional-tracking'),datesOpen=keepOpen('.dn-history'),unitsOpen=keepOpen('.dn-page-units');
 
   const m=current(),today=localCoachingDate(),eaten=m.rows.filter(r=>r.eaten).length,consumed=loaded&&eaten?M.totals(m.rows,true):Object.fromEntries(M.fields.map(k=>[k,null]));
   const plannedRows=m.rows.filter(r=>! /^(quick|anywhere)-/.test(r.key));
@@ -161,7 +161,7 @@
     <div class="dn-daily-actions">${dailyTracking?'':`<button class="btn ghost" id="dnQuickLog" ${!loaded?'disabled':''}>Record other food</button><button class="btn ghost" id="dnAnywhere" type="button">Search foods & barcodes</button>`}<button class="btn ghost" id="dnIdeas" type="button">Browse meal ideas</button></div>
    ${dailyTracking?'</section>':'</details>'}
    <div id="dnSheetHost"></div></div>`;
-  if(dailyTracking){const meals=host().querySelector('.dn-meals'),targets=host().querySelector('.dn-nutrition-details'),log=host().querySelector('.dn-tracking-panel');meals?.after(targets,log);}
+  if(dailyTracking){const meals=host().querySelector('.dn-meals'),targets=host().querySelector('.dn-nutrition-details'),log=host().querySelector('.dn-tracking-panel'),shortcuts=host().querySelector('.dn-tracking-shortcuts');if(trackingFirst&&log){log.querySelector('h2').textContent='Your daily food tracker';log.querySelector('p').textContent='Record what you eat each day so Calum can review it.';shortcuts?.querySelector('#dnQuickLog')?.classList.replace('ghost','primary');if(shortcuts){shortcuts.querySelector('#dnQuickLog').textContent='Log food';log.querySelector('p').after(shortcuts);}host().querySelector('.dn-history')?.after(log);meals?.after(targets);}else meals?.after(targets,log);}
   if(loadError)host().querySelector('.dn-meals')?.insertAdjacentHTML('beforeend','<p class="dn-notice">Meals are available. Retry in your food log to enable saved swaps.</p>');
   $('#dnLibrary').onclick=()=>openLibrary();$('#dnEmptyLibrary')?.addEventListener('click',()=>openLibrary());
   $('#dnPageUnits').onchange=e=>{saveUnits(e.target.value);paint();};

@@ -14,13 +14,22 @@ exerciseCard=function(ex,loggable=false){
  html=html.replace(/<b>Set (\d+)<\/b>/g,(match,n)=>{const previous=history.find(r=>r.set_number===Number(n));const detail=previous?(previous.duration_seconds!=null?previous.duration_seconds+' seconds':[(previous.reps!=null?previous.reps+' reps':''),(previous.load!=null?previous.load+' '+(previous.load_unit||'kg'):'')].filter(Boolean).join(' · ')):'No previous set';return match+'<small class="last-set">Last: '+esc(detail)+(previous?' · '+esc(fmt(previous.performed_at)):'')+'</small>';});
  return html.replace('<button class="btn primary small">Save','<p class="set-save-status" role="status" aria-live="polite">Sets autosave after you enter reps or time.</p><button class="btn primary small">Save');
 };
+// Coach-selected client preference, kept in the scoped guidance data.
+function simpleTrainingEnabled(){
+ const id=state.client?.id;
+ return !!id&&(state.data.coachingGuidance||[]).some(g=>g.client_id===id&&g.published&&g.category==='recovery'&&g.title==='Training display preference · simple logging');
+}
 const polishTraining=clientTraining;
 clientTraining=function(){
  polishTraining();const client=state.client,user=state.user?.id,session=state.data.sessions.find(r=>r.id===state.selectedSessionId);
  if(!client||!session)return;
  document.querySelectorAll('#clientMain form[data-exercise-log]').forEach(form=>{
  const exercise=exercisesForSession(session).find(r=>r.id===form.dataset.exerciseLog);if(!exercise)return;
- let chain=Promise.resolve(),pending=0;const manual=form.querySelector('button');
+ let chain=Promise.resolve(),pending=0;const manual=form.querySelector('button[type="submit"],button.btn.primary');
+ const simple=simpleTrainingEnabled(),failedSets=new Set();
+ const setManualVisible=visible=>{if(manual&&simple){manual.hidden=!visible;manual.style.display=visible?'':'none';manual.textContent=visible?'Retry saving':'Save sets';}};
+ if(simple)setManualVisible(false);
+ if(simple&&!form.querySelector('.set-save-status')){const status=document.createElement('p');status.className='set-save-status';status.setAttribute('role','status');status.textContent='Your sets save automatically.';form.append(status);}
  form.addEventListener('change',event=>{
  if(!event.target.matches('input'))return;const set=Number(event.target.name.split('_').pop());let rows;
  const status=form.querySelector('.set-save-status');
@@ -34,8 +43,8 @@ clientTraining=function(){
  if(saved.length!==rows.length||saved.some(r=>r.client_id!==client.id||r.training_session_id!==session.id||r.program_exercise_id!==exercise.id||r.set_number!==set))throw Error('Save was not confirmed.');
  if(!active())return;
  const keys=new Set(saved.map(r=>r.training_session_id+'|'+r.program_exercise_id+'|'+r.set_number));state.data.exerciseLogs=[...saved,...(state.data.exerciseLogs||[]).filter(r=>!keys.has(r.training_session_id+'|'+r.program_exercise_id+'|'+r.set_number))];
- if(status&&form.isConnected)status.textContent='Set '+set+' saved.';
- }catch(error){if(active()&&status&&form.isConnected)status.textContent='Set '+set+' didn’t save. Use Save sets to retry.';}finally{pending--;if(manual&&pending===0)manual.disabled=false;}
+ failedSets.delete(set);if(!failedSets.size)setManualVisible(false);if(status&&form.isConnected)status.textContent='Set '+set+' saved.';
+ }catch(error){failedSets.add(set);if(active()&&form.isConnected){setManualVisible(true);if(status)status.textContent='Set '+set+' didn’t save. '+(simple?'Tap Retry saving.':'Use Save sets to retry.');}}finally{pending--;if(manual&&pending===0)manual.disabled=false;}
  });
  });
  });
