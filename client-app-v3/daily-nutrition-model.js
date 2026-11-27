@@ -87,6 +87,21 @@
   }
   return [...families.values()].sort((a,b)=>a.score-b.score||String(a.meal.name).localeCompare(String(b.meal.name)));
  }
- const model={placeholderMeal,matchesRecipeSearch,sameRecipe,fields,number,category,snapshot,slots,totals,targets,targetRange,comparable,matchesGroup,recipeFamily,mealIdeas};
+ // Logging coverage only; it is not an estimate of actual intake or adherence.
+ function trackingSummary({days,entries,today,clientId,startDate}){
+  const scoped=entries.filter(e=>e.client_id===clientId&&e.eaten===true);
+  const rows=days.filter(day=>day.date<=today&&(!startDate||day.date>=startDate)).map(day=>{
+   const planned=new Set(day.keys||[]),recorded=new Map();
+   for(const entry of scoped.filter(e=>e.entry_date===day.date))recorded.set(entry.slot_key,entry);
+   const items=[...recorded.values()],matched=[...recorded.keys()].filter(key=>planned.has(key)).length;
+   const totalsRecorded=items.length?totals(items.map(entry=>({meal:entry.meal_snapshot||{},servings:number(entry.servings)??1,eaten:true})),true):Object.fromEntries(fields.map(k=>[k,null]));
+   return {date:day.date,today:day.date===today,assigned:planned.size,matched,items:items.length,extra:items.length-matched,totals:totalsRecorded,targets:day.targets||{}};
+  });
+  const elapsed=rows.filter(r=>!r.today),assignedDays=elapsed.filter(r=>r.assigned>0);
+  const planned=elapsed.reduce((n,r)=>n+r.assigned,0),matched=elapsed.reduce((n,r)=>n+r.matched,0),logged=elapsed.filter(r=>r.items>0).length,complete=assignedDays.filter(r=>r.matched===r.assigned).length;
+  const pct=(n,d)=>d?Math.round(100*n/d):null;
+  return {rows,elapsed:elapsed.length,logged,planned,matched,assignedDays:assignedDays.length,complete,daysPercentage:pct(logged,elapsed.length),mealsPercentage:pct(matched,planned),completePercentage:pct(complete,assignedDays.length)};
+ }
+ const model={trackingSummary,placeholderMeal,matchesRecipeSearch,sameRecipe,fields,number,category,snapshot,slots,totals,targets,targetRange,comparable,matchesGroup,recipeFamily,mealIdeas};
  root.DailyNutrition=model;if(typeof module!=='undefined')module.exports=model;
 })(typeof window==='undefined'?globalThis:window);

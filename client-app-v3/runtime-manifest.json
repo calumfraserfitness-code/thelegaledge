@@ -92,7 +92,8 @@
     "recovery-trends.js",
     "coach-change-log.js",
     "checkin-quick-view.js",
-    "gym-plan.js"
+    "gym-plan.js",
+    "coach-food-tracking.js"
   ],
   "styles": [
     "app.css",
