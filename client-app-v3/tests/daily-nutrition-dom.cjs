@@ -44,6 +44,15 @@ async function tick(){await new Promise(r=>setTimeout(r,0));}
  assert(!prep.textContent.includes('Peer guide'));
  prep.open=true;run('renderClient()');assert(doc.querySelector('[data-dn-weekday-prep]').open);
  assert(!doc.querySelector('.dn-meals').textContent.includes('Turkey rice bowl'),'Optional swaps do not become extra scheduled meals');
+ run(`state.data.coachingGuidance.push({client_id:state.client.id,published:true,category:'meal_example',title:'Your nutrition focus',body:'Repeat your office breakfast.\\nPack a lunch.\\nChoose a family dinner.'},{client_id:'peer',published:true,category:'meal_example',title:'Your nutrition focus',body:'PRIVATE PEER NUTRITION',created_at:'2099'});renderClient();`);
+ assert.match(doc.querySelector('.dn-focus').textContent,/Repeat your office breakfast/);
+ assert.equal(doc.querySelectorAll('.dn-focus li').length,3);
+ assert.doesNotMatch(doc.querySelector('.dn-focus').textContent,/PRIVATE PEER NUTRITION/);
+ assert(!doc.querySelector('.dn-meals [data-dn-log]'),'Planned meals never show food logging controls');
+ assert(!doc.querySelector('.dn-optional-tracking').open,'Optional diary starts closed');
+ assert(doc.querySelector('#dnAnywhere').closest('.dn-optional-tracking'));
+ assert(doc.querySelector('.dn-target-panel').closest('details'),'Targets are available on demand rather than the main task');
+
  doc.querySelector('#dnLibrary').click();assert(doc.querySelector('[role=dialog]').textContent.includes('Turkey rice bowl'),'Assigned optional recipes are selectable');doc.querySelector('[data-dn-filter="Breakfast"]').click();assert(!doc.querySelector('[role=dialog]').textContent.includes('Turkey rice bowl'),'Main meals never enter breakfast');doc.querySelector('[data-dn-filter="Dinner"]').click();assert(doc.querySelector('[role=dialog]').textContent.includes('Turkey rice bowl'),'Optional mains stay available for dinner');doc.querySelector('#dnClose').click();
  run(`state.data.mealAssignments.push(...[{id:'fruit-a',name:'Greek Yogurt Bowl · strawberries',calories:400,protein_g:30,carbs_g:45,fat_g:12,ingredients:[{name:'Strawberries',quantity:100,unit:'g'}]},{id:'fruit-b',name:'Greek Yogurt Bowl · banana',calories:420,protein_g:32,carbs_g:48,fat_g:13,ingredients:[{name:'Banana',quantity:80,unit:'g'}]}].map(meal=>({id:meal.id,client_id:state.client.id,nutrition_plan_id:null,historical:false,meal:{...meal,meal_type:'Breakfast'}})));`);
  doc.querySelector('#dnLibrary').click();doc.querySelector('[data-dn-filter="Breakfast"]').click();
@@ -115,7 +124,7 @@ async function tick(){await new Promise(r=>setTimeout(r,0));}
  doc.querySelector('[data-dn-recipe]').click();assert.ok(doc.querySelector('[role="dialog"]'));assert.ok(doc.querySelector('.dn-ingredients').textContent.includes('Eggs'));
  doc.querySelector('#dnFavourite').click();await tick();assert.equal(doc.querySelector('#dnFavourite').textContent,'Saved recipe ✓');
  doc.querySelector('#dnClose').click();
- doc.querySelector('[data-dn-log]').click();await tick();assert.equal(doc.querySelectorAll('.dn-eaten').length,1);
+ doc.querySelector('.dn-optional-tracking').open=true;doc.querySelector('[data-dn-log]').click();await tick();assert.equal(doc.querySelectorAll('.dn-eaten').length,1);assert(doc.querySelector('.dn-optional-tracking').open,'User-opened diary stays open after logging');
  assert.ok(doc.querySelector('.dn-intake strong').textContent.includes('400'));
  doc.querySelector('[data-dn-log]').click();await tick();assert.equal(doc.querySelectorAll('.dn-eaten').length,0);
  doc.querySelector('[data-dn-swap]').click();assert.ok(doc.querySelector('[role=dialog]').textContent.includes('SIMILAR CALORIES'));
@@ -124,9 +133,9 @@ async function tick(){await new Promise(r=>setTimeout(r,0));}
  assert.equal(doc.querySelector('.dn-meal h3').textContent,'Yogurt bowl');
  assert.equal(run('state.data.mealAssignments[0].meal.name'),'Egg wrap');
  doc.querySelector('#dnQuickLog').click();const form=doc.querySelector('#dnQuickForm');form.elements.name.value='Fruit';form.elements.calories.value='100';form.dispatchEvent(new dom.window.Event('submit',{bubbles:true,cancelable:true}));await tick();
- assert.ok(doc.querySelector('.dn-intake strong').textContent.includes('100'));
+ assert.ok(doc.querySelector('.dn-intake strong').textContent.includes('100'));assert(!doc.querySelector('.dn-meals').textContent.includes('Fruit'),'Recorded extra food is not shown as a planned meal');
  run(`state.clientView='progress';renderClient();`);assert.ok(doc.querySelector('#dnProgressNav'));
- run(`state.client={...state.client,id:'other'};state.clientView='nutrition';renderClient();`);await tick();assert.equal(doc.querySelectorAll('.dn-eaten').length,0,'No previous client logs');
+ run(`state.client={...state.client,id:'other'};state.clientView='nutrition';renderClient();`);await tick();assert.equal(doc.querySelectorAll('.dn-eaten').length,0,'No previous client logs');assert(!doc.querySelector('.dn-optional-tracking').open,'Tracking UI does not carry over between clients');assert(!doc.querySelector('.dn-focus').textContent.includes('Repeat your office breakfast'));
  run(`state.preview=false;state.user={id:'mock-client'};state.client.onboarding_status='complete';renderClient();`);await tick();await tick();
  failSave=true;doc.querySelector('[data-dn-log]').click();await tick();assert.equal(doc.querySelectorAll('.dn-eaten').length,0,'Failed save does not fake success');assert.ok(doc.querySelector('#toast').textContent.includes('rejected'));
  failSave=false;doc.querySelector('[data-dn-log]').click();await tick();assert.equal(tables.client_food_entries.length,1);
@@ -152,7 +161,7 @@ async function tick(){await new Promise(r=>setTimeout(r,0));}
  run(`state.preview=true;state.client.onboarding_status='complete';state.client.plan_status='published';state.clientView='checkin';renderClient();`);await tick();assert.equal(doc.querySelector('#clientNav [data-client-view=checkin]').getAttribute('aria-current'),'page');assert(!doc.querySelector('#dnProgressNav'),'Check-in has its own destination');
  run(`state.role='coach';$('#coachMain').innerHTML='<div id="clientWorkspaceBody"></div>';state.selectedNutritionPlanId='p';coachNutrition();`);assert(doc.querySelector('#coachDailyMenu'));assert(!doc.querySelector('#clientWorkspaceBody .nutrition-day-tabs'));assert(doc.querySelector('[data-plan-editor] [name=calories]'));assert(doc.querySelector('[data-meal-editor]'),'Existing personal recipe editor retained');
  doc.querySelector('#coachDailyAssign').click();await tick();assert.equal(run(`state.data.nutritionDays.find(d=>d.nutrition_date===localCoachingDate()).nutrition_plan_id`),'p');
- doc.querySelector('#coachDailyPreview').click();await tick();assert(doc.querySelector('.dn-page'));assert(!doc.querySelector('[data-dn-date]'),'No seven-day meal selector on client');assert(!doc.querySelector('.dn-history').open);
+ doc.querySelector('#coachDailyPreview').click();await tick();assert(doc.querySelector('.dn-page'));assert(doc.querySelector('[data-dn-date]')?.closest('details'),'Week selector is tucked inside another-day details');assert(!doc.querySelector('.dn-history').open);
  run('showAddClient()');const create=doc.querySelector('#addClientForm');assert(create.elements.start_onboarding.checked);assert.equal(create.elements.password.value.length,36);assert(!create.elements.start_weight_display.required);assert(!create.querySelector('[name=payment_url],[name=welcome_url]'));doc.querySelector('.modal-backdrop [data-close-modal]').click();
  run(`renderJourney({client_id:'fixture',stage:'welcome',funding_mode:'personal',welcome_url:'https://example.invalid/welcome.mp4'});`);assert(!doc.querySelector('video'));assert(doc.querySelector('#journeyContinue').textContent.includes('agreement'));
  run(`renderJourney({client_id:'fixture',stage:'contract',funding_mode:'personal',payment_handled_externally:true,contract_title:'QA agreement',contract_version:'QA',contract_body:'QA only'});`);assert.equal(doc.querySelectorAll('.journey-steps li').length,4);assert(!doc.querySelector('.journey-steps').textContent.includes('Payment'));assert(doc.querySelector('#journeySign'));

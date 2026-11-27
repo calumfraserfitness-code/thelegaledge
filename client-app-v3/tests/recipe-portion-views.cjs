@@ -46,7 +46,7 @@ function mode(id,value){const select=doc.querySelector(id);select.value=value;se
  doc.querySelector('#dnBatch').value='2';doc.querySelector('#dnBatch').dispatchEvent(new dom.window.Event('change'));assert(doc.querySelector('[role=dialog]').textContent.includes('2 servings total'));
  assert.equal(run(`JSON.stringify(state.data.mealAssignments)`),before,'Display mode and batch guides never rewrite prescriptions');assert.equal(doc.querySelector('.dn-target-panel').textContent,targets);
  doc.querySelector('#dnClose').click();assert.equal(doc.querySelector('#dnPageUnits').value,'visual');doc.querySelector('[data-dn-log]').click();await tick();assert(doc.querySelector('.dn-status').textContent.includes('estimated portion'),'Eyed log is labelled as estimated');
- assert.equal(doc.querySelector('.dn-meal').textContent.includes('420'),true,'Logging keeps saved recipe nutrition estimate');
+ assert.equal(doc.querySelector('.dn-log-row').textContent.includes('420'),true,'Logging keeps saved recipe nutrition estimate');
  run(`renderClient()`);await tick();assert.equal(doc.querySelector('#dnPageUnits').value,'visual','Display preference survives navigation');
  doc.querySelector('[data-dn-log]').click();await tick();mode('#dnPageUnits','metric');doc.querySelector('[data-dn-log]').click();await tick();assert(!doc.querySelector('.dn-status').textContent.includes('estimated portion'),'Undo then weighed log clears the previous rough-method receipt');
  run(`state.client={...state.client,id:'different-client'};renderClient();`);await tick();assert.equal(doc.querySelector('#dnPageUnits').value,'us','Another account/client does not inherit the portion preference');
