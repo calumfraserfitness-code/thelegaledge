@@ -6,8 +6,8 @@ const ctx=vm.createContext({window:{supabase:null,addEventListener(){}},location
 vm.runInContext(app+'\n'+helpers,ctx);
 function check(src){return vm.runInContext(src,ctx)}
 check("state.client={weight_unit:'lbs'}");
-assert.equal(check("nutritionUnit(100,'g')"),'3.53 oz');
-check("state.foodUnits='metric'");assert.equal(check("nutritionUnit(5,'oz')"),'141.75 g');
+assert.equal(check("nutritionUnit(100,'g')"),'3.5 oz');
+check("state.foodUnits='metric'");assert.equal(check("nutritionUnit(5,'oz')"),'141.7 g');
 assert.equal(check("nutritionUnit(1,'slice')"),'1 slice');
 assert.equal(check("safeMediaUrl('javascript:alert(1)')"),'');
 check("state.data=emptyData();state.data.mealAssignments=[{nutrition_plan_id:'qa',meal:{name:'Measured meal',calories:500,protein_g:30,carbs_g:50,fat_g:20}},{nutrition_plan_id:'qa',meal:{name:'Unmeasured meal'}}]");

@@ -81,7 +81,7 @@ function beginRestTimer(exercise){
 const dailyToolsExerciseCard=exerciseCard;
 exerciseCard=function(exercise,loggable=false){
  const html=dailyToolsExerciseCard(exercise,loggable),seconds=Number(exercise.rest_seconds);
- if(!loggable||exerciseTrackingMode(exercise)==='completion'||!Number.isFinite(seconds)||seconds<=0||seconds>3600)return html;
+ if(!loggable||(typeof simpleTrainingEnabled==='function'&&simpleTrainingEnabled())||exerciseTrackingMode(exercise)==='completion'||!Number.isFinite(seconds)||seconds<=0||seconds>3600)return html;
  return html.replace('</article>',`<button class="btn ghost small" type="button" data-start-rest="${esc(exercise.id)}">Start ${esc(restTimeLabel(Math.ceil(seconds)))} rest</button></article>`);
 };
 document.addEventListener('click',event=>{

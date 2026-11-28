@@ -1,0 +1,314 @@
+/* Daily meals use additive food logs; original programmes and assignments are never edited. */
+(function(){
+ 'use strict';
+ const M=window.DailyNutrition,host=()=>$('#clientMain');
+ let owner=null,logs=[],favourites=[],loaded=false,loadedDate=null,favouritesLoaded=false,loadError='',loading=null,loadSequence=0,dateChoice=null,libraryFilter='All',searchText='',sheet=null,busy=false,ideaGroup='All',recipeToOpen=null;
+ const ownerKey=()=>`${state.preview?'sample':state.user?.id||''}:${state.client?.id||''}`;
+ function unitsKey(){return 'legal-edge-food-units:'+ownerKey();}
+ function visualNutritionEnabled(){const id=state.client?.id;return !!id&&(state.data.coachingGuidance||[]).some(g=>g.client_id===id&&g.published&&g.category==='meal_example'&&g.title==='Nutrition display preference · visual portions');}
+ // Keep the original recipe and logs intact; this preference changes presentation only.
+ let visualOverride=false,previousPortionView=null;
+ function applyVisualPreference(){if(visualNutritionEnabled()){if(!visualOverride)previousPortionView=state.foodPortionView;visualOverride=true;state.foodPortionView='visual';}else if(visualOverride){state.foodPortionView=previousPortionView||'weighed';visualOverride=false;previousPortionView=null;}}
+ function roughCommonPortion(i,servings){
+  const n=M.number(i.quantity),unit=String(i.unit||'').toLowerCase(),name=String(i.name||'').toLowerCase();
+  if(!n||!['g','gram','grams','oz','ounce','ounces'].includes(unit))return null;
+  const grams=n*servings*(unit==='g'||unit==='gram'||unit==='grams'?1:28.3495);
+  const approx=(ref,label,note)=>{const amount=Math.max(.25,Math.round(grams/ref*4)/4);return {text:'About '+amount+' '+label.replace(/\(s\)/g,amount===1?'':'s'),note:'Rough estimate only; '+note};};
+  if(/mixed vegetables/.test(name))return approx(80,'handful(s) of mixed veg','vegetable size and preparation vary.');
+  if(/^berries$|mixed berries/.test(name))return approx(80,'handful(s) of berries','berry size varies.');
+  if(/salad mix|mixed salad/.test(name))return approx(80,'generous portion(s) of salad','leafiness and ingredients vary.');
+  if(/reduced.fat cheese|light cheese/.test(name))return approx(30,'matchbox-sized piece(s) of cheese','slice thickness and cheese type vary.');
+  if(/dressing/.test(name))return approx(15,'tablespoon(s)','check the serving size on the dressing label; density varies.');
+  return null;
+ }
+
+ function saveUnits(value){if(visualNutritionEnabled()){applyVisualPreference();return;}state.foodPortionView=['household','visual'].includes(value)?value:'weighed';if(state.foodPortionView==='weighed')state.foodUnits=value==='metric'?'metric':'us';try{localStorage.setItem(unitsKey(),value);if(state.foodPortionView==='weighed')localStorage.setItem(unitsKey()+':weighed',state.foodUnits);}catch{}}
+ function reset(){visualOverride=false;previousPortionView=null;owner=ownerKey();logs=[];favourites=[];loaded=false;loadedDate=null;favouritesLoaded=false;loadError='';loading=null;loadSequence++;dateChoice=null;recipeToOpen=null;sheet=null;busy=false;libraryFilter='All';searchText='';let saved,weighed;try{saved=localStorage.getItem(unitsKey());weighed=localStorage.getItem(unitsKey()+':weighed');}catch{}state.foodUnits=weighed==='metric'||(!weighed&&saved==='metric')||(!saved&&!weighed&&state.client?.weight_unit==='kg')?'metric':'us';state.foodPortionView=['household','visual'].includes(saved)?saved:'weighed';applyVisualPreference();}
+ function publishedWeek(d){
+  return state.data.weeks.find(w=>(w.published||state.preview)&&(!w.client_id||w.client_id===state.client.id)&&d>=w.week_start&&d<=iso(new Date(new Date(w.week_start+'T12:00:00Z').getTime()+6*864e5)));
+ }
+ function defaultDate(){
+  const today=localCoachingDate(),start=state.client?.start_date;
+  return start>today&&publishedWeek(start)?start:today;
+ }
+ function date(){return dateChoice||state.selectedNutritionDate||defaultDate();}
+ function current(){
+  const d=date(),w=publishedWeek(d);
+  const day=w?state.data.nutritionDays.find(n=>n.week_id===w.id&&n.nutrition_date===d):null;
+  const plan=day?state.data.nutritionPlans.find(p=>p.id===day.nutrition_plan_id&&(!p.client_id||p.client_id===state.client.id)):null;
+  const meals=plan?mealsForNutritionPlan(plan):[];
+  const entries=logs.filter(e=>e.entry_date===d);
+  return {date:d,day,plan,rows:M.slots(meals,entries),targets:M.targets(state.client,plan,day,d),range:M.targetRange(state.client,d),week:w};
+ }
+ function recipes(){
+  const published=new Set(state.data.weeks.filter(w=>w.published||state.preview).map(w=>w.id));
+  const planIds=new Set(state.data.nutritionDays.filter(n=>published.has(n.week_id)).map(n=>n.nutrition_plan_id));
+  const result=[];
+  for(const plan of state.data.nutritionPlans.filter(p=>planIds.has(p.id)&&p.is_active!==false&&(!p.client_id||p.client_id===state.client.id))){
+   M.slots(mealsForNutritionPlan(plan)).forEach(({meal,group},i)=>{
+    const key=String(meal.id||`${plan.id}:${i}`);
+    const signature=JSON.stringify([group,String(meal.name||'').trim().toLowerCase(),...M.fields.map(k=>M.number(meal[k])),meal.ingredients||meal.items||[],meal.cooking_instructions||'']);
+    if(!result.some(r=>r.signature===signature))result.push({key,group,meal,plan,signature});
+   });
+  }
+  for(const assignment of (state.data.mealAssignments||[]).filter(a=>!a.nutrition_plan_id&&!a.historical&&a.meal&&!M.placeholderMeal(a.meal)&&(!a.client_id||a.client_id===state.client.id))){
+   const meal=assignment.meal,group=M.category(meal),key=String(meal.id||assignment.id);
+   const signature=JSON.stringify([group,String(meal.name||'').trim().toLowerCase(),...M.fields.map(k=>M.number(meal[k])),meal.ingredients||meal.items||[],meal.cooking_instructions||'']);
+   if(!result.some(r=>r.signature===signature))result.push({key,group,meal,plan:{name:'Optional meal swap'},groups:/main meal/i.test(meal.meal_type||'')?['Lunch','Dinner']:[group],signature});
+  }
+  return result;
+ }
+ async function load(){
+  const d=date();
+  if(loaded&&loadedDate===d)return;
+  if(loading?.date===d)return loading.promise;
+  if(state.preview){loaded=true;loadedDate=d;paint();return;}
+  const key=owner,client=state.client.id,sequence=++loadSequence;
+  loaded=false;loadedDate=null;logs=[];loadError='';paint();
+  const request={date:d,promise:null};loading=request;
+  request.promise=(async()=>{
+   try{
+    const [a,b]=await Promise.all([
+     query('Daily food log',db.from('client_food_entries').select('*').eq('client_id',client).eq('entry_date',d).order('created_at',{ascending:true})),
+     favouritesLoaded?Promise.resolve(favourites):query('Saved recipes',db.from('client_recipe_favourites').select('*').eq('client_id',client).limit(500))
+    ]);
+    if(owner!==key||ownerKey()!==key||sequence!==loadSequence||date()!==d)return;
+    logs=a;favourites=b;favouritesLoaded=true;loaded=true;loadedDate=d;loadError='';
+   }catch(e){if(owner===key&&sequence===loadSequence&&date()===d){loadError='Your food log could not load. Your assigned meals are still available.';}}
+   finally{if(owner===key&&sequence===loadSequence){loading=null;if(state.clientView==='nutrition')paint();}}
+  })();return request.promise;
+ }
+ function changeDate(d){dateChoice=d;state.selectedNutritionDate=null;recipeToOpen=null;sheet=null;if(!state.preview){loaded=false;loadedDate=null;logs=[];}paint();load();}
+ const value=(n,unit='')=>n===null?'Not supplied':`${Math.round(n).toLocaleString()}${unit}`;
+ function summary(meal,servings=1){return `${['household','visual'].includes(state.foodPortionView)?'Recipe estimate: ':''}${value(M.number(meal.calories)===null?null:Number(meal.calories)*servings,' kcal')} · ${value(M.number(meal.protein_g)===null?null:Number(meal.protein_g)*servings,'g protein')}`;}
+ function fullSummary(meal){return `${summary(meal)} · ${value(M.number(meal.carbs_g),'g carbs')} · ${value(M.number(meal.fat_g),'g fat')}`;}
+ function visualCookingInstructions(value){const text=String(value||'');if(!visualNutritionEnabled())return value;return text.replace(/Weigh every listed ingredient for one portion\./gi,'Use the visual portion guide above for one serving.').replace(/; weigh it before cooking\./gi,'; use the dry portion guide above.').replace(/weigh each ingredient/gi,'use the visual portion guide for each ingredient');}
+ function portionMode(){return ['household','visual'].includes(state.foodPortionView)?state.foodPortionView:state.foodUnits||'us';}
+ function portionControls(id){const selected=portionMode();if(visualNutritionEnabled())return '<label class="dn-measurements">Portion guide<select id="'+id+'"><option value="visual">Visual portions</option></select><small>Use approximate hand-sized portions, familiar pieces, cups and spoons. No weighing needed.</small></label>';return `<label class="dn-measurements">How to view portions<select id="${id}">${[['us','Weighed · ounces'],['metric','Weighed · grams / ml'],['household','Cups, spoons & pieces (approx.)'],['visual','Visual guide (rough estimate)']].map(([value,label])=>`<option value="${value}" ${selected===value?'selected':''}>${label}</option>`).join('')}</select><small>${selected==='household'?'Approximate standard household measures; use level measures.':selected==='visual'?'A rough guide when you prefer to eye it out.':'Shows the original weighed recipe in your chosen units.'} The saved recipe and daily targets stay the same.</small></label>`;}
+ function portionGuide(ingredient,servings=1){if(state.foodPortionView==='visual'&&ingredient.visual&&servings===1)return {text:ingredient.visual,note:'Approximate portion.'};return ['household','visual'].includes(state.foodPortionView)?(window.FoodPortions?.describe(cleanIngredient(ingredient),{mode:state.foodPortionView,servings})||(visualNutritionEnabled()?roughCommonPortion(cleanIngredient(ingredient),servings):null)):null;}
+ function portionText(ingredient,servings=1){const i=cleanIngredient(ingredient),guide=portionGuide(i,servings);if(guide?.text)return guide.text;if(visualNutritionEnabled()){const unit=String(i.unit||'').toLowerCase();if(['serving','servings','scoop','scoops','packet','packets','container','containers'].includes(unit)&&M.number(i.quantity)!==null)return 'About '+Number(i.quantity)*servings+' '+unit+' (use package serving guide)';return 'Use the package serving guide or ask Calum for a visual portion';}const q=M.number(i.quantity);return [q===null?'Amount not supplied':nutritionUnit(q*servings,i.unit),['household','visual'].includes(state.foodPortionView)?'(use label or weighed amount)':''].filter(Boolean).join(' ');}
+ function recipePresentation(meal){
+  if(meal.source_system==='coach_portion_menu'){
+   const ingredients=meal.ingredients||[];
+   return {name:meal.name,ingredients,description:ingredients.length?ingredients.map(i=>i.name+' · '+(i.unit==='count'?i.quantity:portionText(i))).join('  |  '):meal.preparation};
+  }
+  if(typeof mealLibraryPresentation==='function'){const shown=mealLibraryPresentation(meal);return {...shown,description:shown.ingredients.map(i=>[portionText(i),i.name||i.food||''].filter(Boolean).join(' ')).join(' · ')||shown.description};}
+  const ingredients=meal.ingredients||meal.items||[];
+  return {name:meal.name||'Meal',ingredients,description:ingredients.slice(0,4).map(i=>i.name||i.food).filter(Boolean).join(' · ')||'Open the recipe for ingredients and preparation.'};
+ }
+ function openRoute(route){state.clientView=route;renderClient();}
+ function foodBriefMarkup(plan,{coach=false}={}){
+  if(!coach)return '';
+  const brief=plan?.source_json?.food_brief;if(!brief?.routine)return '';
+  const fields=[['Ryan’s usual meals','routine'],['Where the week gets hard','friction'],['Food preferences','preferences'],['Suggested tracking','tracking']];
+  return '<section class="panel food-plan-brief"><h2>Food and tracking</h2><div class="food-plan-brief-grid">'+fields.filter(([,key])=>brief[key]).map(([label,key])=>'<div><h3>'+esc(label)+'</h3><p>'+esc(brief[key])+'</p></div>').join('')+'</div>'+(brief.baseline?'<p class="food-plan-baseline">'+esc(brief.baseline)+'</p>':'')+'</section>';
+ }
+ window.FoodPlanBrief={markup:foodBriefMarkup};
+ function quickChoices(m,today){
+  if(m.date!==today||!window.DayType||window.DayType.get(today)==='normal')return [];
+  const busyIds=new Set((state.data.nutritionDays||[]).filter(d=>d.week_id===m.week?.id).map(d=>d.nutrition_plan_id));
+  const plans=(state.data.nutritionPlans||[]).filter(p=>busyIds.has(p.id)&&p.is_active!==false&&
+   (!p.client_id||p.client_id===state.client.id)&&(p.day_type==='Busy Day'||/\b(?:busy|deadline) day\b/i.test(p.name||'')));
+  const assigned=plans.flatMap(plan=>M.slots(mealsForNutritionPlan(plan)).map((row,i)=>({...row,key:String(row.meal.id||plan.id+':'+i)})));
+  return assigned.slice(0,3);
+ }
+ function weekdayPrepMarkup(){
+  const guide=(state.data.coachingGuidance||[]).filter(g=>g.client_id===state.client.id&&g.published&&g.category==='meal_example'&&
+   g.title==='Sunday meal prep · Monday to Friday'&&g.body?.trim()).sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at)))[0];
+  if(!guide)return '';
+  const open=host().querySelector('[data-dn-weekday-prep]')?.open;
+  const sections=guide.body.trim().split(/\n\s*\n/).map(section=>{
+   const [heading,...lines]=section.split(/\r?\n/).map(line=>line.trim()).filter(Boolean);
+   return '<section><h3>'+esc(heading)+'</h3><ul>'+lines.map(line=>'<li>'+esc(line)+'</li>').join('')+'</ul></section>';
+  });
+  return '<details class="panel dn-weekday-prep" data-dn-weekday-prep '+(open?'open':'')+'><summary>'+esc(guide.title)+
+   '<small>Shopping list · Five lunches · Dinner portions</small></summary><div>'+sections.join('')+'</div></details>';
+ }
+ // The coach can opt an individual client into the familiar tracking experience
+ // by publishing this private meal-example guidance. Everyone else stays meal-plan first.
+ function dailyTrackingEnabled(){
+  return (state.data.coachingGuidance||[]).some(g=>g.client_id===state.client.id&&g.published&&g.category==='meal_example'&&g.title==='Your food tracking routine');
+ }
+ function nutritionFocusMarkup(dailyTracking){
+  const focus=(state.data.coachingGuidance||[]).filter(g=>g.client_id===state.client.id&&g.published&&g.category==='meal_example'&&g.title==='Your nutrition focus'&&g.body?.trim()).sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at)))[0];
+  const priorities=focus?.body.split(/\r?\n/).map(line=>line.trim()).filter(Boolean).slice(0,3);
+  return '<section class="dn-focus" aria-label="Your nutrition focus"><h2>Your nutrition focus</h2><ul>'+ (priorities?.length?priorities:['Use your assigned meals as a guide, not a checklist.','Repeat meals and swap when your schedule changes.','Tell Calum how the week went in your weekly check-in.']).map(line=>'<li>'+esc(line)+'</li>').join('')+'</ul><p>'+(dailyTracking?'Keep recording your meals when it helps you stay consistent.':'No daily logging required. Use your weekly check-in to tell Calum what worked.')+'</p></section>';
+ }
+ function paint(){
+  if(owner!==ownerKey())reset();
+  applyVisualPreference();const visualOnly=visualNutritionEnabled();
+  const prior=host().querySelector('.dn-page');
+  const keepOpen=selector=>prior?.dataset.dnOwner===owner&&prior.querySelector(selector)?.open===true;
+  const dailyTracking=dailyTrackingEnabled(),trackingFirst=dailyTracking&&typeof simpleTrainingEnabled==='function'&&simpleTrainingEnabled(),trackingOpen=keepOpen('.dn-optional-tracking'),datesOpen=keepOpen('.dn-history'),unitsOpen=keepOpen('.dn-page-units');
+
+  const m=current(),today=localCoachingDate(),eaten=m.rows.filter(r=>r.eaten).length,consumed=loaded&&eaten?M.totals(m.rows,true):Object.fromEntries(M.fields.map(k=>[k,null]));
+  const plannedRows=m.rows.filter(r=>! /^(quick|anywhere)-/.test(r.key));
+  const planned=plannedRows.length?M.totals(plannedRows):Object.fromEntries(M.fields.map(k=>[k,null]));
+  const menuDays=(state.data.nutritionDays||[]).filter(d=>d.week_id===m.week?.id&&d.nutrition_plan_id).sort((a,b)=>a.nutrition_date.localeCompare(b.nutrition_date));
+  const menuPicker=menuDays.length?'<nav class="dn-subnav" aria-label="Meal plan days">'+menuDays.map(d=>{
+   const selected=d.nutrition_date===m.date;
+   return '<button type="button" class="btn small '+(selected?'primary':'ghost')+'" data-dn-date="'+esc(d.nutrition_date)+'"'+(selected?' aria-current="date"':'')+'>'+esc(fmt(d.nutrition_date,{weekday:'short',day:'numeric'}))+'</button>';
+  }).join('')+'</nav>':'';
+
+  const guide=(state.data.coachingGuidance||[]).find(g=>g.client_id===state.client.id&&g.published&&g.category==='eating_out'&&g.body?.trim());
+  const rushGuide=guide?'<details class="dn-rush-guide"><summary>In a rush? <small>Late at work · Takeaway · Eating out</small></summary>'+guide.body.split(/\n\s*\n/).map(note=>'<p>'+esc(note)+'</p>').join('')+'</details>':'';
+  const firstDate=defaultDate();
+  const quick=quickChoices(m,today),adjusted=m.date===today&&window.DayType&&window.DayType.get(today)!=='normal';
+  state.foodUnits=state.foodUnits||(state.client?.weight_unit==='kg'?'metric':'us');
+  host().innerHTML=`<div class="dn-page ${dailyTracking?'dn-daily-tracking':''}" data-dn-owner="${esc(owner)}"><header class="dn-heading dn-plan-heading"><div><span class="eyebrow">YOUR NUTRITION</span><h1>Your meals</h1><p>A practical plan for your week.</p></div></header>
+   ${nutritionFocusMarkup(dailyTracking)}
+   <div class="dn-date-row"><div><span class="dn-dot"></span><strong>${m.date===today?'Today':fmt(m.date,{weekday:'long'})}</strong><span>${fmt(m.date,{day:'numeric',month:'long'})}</span></div>${m.date!==firstDate?'<button class="text-btn" id="dnToday">'+(firstDate===today?'Back to today':'Back to first day')+'</button>':''}</div>
+   <details class="dn-history" ${datesOpen?'open':''}><summary>View another day</summary>${menuPicker}<label class="dn-date-label">Choose date<input id="dnDate" type="date" value="${m.date}"></label></details>
+   <div class="dn-section-heading"><h2>Planned meals</h2><button class="btn ghost small" id="dnLibrary" type="button">Find a recipe</button></div>
+   ${dailyTracking?`<div class="dn-tracking-shortcuts"><button class="btn ghost small" id="dnQuickLog" ${!loaded||busy?'disabled':''}>Record other food</button><button class="btn ghost small" id="dnAnywhere" type="button">Search foods & barcodes</button></div>`:''}
+   <div class="dn-meals">${plannedRows.map(r=>{const shown=recipePresentation(r.meal);return `<article class="dn-meal ${dailyTracking&&r.eaten?'dn-eaten':''}"><div class="dn-meal-body"><div class="dn-meal-label"><span class="eyebrow">${esc(r.group)}</span>${dailyTracking&&r.eaten?'<span class="dn-status">'+(['household','visual'].includes(r.meal.portion?.method)?'Logged · estimated portion':'Logged')+'</span>':''}</div><h3>${esc(shown.name)}</h3><p class="muted">${esc(shown.description)}</p>${dailyTracking?`<p class="dn-meal-estimate">${esc(fullSummary(M.totals([r])))} · recipe estimate</p>`: ''}<div class="dn-meal-actions"><button class="btn ghost small" data-dn-recipe="${esc(r.key)}">Recipe & portions</button><button class="btn ghost small" data-dn-swap="${esc(r.key)}" ${r.eaten?'disabled title="Undo the existing food record before swapping."':!loaded||busy?'disabled':''}>Swap meal</button>${dailyTracking?`<button class="btn ${r.eaten?'ghost':'primary'} small" data-dn-log="${esc(r.key)}" ${!loaded||busy?'disabled':''}>${r.eaten?'Undo log':'Log eaten'}</button>`:''}</div></div></article>`;}).join('')||`<div class="dn-empty"><h3>${m.day?'No recipes assigned for this day yet.':'No published meal schedule for this date.'}</h3><p>Browse your assigned recipes or ask Calum for help with your plan.</p><button class="btn ghost" id="dnEmptyLibrary">Choose a recipe</button></div>`}</div>
+   ${weekdayPrepMarkup()}
+   <details class="dn-details dn-week"><summary>Shopping list</summary>${shoppingListMarkup(weeklyNutritionSelection().days)}</details>
+   ${rushGuide||'<details class="dn-rush-guide"><summary>In a rush? <small>Late at work · Eating out · Missed prep</small></summary><p>Choose a convenient meal with protein, carbohydrates and vegetables you enjoy. Use the meal swaps for another option, and return to your usual routine at the next meal.</p></details>'}
+   ${adjusted?`<section class="panel day-type-food" aria-labelledby="dnDayTypeTitle"><h2 id="dnDayTypeTitle">Quick meal options</h2>${quick.length?quick.map((r,i)=>`<button class="btn ghost small" type="button" data-dn-quick-choice="${i}">${esc(r.meal.name)}</button>`).join(''):`<button class="btn ghost small" type="button" id="dnDayIdeas">See ideas from your recipes</button>`}</section>`:''}
+   <details class="dn-details dn-nutrition-details" ${dailyTracking?'open':''}><summary>${dailyTracking?'Daily targets & planned nutrition':'Nutrition details (optional)'}</summary>
+    <section class="dn-target-panel" aria-label="Daily coaching targets"><div class="dn-target-intro"><span class="eyebrow">YOUR AGREED TARGETS</span><span>Coach targets · not food consumed</span></div><div class="dn-targets">${M.fields.map((k,i)=>`<div><small>${['Calories','Protein','Carbs','Fat'][i]}</small><strong>${k==='calories'&&m.range?Number(m.range.calorie_min).toLocaleString()+'–'+Number(m.range.calorie_max).toLocaleString():m.targets[k]===null?'To agree':Math.round(m.targets[k]).toLocaleString()}<em>${m.targets[k]===null?'':['kcal','g','g','g'][i]}</em></strong></div>`).join('')}</div></section>
+    <p><strong>Planned recipe estimates:</strong> ${value(planned.calories,' kcal')} · ${value(planned.protein_g,'g protein')} · ${value(planned.carbs_g,'g carbs')} · ${value(planned.fat_g,'g fat')}</p><p>These are recipe estimates, not a record of how much you have eaten.</p>
+    ${m.range?'<p class="dn-notice">A temporary target range is saved. Older recipe portions need review with Calum.</p>':''}
+   </details>
+   ${m.plan?.coach_notes?`<details class="dn-details"><summary>Notes from Calum</summary><p>${esc(m.plan.coach_notes)}</p></details>`:''}
+   <details class="dn-details dn-page-units" ${unitsOpen?'open':''}><summary>Portion units & measurements</summary>${portionControls('dnPageUnits')}</details>
+   ${dailyTracking?'<section class="dn-details dn-tracking-panel"><h2>Food log</h2><p>Recorded food is shown below. Unlogged meals are not included.</p>':`<details class="dn-details dn-optional-tracking" ${trackingOpen?'open':''}><summary>Optional food tracking</summary><p>Use this only when it helps. No logs does not mean no food eaten. Your weekly check-in is what matters.</p>`}
+    <div class="dn-log-rows">${(dailyTracking?m.rows.filter(row=>!plannedRows.includes(row)):m.rows).map(r=>`<article class="dn-log-row ${r.eaten?'dn-eaten':''}"><div><strong>${esc(recipePresentation(r.meal).name)}</strong><small>${esc(summary(r.meal,r.servings))}</small>${r.eaten?'<span class="dn-status">'+(['household','visual'].includes(r.meal.portion?.method)?'Logged · estimated portion':'Logged')+'</span>':''}</div><button class="btn ghost small" data-dn-log="${esc(r.key)}" ${!loaded||busy?'disabled':''}>${r.eaten?'Undo log':'Record eaten'}</button></article>`).join('')}</div>
+    ${!visualOnly?`<section class="dn-intake"><div><span class="eyebrow">RECORDED FOOD ONLY</span><strong>${value(consumed.calories,' kcal')}</strong><p>${eaten} ${eaten===1?'meal':'meals'} logged · not a complete intake record</p></div><div class="dn-progress-bars">${M.fields.slice(1).map((k,i)=>`<div><span>${['Protein','Carbs','Fat'][i]}</span><b>${value(consumed[k],'g')}</b></div>`).join('')}</div></section>`:''}
+    ${loadError?`<div class="dn-notice" role="status">${esc(loadError)} <button class="text-btn" id="dnRetry">Retry</button></div>`:!loaded?'<p class="muted" role="status">Loading your saved food log…</p>':''}
+    ${!visualOnly||!dailyTracking?`<div class="dn-daily-actions">${dailyTracking?'':`<button class="btn ghost" id="dnQuickLog" ${!loaded?'disabled':''}>Record other food</button><button class="btn ghost" id="dnAnywhere" type="button">Search foods & barcodes</button>`}${!visualOnly?'<button class="btn ghost" id="dnIdeas" type="button">Browse meal ideas</button>':''}</div>`:''}
+   ${dailyTracking?'</section>':'</details>'}
+   <div id="dnSheetHost"></div></div>`;
+  if(dailyTracking){const meals=host().querySelector('.dn-meals'),targets=host().querySelector('.dn-nutrition-details'),log=host().querySelector('.dn-tracking-panel'),shortcuts=host().querySelector('.dn-tracking-shortcuts');if(trackingFirst&&log){log.querySelector('h2').textContent='Your daily food tracker';log.querySelector('p').textContent='Record what you eat each day so Calum can review it.';shortcuts?.querySelector('#dnQuickLog')?.classList.replace('ghost','primary');if(shortcuts){shortcuts.querySelector('#dnQuickLog').textContent='Log food';log.querySelector('p').after(shortcuts);}host().querySelector('.dn-history')?.after(log);meals?.after(targets);}else meals?.after(targets,log);}
+  if(loadError)host().querySelector('.dn-meals')?.insertAdjacentHTML('beforeend','<p class="dn-notice">Meals are available. Retry in your food log to enable saved swaps.</p>');
+  $('#dnLibrary').onclick=()=>openLibrary();$('#dnEmptyLibrary')?.addEventListener('click',()=>openLibrary());
+  $('#dnPageUnits').onchange=e=>{saveUnits(e.target.value);paint();};
+  $('#dnDate').onchange=e=>{if(e.target.value)changeDate(e.target.value);};
+  $('#dnToday')?.addEventListener('click',()=>changeDate(null));
+  $$('[data-dn-date]').forEach(b=>b.onclick=()=>changeDate(b.dataset.dnDate));
+  $$('[data-dn-recipe]').forEach(b=>b.onclick=()=>openRecipe(current().rows.find(r=>r.key===b.dataset.dnRecipe)));
+  $$('[data-dn-swap]').forEach(b=>b.onclick=()=>openLibrary(b.dataset.dnSwap));
+  $$('[data-dn-log]').forEach(b=>b.onclick=()=>{const r=current().rows.find(r=>r.key===b.dataset.dnLog);save(r,!r.eaten);});
+  $('#dnDayIdeas')?.addEventListener('click',openIdeas);
+  $$('[data-dn-quick-choice]').forEach(b=>b.onclick=()=>{
+   const row=quick[Number(b.dataset.dnQuickChoice)];
+   const slot=loaded&&current().rows.find(r=>!r.eaten&&r.group===row.group);
+   sheet={type:'recipe',row,returnSlot:slot?.key};renderSheet();
+  });
+  $('#dnIdeas')?.addEventListener('click',openIdeas);$('#dnAnywhere').onclick=()=>window.FoodAnywhere?.open();$('#dnQuickLog').onclick=quickLog;$('#dnRetry')?.addEventListener('click',()=>{loadError='';load();paint();});
+  if(recipeToOpen){
+   const key=recipeToOpen;recipeToOpen=null;
+   if(m.rows.some(row=>row.key===key))sheet={type:'recipe',slotKey:key};
+  }
+  if(sheet)renderSheet();
+ }
+ async function save(row,eaten,meal=row.meal,servings=row.servings||1){
+  if(busy||!loaded)return;
+  const key=ownerKey(),d=date(),client=state.client.id;
+  const snapshot=M.snapshot(meal);if(eaten&&Array.isArray(meal.ingredients)&&meal.ingredients.length&&['household','visual'].includes(state.foodPortionView))snapshot.portion={...((snapshot.portion&&typeof snapshot.portion==='object')?snapshot.portion:{}),method:state.foodPortionView,note:'Portion estimated using '+state.foodPortionView+' guide; nutrition uses the saved recipe.'};
+  if(eaten&&meal.ingredients?.length&&state.foodPortionView==='weighed'&&['household','visual'].includes(snapshot.portion?.method)){const {method,note,...other}=snapshot.portion;snapshot.portion=Object.keys(other).length?other:null;}
+  const payload={client_id:client,entry_date:d,slot_key:row.key,meal_snapshot:snapshot,servings,eaten};
+  busy=true;paint();
+  try{
+   const saved=state.preview?{...payload,id:`sample:${d}:${row.key}`}: (await query('Save food log',db.from('client_food_entries').upsert(payload,{onConflict:'client_id,entry_date,slot_key'}).select()))[0];
+   if(!saved)throw new Error('Your food log was not saved. Try again.');
+   if(ownerKey()!==key)return;
+   if(date()===d){const i=logs.findIndex(e=>e.entry_date===d&&e.slot_key===row.key);if(i<0)logs.push(saved);else logs[i]=saved;}
+   sheet=null;toast(state.preview?'Sample food updated locally':eaten?'Food logged':'Meal saved');return true;
+  }catch(e){if(ownerKey()===key)toast(e.message,'error');return false;}
+  finally{if(ownerKey()===key){busy=false;if(state.clientView==='nutrition')paint();}}
+ }
+ function showSheet(content,title){
+  const h=$('#dnSheetHost');if(!h)return;
+  h.innerHTML=`<div class="dn-sheet-overlay"><section class="dn-sheet" role="dialog" aria-modal="true" aria-label="${esc(title)}" tabindex="-1"><header><h2>${esc(title)}</h2><button class="btn ghost small" id="dnClose" aria-label="Close ${esc(title)}">Close</button></header><div class="dn-sheet-content">${content}</div></section></div>`;
+  const panel=h.querySelector('[role=dialog]');$('#dnClose').onclick=closeSheet;
+  panel.onkeydown=e=>{if(e.key==='Escape')closeSheet();if(e.key==='Tab'){const all=[...panel.querySelectorAll('button:not(:disabled),input,select,textarea,a[href]')];const first=all[0],last=all[all.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}}};panel.focus();
+ }
+ function closeSheet(){sheet=null;$('#dnSheetHost').innerHTML='';$('#dnLibrary')?.focus();}
+ function recipeKey(meal){return String(meal.id||meal.name||'Meal').slice(0,190);}
+ function openRecipe(row){if(!row)return;sheet={type:'recipe',row};renderSheet();}
+ function openLibrary(slot=null,search=''){sheet={type:'library',slot};libraryFilter='All';searchText=search;renderSheet();}
+ function renderSheet(){if(sheet?.type==='recipe')recipeSheet();else if(sheet?.type==='library')librarySheet();else if(sheet?.type==='quick')quickLog();else if(sheet?.type==='ideas')ideasSheet();}
+ function recipeSheet(){
+  const row=sheet.slotKey?current().rows.find(r=>r.key===sheet.slotKey):sheet.row;
+  if(!row){closeSheet();return;}
+  const meal=row.meal,shown=recipePresentation(meal),found=recipes().find(r=>r.key===row.key||r.meal.id&&r.meal.id===meal.id),key=found?.key||row.key||recipeKey(meal),star=favourites.some(f=>f.recipe_key===key);
+  if(meal.source_system==='coach_portion_menu'&&!shown.ingredients.length&&!sheet.returnSlot){
+   showSheet('<h3 class="dn-recipe-title">'+esc(shown.name)+'</h3><p>'+esc(shown.description)+'</p><p>'+esc(fullSummary(meal))+' · per serving</p>','Meal portions');
+   return;
+  }
+  const quantities=shown.ingredients.map(cleanIngredient),rough=['household','visual'].includes(state.foodPortionView),batch=Number(state.mealBatchPortions||1);
+  const ingredients=quantities.map(i=>{const guide=portionGuide(i,batch),amount=i.unit==='count'&&meal.source_system==='coach_portion_menu'?Number(i.quantity)*batch:rough?portionText(i,batch):scaledIngredientAmount(i,meal);return `<li><span>${esc(i.name)}${rough&&(guide?.basis||i.weight_basis)?`<small>${esc(guide?.basis||i.weight_basis)}</small>`:''}${rough&&guide?.note?`<small>${esc(guide.note)}</small>`:''}</span><strong>${esc(amount||'Ask coach for amount')}</strong></li>`;}).join('');
+  showSheet(`<span class="eyebrow">${esc(row.group||M.category(meal))}</span><h3 class="dn-recipe-title">${esc(shown.name)}</h3><p>${esc(shown.description)}</p><p>${esc(fullSummary(meal))} · per serving</p><p class="muted">${esc(meal.source_system?.includes('usda')?'USDA-based estimates; brands and preparation can vary.':'Nutrition from your coach’s saved recipe. Check product labels for allergens.')}</p><div class="dn-recipe-controls">${portionControls('dnUnits')}<label>Prepare servings<select id="dnBatch">${[1,2,3,4,7].map(n=>`<option ${Number(state.mealBatchPortions||1)===n?'selected':''}>${n}</option>`).join('')}</select></label><button class="btn ghost small" id="dnFavourite" ${!loaded?'disabled':''}>${star?'Saved recipe ✓':'Save favourite'}</button></div><h4>${rough?(state.foodPortionView==='visual'?'Rough visual guide':'Approximate household measures'):'Ingredients'}${batch>1?' · '+batch+' servings total':''}</h4>${rough?'<p class="dn-notice">These are estimates for the saved recipe. Eyed portions vary; the calories and macros shown are recipe estimates, not a measurement of what you eat.</p>':''}<ul class="dn-ingredients">${ingredients||'<li>Ingredient details not supplied. Ask your coach.</li>'}</ul>${rough&&!visualNutritionEnabled()?`<details class="dn-details"><summary>Original weighed ingredients</summary><ul class="dn-ingredients">${quantities.map(i=>`<li><span>${esc(i.name)}${i.weight_basis?`<small>${esc(i.weight_basis)}</small>`:''}</span><strong>${esc(scaledIngredientAmount(i,meal)||'Ask coach for amount')}</strong></li>`).join('')}</ul></details>`:''}${rough?'<details class="dn-details"><summary>About these portion guides</summary><p>Household measures and hand-sized portions are approximate. Food shape, thickness, brands and hand sizes vary. The original recipe remains your reference.</p><p><a href="https://fdc.nal.usda.gov/download-datasets/" target="_blank" rel="noopener noreferrer">USDA household measures ↗</a> · <a href="https://www.bda.uk.com/resource/food-facts-portion-sizes.html" target="_blank" rel="noopener noreferrer">Visual portion references ↗</a></p></details>':''}<h4>How to make it</h4>${rough?'<p class="muted">Use the approximate portions above with the recipe steps below.</p>':''}${meal.cooking_instructions?cookingStepsMarkup(visualCookingInstructions(meal.cooking_instructions)):meal.source_system==='coach_portion_menu'?'<p>'+esc(meal.preparation)+'</p>':'<p>Preparation instructions have not been supplied.</p>'}${meal.swaps?.length?`<details class="dn-details"><summary>Coach’s substitution notes</summary><p>${meal.swaps.map(s=>esc(humanValue(s))).join('<br>')}</p></details>`:''}<p class="muted">Batch quantities help with preparation. They do not multiply your food log or change your targets.</p>${sheet.returnSlot?'<button class="btn primary" id="dnChooseRecipe">Use this meal</button>':''}`, 'Recipe');
+  $('#dnUnits').onchange=e=>{saveUnits(e.target.value);paint();};$('#dnBatch').onchange=e=>{state.mealBatchPortions=Number(e.target.value);recipeSheet();};
+  $('#dnFavourite').onclick=async e=>{
+   const own=ownerKey();setBusy(e.currentTarget,true);
+   try{
+    if(state.preview){favourites=star?favourites.filter(f=>f.recipe_key!==key):[...favourites,{recipe_key:key,meal_snapshot:M.snapshot(meal)}];}
+    else if(star){const r=await db.from('client_recipe_favourites').delete().eq('client_id',state.client.id).eq('recipe_key',key);if(r.error)throw r.error;if(ownerKey()===own)favourites=favourites.filter(f=>f.recipe_key!==key);}
+    else{const [r]=await query('Save favourite',db.from('client_recipe_favourites').upsert({client_id:state.client.id,recipe_key:key,meal_snapshot:M.snapshot(meal)},{onConflict:'client_id,recipe_key'}).select());if(ownerKey()===own&&r)favourites.push(r);}
+    if(ownerKey()===own&&sheet?.type==='recipe')recipeSheet();
+   }catch(err){toast(err.message,'error');setBusy(e.currentTarget,false);}
+  };
+  $('#dnChooseRecipe')?.addEventListener('click',()=>{const r=current().rows.find(r=>r.key===sheet.returnSlot);if(r&&!r.eaten)save(r,false,meal,1);});
+ }
+ function librarySheet(){
+  const slot=sheet.slot,original=current().rows.find(r=>r.key===slot),all=recipes();
+  const eligible=original?all.filter(r=>M.matchesGroup(r,original.group)&&
+   !M.sameRecipe(r.meal,original.meal)):all;
+  function matchingRecipes(){
+   return eligible.filter(r=>(libraryFilter==='All'||libraryFilter==='Saved'&&favourites.some(f=>f.recipe_key===r.key)||
+    M.matchesGroup(r,libraryFilter))&&M.matchesRecipeSearch(r.meal,searchText,recipePresentation(r.meal)))
+    .sort((a,b)=>(original?Number(M.comparable(original.meal,b.meal))-Number(M.comparable(original.meal,a.meal)):0)||
+     Number(b.meal.source_system==='usda-personal-meal-examples-v1')-Number(a.meal.source_system==='usda-personal-meal-examples-v1'));
+  }
+  let candidates=matchingRecipes();
+  const distinct=new Set(all.map(r=>r.group+':'+M.recipeFamily(r.meal))).size;
+  showSheet(`<p>${original?'Choose another assigned meal. Similar calories and protein appear first.':`${distinct} meal choices. Fruit and portion variations are grouped together.`}</p><label class="dn-search">Search names or ingredients<input id="dnSearch" type="search" placeholder="Try chicken rice, Greek yogurt or oats" value="${esc(searchText)}"></label><div class="dn-library-filters">${(original?['All','Saved']:['All','Breakfast','Lunch','Dinner','Snacks','Saved']).map(f=>`<button type="button" class="btn ${f===libraryFilter?'primary':'ghost'} small" data-dn-filter="${f}">${f}</button>`).join('')}</div><div class="dn-library-results"></div><p class="muted">These options use your coach’s assigned portions and saved targets. Add allergies, dislikes and favourites in Food Anywhere so future recommendations can be tailored safely.</p>`,original?`Swap ${original.group.toLowerCase()}`:'Recipe library');
+  function results(){const h=$('.dn-library-results'),families=new Map();candidates.forEach((r,i)=>{const key=r.group+':'+M.recipeFamily(r.meal);if(!families.has(key))families.set(key,[]);families.get(key).push(i);});h.innerHTML=[...families.values()].map(indices=>{const i=indices[0],r=candidates[i],shown=recipePresentation(r.meal);return `<article><div><span class="eyebrow" data-dn-variant-group>${esc(r.group)}${original&&M.comparable(original.meal,r.meal)?' · SIMILAR CALORIES & PROTEIN':''}</span><h3 data-dn-variant-name>${esc(shown.name)}</h3><p class="muted" data-dn-variant-ingredients>${esc(shown.description)}</p><p data-dn-variant-summary>${esc(fullSummary(r.meal))}</p>${indices.length>1?`<label>Recipe & portion<select data-dn-variant>${indices.map(index=>`<option value="${index}">${esc(candidates[index].meal.name)} · ${esc(candidates[index].plan.name)} · ${esc(summary(candidates[index].meal))}</option>`).join('')}</select></label>`:`<small>${esc(r.plan.name)} · assigned portion</small>`}</div><div><button class="btn ghost small" data-dn-library-recipe="${i}">Recipe</button><button class="btn primary small" data-dn-choose="${i}" ${!loaded||busy?'disabled':''}>${original?'Choose swap':'Add to day'}</button></div></article>`;}).join('')||'<div class="dn-empty">No assigned recipes match. Try fewer words or a different ingredient.</div>';
+   h.querySelectorAll('[data-dn-variant]').forEach(select=>select.onchange=()=>{const card=select.closest('article'),index=Number(select.value);const selected=candidates[index].meal,shown=recipePresentation(selected);card.querySelector('[data-dn-variant-group]').textContent=candidates[index].group+(original&&M.comparable(original.meal,selected)?' · SIMILAR CALORIES & PROTEIN':'');card.querySelector('[data-dn-variant-name]').textContent=shown.name;card.querySelector('[data-dn-variant-ingredients]').textContent=shown.description;card.querySelector('[data-dn-variant-summary]').textContent=fullSummary(selected);card.querySelector('[data-dn-library-recipe]').dataset.dnLibraryRecipe=index;card.querySelector('[data-dn-choose]').dataset.dnChoose=index;});
+   h.querySelectorAll('[data-dn-library-recipe]').forEach(b=>b.onclick=()=>{const r=candidates[Number(b.dataset.dnLibraryRecipe)];sheet={type:'recipe',row:{key:r.key,meal:r.meal,group:r.group},returnSlot:slot};recipeSheet();});
+   h.querySelectorAll('[data-dn-choose]').forEach(b=>b.onclick=()=>{const r=candidates[Number(b.dataset.dnChoose)],group=r.groups?.includes(libraryFilter)?libraryFilter:r.group;save(original||{key:group.toLowerCase()+'-extra-'+crypto.randomUUID(),group},false,{...r.meal,meal_type:group},1);});
+  }results();
+  $('#dnSearch').oninput=e=>{searchText=e.target.value;candidates=matchingRecipes();results();};
+  $$('[data-dn-filter]').forEach(b=>b.onclick=()=>{libraryFilter=b.dataset.dnFilter;librarySheet();});
+ }
+ function openIdeas(){sheet={type:'ideas'};ideaGroup='All';ideasSheet();}
+ function ideasSheet(){
+  const own=ownerKey(),m=current(),candidates=[...new Map(recipes().filter(r=>ideaGroup==='All'||M.matchesGroup(r,ideaGroup)).map(r=>[r.group+':'+M.recipeFamily(r.meal),ideaGroup==='All'?r:{...r,group:ideaGroup}])).values()];
+  showSheet(`<p>Meal ideas from your coach-assigned recipes. Pick what fits your day. No AI credits needed.</p><label>What are you looking for?<select id="dnIdeaGroup">${['All','Breakfast','Lunch','Dinner','Snacks'].map(g=>`<option ${g===ideaGroup?'selected':''}>${g}</option>`).join('')}</select></label><p class="muted">Check ingredients against your dietary requirements.</p><div class="dn-library-results">${candidates.slice(0,8).map((r,i)=>`<article><div><span class="eyebrow">${esc(r.group)}</span><h3>${esc(r.meal.name)}</h3><p>${esc(summary(r.meal))}</p></div><div><button class="btn ghost small" data-idea-recipe="${i}">Recipe & portions</button><button class="btn primary small" data-idea-choose="${i}" ${!loaded||busy?'disabled':''}>Choose for my day</button></div></article>`).join('')||'<p>No assigned recipes match. Ask Calum to add more options.</p>'}</div><details><summary>Eating out instead?</summary><p>Choose a main with protein, vegetables and a carbohydrate you enjoy. Confirm allergens with staff.</p><button class="btn ghost" id="dnIdeasAnywhere">Search foods & barcodes</button></details><p class="muted">Choosing a meal updates your plan without logging it as eaten.</p>`,'Meal ideas');
+  $('#dnIdeaGroup').onchange=e=>{ideaGroup=e.target.value;ideasSheet();};
+  $$('[data-idea-recipe]').forEach(b=>b.onclick=()=>{if(ownerKey()!==own)return;const r=candidates[Number(b.dataset.ideaRecipe)];openRecipe({key:r.key,group:r.group,meal:r.meal});});
+  $$('[data-idea-choose]').forEach(b=>b.onclick=()=>{if(ownerKey()!==own||date()!==m.date)return;const r=candidates[Number(b.dataset.ideaChoose)],group=r.group;const slot=current().rows.find(row=>!row.eaten&&row.group===r.group);save(slot||{key:r.group.toLowerCase()+'-extra-'+crypto.randomUUID(),group},false,{...r.meal,meal_type:group},1);});
+  $('#dnIdeasAnywhere').onclick=()=>{closeSheet();window.FoodAnywhere?.open();};
+ }
+ function quickLog(){
+  sheet={type:'quick'};showSheet(`<p>Use the food label or your own tracked values. Leave unknown nutrients blank.</p><form id="dnQuickForm"><label>Food or meal<input name="name" maxlength="200" required placeholder="e.g. Lunch leftovers"></label><div class="dn-quick-grid">${M.fields.map((k,i)=>`<label>${['Calories (kcal)','Protein (g)','Carbs (g)','Fat (g)'][i]}<input name="${k}" type="number" inputmode="decimal" min="0" max="10000" step="any" placeholder="Optional"></label>`).join('')}</div><p class="muted">Enter totals for the amount you ate. This adds a food log; it does not change your coaching plan.</p><button class="btn primary">Log food eaten</button></form>`,'Quick food log');
+  $('#dnQuickForm').onsubmit=e=>{e.preventDefault();const f=new FormData(e.target),meal={name:String(f.get('name')).trim(),meal_type:'Snack',...Object.fromEntries(M.fields.map(k=>[k,M.number(f.get(k))]))};if(!meal.name)return;save({key:'quick-'+crypto.randomUUID(),servings:1},true,meal,1);};
+ }
+ window.DailyNutritionAccess={trackingEnabled:dailyTrackingEnabled,ideas:openIdeas,search:value=>openLibrary(null,value),context:()=>({...current(),loaded,owner:ownerKey()}),log:async(meal,servings=1)=>{if(!loaded||busy)throw Error('Wait for your food log to load.');const ok=await save({key:'anywhere-'+crypto.randomUUID(),servings},true,meal,servings);if(!ok)throw Error('Your food was not logged. Retry when your connection is available.');}};
+ // The outer renderer still enforces the existing account, consent and plan gates.
+ renderWeeklyNutrition=function(){if(owner!==ownerKey())reset();if(!dateChoice&&state.selectedNutritionDate&&state.selectedNutritionDate!==localCoachingDate())dateChoice=state.selectedNutritionDate;if(!state.preview&&loadedDate!==date()){loaded=false;logs=[];}paint();load();};
+ window.openDailyNutritionDate=function(d,recipeKey){if(owner!==ownerKey())reset();dateChoice=d||null;state.selectedNutritionDate=null;sheet=null;recipeToOpen=recipeKey||null;if(!state.preview){loaded=false;loadedDate=null;logs=[];}renderClient();};
+ const previousRender=renderClient;
+ renderClient=function(){
+  if(owner!==ownerKey())reset();
+  const identity=ownerKey(),view=state.clientView,role=state.role;
+  function decorate(){
+   if(ownerKey()!==identity||state.clientView!==view||state.role!==role)return;
+   if(!state.preview&&role==='client'&&typeof journeyCache==='function'&&!journeyCache().ready)return;
+  const ready=state.preview||(state.client?.onboarding_status==='complete'&&state.client?.plan_status==='published');if(!ready||host()?.classList.contains('journey-page'))return;
+  const routes=['progress','diagnostics','health'];
+  if(routes.includes(state.clientView)&&!$('#dnProgressNav')){
+   const nav=document.createElement('nav');nav.id='dnProgressNav';nav.className='dn-subnav';nav.setAttribute('aria-label','Progress sections');nav.innerHTML=[['progress','Overview'],['diagnostics','Diagnostics'],['health','Devices']].map(([k,label])=>`<button type="button" class="btn ${k===state.clientView?'primary':'ghost'} small" data-dn-route="${k}">${label}</button>`).join('');host().prepend(nav);nav.querySelectorAll('button').forEach(b=>b.onclick=()=>openRoute(b.dataset.dnRoute));
+  }
+  if(state.clientView==='training'&&!$('#dnSchedule')){const b=document.createElement('button');b.id='dnSchedule';b.className='btn ghost small dn-schedule';b.textContent='Arrange my week';b.onclick=()=>openRoute('planner');host().prepend(b);}
+  updateClientNav();
+  }
+  const result=previousRender();decorate();
+  if(result?.then)result.then(decorate).catch(()=>{});
+  return result;
+ };
+ document.addEventListener('DOMContentLoaded',()=>{document.querySelectorAll('.logout').forEach(b=>b.addEventListener('click',()=>{owner=null;logs=[];favourites=[];loaded=false;sheet=null;}));});
+})();

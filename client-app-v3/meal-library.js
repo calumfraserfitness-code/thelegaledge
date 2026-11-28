@@ -1,3 +1,11 @@
+function mealLibraryPresentation(meal){
+ let name=meal.name,ingredients=Array.isArray(meal.ingredients)?meal.ingredients:[],text=String(meal.preparation||'');
+ if(name==='Apple'&&/Greek Yoghurt/i.test(text)&&/150g/.test(text)&&Number(meal.calories)===180&&Number(meal.protein_g)===15){name='Apple & Greek yogurt';ingredients=[{name:'Apple',quantity:150,unit:'g'},{name:'Greek yogurt',quantity:150,unit:'g'}];}
+ if(name==='Ancient Nutrition Protein'&&/3 soft boiled eggs/i.test(text)&&/1 serving protein drink/i.test(text)&&Number(meal.calories)===330&&Number(meal.protein_g)===38){name='Protein drink & soft-boiled eggs';ingredients=[{name:'Ancient Nutrition protein drink',quantity:1,unit:'serving'},{name:'Soft-boiled eggs',quantity:3,unit:'eggs'}];}
+ const describe=i=>[i.quantity??'',i.unit||'',i.name||i.food||''].filter(v=>v!=='').join(' ');
+ return {name,ingredients,description:ingredients.map(describe).join(' · ')||'Ingredients not supplied. Review before assigning.'};
+}
+function mealLibraryNumber(v){return v===null||v===undefined||v===''||!Number.isFinite(Number(v))?'—':Number(v).toLocaleString(undefined,{maximumFractionDigits:1});}
 /* Paginated coach library. Personal plans and completion logs stay separate. */
 (function () {
   'use strict';
@@ -32,7 +40,7 @@
         const all = (window.mealLibraryPreview || []).filter(m => (!filters.search || m.name.toLowerCase().includes(filters.search.toLowerCase())) && (!filters.type || m.meal_type === filters.type) && (!filters.tag || m.tags?.includes(filters.tag)));
         count = all.length; rows = all.slice(page * PAGE, (page + 1) * PAGE);
       } else {
-        let q = db.from('meal_bank').select('id,name,meal_type,calories,protein_g,carbs_g,fat_g,tags,source_system', { count: 'exact' }).order('name').order('id');
+        let q = db.from('meal_library_unique').select('id,name,meal_type,calories,protein_g,carbs_g,fat_g,ingredients,preparation,tags,source_system', { count: 'exact' }).order('name').order('id');
         if (filters.search) q = q.ilike('name', '%' + filters.search.replace(/[\\%_]/g, '\\$&') + '%');
         if (filters.type) q = q.eq('meal_type', filters.type);
         if (filters.tag) q = q.contains('tags', [filters.tag]);
@@ -42,7 +50,7 @@
       }
       if (!active(host, client, plan) || host.request !== request) return;
       status.textContent = count ? `${count.toLocaleString()} meals · showing ${page * PAGE + 1}–${page * PAGE + rows.length}${state.preview ? ' · sample preview' : ''}` : 'No matching meals. Try a different search.';
-      results.innerHTML = rows.map(m => `<article class="meal-library-card"><span class="eyebrow">${esc(m.meal_type || 'Meal')}</span><h4>${esc(m.name)}</h4><p>${Math.round(Number(m.calories)||0)} kcal · ${Number(m.protein_g)||0}g protein</p><p class="muted">${Number(m.carbs_g)||0}g carbs · ${Number(m.fat_g)||0}g fat</p><button class="btn ghost small" data-recipe="${esc(m.id)}">View ingredients & choose</button></article>`).join('');
+      results.innerHTML = rows.map(m => {const presentation=mealLibraryPresentation(m);return `<article class="meal-library-card"><span class="eyebrow">${esc(m.meal_type || 'Meal')}</span><h4>${esc(presentation.name)}</h4><p class="muted">${esc(presentation.description)}</p><p>${m.calories==null?"—":Math.round(Number(m.calories))} kcal · ${mealLibraryNumber(m.protein_g)}g protein</p><p class="muted">${mealLibraryNumber(m.carbs_g)}g carbs · ${mealLibraryNumber(m.fat_g)}g fat</p><button class="btn ghost small" data-recipe="${esc(m.id)}">View ingredients & choose</button></article>`;}).join('');
       results.querySelectorAll('[data-recipe]').forEach(b => b.onclick = () => detail(host, b.dataset.recipe, client, plan));
       paging.innerHTML = `<button class="btn ghost small" data-page="-1" ${page === 0 ? 'disabled' : ''}>Previous</button><span>Page ${page + 1} of ${Math.max(1, Math.ceil(count / PAGE))}</span><button class="btn ghost small" data-page="1" ${(page + 1) * PAGE >= count ? 'disabled' : ''}>Next</button>`;
       paging.querySelectorAll('button').forEach(b => b.onclick = () => { page += Number(b.dataset.page); search(host); });
@@ -56,15 +64,16 @@
       else { const r = await db.from('meal_bank').select('*').eq('id', id).single(); if (r.error) throw r.error; meal = r.data; }
       if (!active(host, client, plan) || panel.request !== token) return;
       const totals = {};
-      const ingredients = Array.isArray(meal.ingredients) ? meal.ingredients : [];
+      const presentation=mealLibraryPresentation(meal);
+      const ingredients = presentation.ingredients;
       const nutrientKeys = ['fibre_g','sodium_mg','calcium_mg','iron_mg','magnesium_mg','potassium_mg','vitamin_a_ug','vitamin_c_mg','vitamin_d_ug'];
       nutrientKeys.forEach(key => { if (ingredients.length && ingredients.every(i => Number.isFinite(i.nutrients?.[key]))) totals[key] = ingredients.reduce((n, i) => n + i.nutrients[key], 0); });
       const labels = {fibre_g:'Fibre',sodium_mg:'Sodium',calcium_mg:'Calcium',iron_mg:'Iron',magnesium_mg:'Magnesium',potassium_mg:'Potassium',vitamin_a_ug:'Vitamin A',vitamin_c_mg:'Vitamin C',vitamin_d_ug:'Vitamin D'};
-      panel.innerHTML = `<h4>${esc(meal.name)}</h4><p>${Math.round(meal.calories)} kcal · ${meal.protein_g}g protein · ${meal.carbs_g}g carbs · ${meal.fat_g}g fat</p><ul>${ingredients.map(i => `<li><strong>${esc(i.name || i.food || 'Ingredient')}</strong> — ${esc(i.quantity ?? 'Amount not supplied')} ${esc(i.unit || '')}<small>${esc(i.description || '')}</small></li>`).join('')}</ul>${Object.keys(totals).length ? `<details><summary>Estimated fibre, minerals & vitamins</summary><p>${Object.entries(totals).map(([k,v]) => `${labels[k]}: ${v.toFixed(1)} ${k.endsWith('_ug') ? 'µg' : k.endsWith('_mg') ? 'mg' : 'g'}`).join(' · ')}</p><p class="muted">Only nutrients available for every ingredient are listed. Missing values are not zero.</p></details>` : ''}<p class="muted">${esc(meal.preparation || '')}</p><p class="meal-library-instructions">${esc(meal.cooking_instructions || 'Preparation not supplied; review before assigning.')}</p><form><input type="hidden" name="meal_id" value="${esc(meal.id)}"><button class="btn primary">Add to ${esc(state.data.nutritionPlans.find(p => p.id === plan)?.name || 'selected day')}</button><button type="button" class="btn ghost" data-close>Close recipe</button></form>`;
+      panel.innerHTML = `<h4>${esc(presentation.name)}</h4><p>${Math.round(meal.calories)} kcal · ${meal.protein_g}g protein · ${meal.carbs_g}g carbs · ${meal.fat_g}g fat</p><ul>${ingredients.map(i => `<li><strong>${esc(i.name || i.food || 'Ingredient')}</strong> — ${esc(i.quantity ?? 'Amount not supplied')} ${esc(i.unit || '')}<small>${esc(i.description || '')}</small></li>`).join('')}</ul>${Object.keys(totals).length ? `<details><summary>Estimated fibre, minerals & vitamins</summary><p>${Object.entries(totals).map(([k,v]) => `${labels[k]}: ${v.toFixed(1)} ${k.endsWith('_ug') ? 'µg' : k.endsWith('_mg') ? 'mg' : 'g'}`).join(' · ')}</p><p class="muted">Only nutrients available for every ingredient are listed. Missing values are not zero.</p></details>` : ''}<p class="muted">${esc(meal.preparation || '')}</p><p class="meal-library-instructions">${esc(meal.cooking_instructions || 'Preparation not supplied; review before assigning.')}</p><form><input type="hidden" name="meal_id" value="${esc(meal.id)}"><button class="btn primary">Add to ${esc(state.data.nutritionPlans.find(p => p.id === plan)?.name || 'selected day')}</button><button type="button" class="btn ghost" data-close>Close recipe</button></form>`;
       panel.querySelector('[data-close]').onclick = () => { panel.innerHTML = ''; };
       panel.querySelector('form').onsubmit = e => {
         if (!active(host, client, plan)) { e.preventDefault(); return; }
-        state.data.mealBank = [meal];
+        state.data.mealBank = [{...meal,name:presentation.name,ingredients}];
         assignMealFromBank(e, state.data.nutritionPlans.find(p => p.id === plan));
       };
       panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });

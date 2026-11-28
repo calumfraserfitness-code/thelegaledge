@@ -3,6 +3,7 @@ async function launchSave(table,id,patch){
  if(state.preview)return {...patch,id};
  const rows=await query('Save '+table,db.from(table).update(patch).eq('id',id).select());
  if(rows.length!==1||rows[0].id!==id)throw Error('Save was not confirmed. Your changes have not been applied.');
+ if(table==='clients'&&state.role==='coach')rows[0].coach_notes=Object.prototype.hasOwnProperty.call(patch,'coach_notes')?patch.coach_notes:(state.clients.find(c=>c.id===id)?.coach_notes??state.client?.coach_notes??null);
  return rows[0];
 }
 function launchApplyClient(id,saved){
@@ -45,7 +46,7 @@ storeProgressPhoto=async function(file,view,week,checkinId=null){
  if(!file?.size)return null;if(file.size>10*1024*1024)throw Error('Each photo must be under 10 MB.');
  const clientId=state.client.id,userId=state.user.id,path=`${clientId}/${Date.now()}-${view}-${String(file.name).replace(/[^a-z0-9._-]/gi,'-')}`;
  const {error}=await db.storage.from('client-files').upload(path,file,{contentType:file.type,upsert:false});if(error)throw error;
- try{const rows=await query('Photo record',db.from('client_files').insert({client_id:clientId,uploaded_by:userId,file_type:'progress_photo',storage_path:path,original_name:file.name,mime_type:file.type,week_number:week||null,photo_view:view,notes:checkinId?`Weekly check-in ${checkinId}`:null}).select());if(rows.length!==1)throw Error('Photo record was not confirmed.');if(state.client?.id===clientId)state.data.files.unshift(rows[0]);return rows[0];}catch(e){await db.storage.from('client-files').remove([path]);throw e;}
+ try{const rows=await query('Photo record',db.from('client_files').insert({client_id:clientId,uploaded_by:userId,file_type:'progress_photo',storage_path:path,original_name:file.name,mime_type:file.type,week_number:week||null,photo_view:view,notes:checkinId?`Weekly check-in ${checkinId}`:null}).select());if(rows.length!==1)throw Error('Photo record was not confirmed.');if(state.client?.id===clientId&&state.user?.id===userId)state.data.files.unshift(rows[0]);return rows[0];}catch(e){await db.storage.from('client-files').remove([path]);throw e;}
 };
 deletePlannerSession=async function(id){
  const clientId=state.client.id,session=state.data.sessions.find(s=>s.id===id);if(!session)return;

@@ -2,7 +2,7 @@
 function cleanCoachingText(value){
  const text=String(value??'').trim();
  if(/(?:SAVE TARGETS|IMPORT WITH AI|Import meal-plan JSON|source_system|\"(?:days|meals|ingredients)\"\s*:|<\/?(?:html|script|div)\b)/i.test(text)||text.length>2500)return '';
- return text;
+ return text.replace(/\bSource:\s*https?:\/\/\S+/gi,'').trim();
 }
 const polishNutritionMarkup=nutritionPlanMarkup;
 nutritionPlanMarkup=function(plan){return polishNutritionMarkup({...plan,coach_notes:cleanCoachingText(plan.coach_notes)});};
@@ -12,29 +12,39 @@ exerciseCard=function(ex,loggable=false){
  if(!loggable)return html;
  const history=(state.data.exerciseLogs||[]).filter(r=>r.training_session_id!==state.selectedSessionId&&(r.program_exercise_id===ex.id||(ex.exercise_bank_id&&r.exercise_bank_id===ex.exercise_bank_id))).sort((a,b)=>String(b.performed_at).localeCompare(String(a.performed_at)));
  html=html.replace(/<b>Set (\d+)<\/b>/g,(match,n)=>{const previous=history.find(r=>r.set_number===Number(n));const detail=previous?(previous.duration_seconds!=null?previous.duration_seconds+' seconds':[(previous.reps!=null?previous.reps+' reps':''),(previous.load!=null?previous.load+' '+(previous.load_unit||'kg'):'')].filter(Boolean).join(' · ')):'No previous set';return match+'<small class="last-set">Last: '+esc(detail)+(previous?' · '+esc(fmt(previous.performed_at)):'')+'</small>';});
- return html.replace('<button class="btn primary small">Save','<p class="set-save-status" role="status" aria-live="polite">Your entries save when you leave a field.</p><button class="btn primary small">Save');
+ return html.replace('<button class="btn primary small">Save','<p class="set-save-status" role="status" aria-live="polite">Sets autosave after you enter reps or time.</p><button class="btn primary small">Save');
 };
+// Coach-selected client preference, kept in the scoped guidance data.
+function simpleTrainingEnabled(){
+ const id=state.client?.id;
+ return !!id&&(state.data.coachingGuidance||[]).some(g=>g.client_id===id&&g.published&&g.category==='recovery'&&g.title==='Training display preference · simple logging');
+}
 const polishTraining=clientTraining;
 clientTraining=function(){
- polishTraining();const client=state.client,session=state.data.sessions.find(r=>r.id===state.selectedSessionId);
+ polishTraining();const client=state.client,user=state.user?.id,session=state.data.sessions.find(r=>r.id===state.selectedSessionId);
  if(!client||!session)return;
  document.querySelectorAll('#clientMain form[data-exercise-log]').forEach(form=>{
  const exercise=exercisesForSession(session).find(r=>r.id===form.dataset.exerciseLog);if(!exercise)return;
- let chain=Promise.resolve(),pending=0;const manual=form.querySelector('button');
+ let chain=Promise.resolve(),pending=0;const manual=form.querySelector('button[type="submit"],button.btn.primary');
+ const simple=simpleTrainingEnabled(),failedSets=new Set();
+ const setManualVisible=visible=>{if(manual&&simple){manual.hidden=!visible;manual.style.display=visible?'':'none';manual.textContent=visible?'Retry saving':'Save sets';}};
+ if(simple)setManualVisible(false);
+ if(simple&&!form.querySelector('.set-save-status')){const status=document.createElement('p');status.className='set-save-status';status.setAttribute('role','status');status.textContent='Your sets save automatically.';form.append(status);}
  form.addEventListener('change',event=>{
  if(!event.target.matches('input'))return;const set=Number(event.target.name.split('_').pop());let rows;
  const status=form.querySelector('.set-save-status');
+ const active=()=>state.client?.id===client.id&&state.user?.id===user;
  try{rows=workoutSetRows(exercise,session,new FormData(form),client).filter(r=>r.set_number===set&&(r.reps!==null||r.duration_seconds!==null));}catch(error){if(status)status.textContent=error.message;return;}
  if(!rows.length){if(status)status.textContent='Enter actual reps or seconds to save this set.';return;}
  if(status)status.textContent='Saving…';pending++;if(manual)manual.disabled=true;
  chain=chain.catch(()=>{}).then(async()=>{
  try{
  const saved=state.preview?rows.map(r=>({...r,id:'sample-'+session.id+'-'+exercise.id+'-'+r.set_number})):await query('Autosave workout set',db.from('exercise_set_logs').upsert(rows,{onConflict:'client_id,training_session_id,program_exercise_id,set_number'}).select());
- if(saved.length!==rows.length)throw Error('Save was not confirmed.');
- if(state.client?.id!==client.id)return;
+ if(saved.length!==rows.length||saved.some(r=>r.client_id!==client.id||r.training_session_id!==session.id||r.program_exercise_id!==exercise.id||r.set_number!==set))throw Error('Save was not confirmed.');
+ if(!active())return;
  const keys=new Set(saved.map(r=>r.training_session_id+'|'+r.program_exercise_id+'|'+r.set_number));state.data.exerciseLogs=[...saved,...(state.data.exerciseLogs||[]).filter(r=>!keys.has(r.training_session_id+'|'+r.program_exercise_id+'|'+r.set_number))];
- if(status&&form.isConnected)status.textContent='Saved ✓';
- }catch(error){toast('Workout set not saved. Return to Training and retry. '+error.message,'error');if(status&&form.isConnected)status.textContent='Not saved. Use Save workout sets to retry. '+error.message;}finally{pending--;if(manual&&pending===0)manual.disabled=false;}
+ failedSets.delete(set);if(!failedSets.size)setManualVisible(false);if(status&&form.isConnected)status.textContent='Set '+set+' saved.';
+ }catch(error){failedSets.add(set);if(active()&&form.isConnected){setManualVisible(true);if(status)status.textContent='Set '+set+' didn’t save. '+(simple?'Tap Retry saving.':'Use Save sets to retry.');}}finally{pending--;if(manual&&pending===0)manual.disabled=false;}
  });
  });
  });
@@ -51,10 +61,10 @@ persistNutritionImport=async function(payload,button){
  if(state.preview)return toast('Plan validated. Sign in to import it.');const id=state.client.id;setBusy(button,true,'Importing…');
  try{await query('Complete nutrition import',db.rpc('import_client_nutrition',{target_client_id:id,payload}));for(const week of (state.data.weeks||[]).filter(w=>w.client_id===id&&w.week_start>iso(monday())))await query('Assign upcoming meal menus',db.rpc('assign_client_week_nutrition',{p_client_id:id,p_week_id:week.id}));if(state.client?.id!==id)return;await loadClientData(id);if(state.client?.id!==id)return;state.selectedNutritionPlanId=state.data.nutritionPlans.find(p=>p.is_active!==false)?.id;state.pendingNutritionImport=null;toast('Measured weekly meal plan saved');coachNutrition();}catch(error){toast(error.message||'Import failed','error');}finally{setBusy(button,false);}
 };
-const polishLoad=loadClientData;
-loadClientData=async function(id){await polishLoad(id);if(state.client?.id!==id)return;for(const key of ['sessions','exercises','weeks','nutritionPlans'])state.data[key]=(state.data[key]||[]).map(row=>({...row,notes:cleanCoachingText(row.notes),coach_note:cleanCoachingText(row.coach_note),coach_notes:cleanCoachingText(row.coach_notes),coach_instructions:cleanCoachingText(row.coach_instructions)}));state.data.programs=(state.data.programs||[]).map(program=>({...program,days:(program.days||[]).map(day=>({...day,coach_notes:cleanCoachingText(day.coach_notes),recovery_notes:cleanCoachingText(day.recovery_notes)}))}));};
+const polishLoad=loadClientData;let polishLoadSequence=0;
+loadClientData=async function(id){const request=++polishLoadSequence,user=state.user?.id,role=state.role;if(await polishLoad(id)===false||request!==polishLoadSequence||state.client?.id!==id||state.user?.id!==user||state.role!==role)return false;for(const key of ['sessions','exercises','weeks','nutritionPlans'])state.data[key]=(state.data[key]||[]).map(row=>({...row,notes:cleanCoachingText(row.notes),coach_note:cleanCoachingText(row.coach_note),coach_notes:cleanCoachingText(row.coach_notes),coach_instructions:cleanCoachingText(row.coach_instructions)}));state.data.programs=(state.data.programs||[]).map(program=>({...program,days:(program.days||[]).map(day=>({...day,coach_notes:cleanCoachingText(day.coach_notes),recovery_notes:cleanCoachingText(day.recovery_notes)}))}));return true;};
 const polishCallsMarkup=coachingCallsMarkup;
-coachingCallsMarkup=function(){const reviews=(state.data.coachingGuidance||[]).filter(r=>r.published&&/^Fathom review ·/.test(r.title));return polishCallsMarkup()+ (reviews.length?'<section class="panel"><span class="eyebrow">RECORDED REVIEWS</span><h2>Agreed priorities from your calls</h2>'+reviews.map(r=>'<article class="cw-call"><div><b>'+esc(r.title.replace('Fathom review · ',''))+'</b><p class="cw-lines">'+esc(r.body)+'</p></div></article>').join('')+'</section>':'');};
+coachingCallsMarkup=function(){const reviews=(state.data.coachingGuidance||[]).filter(r=>r.published&&/^Fathom review ·/.test(r.title));return polishCallsMarkup()+ (reviews.length?'<section class="panel"><span class="eyebrow">RECORDED REVIEWS</span><h2>Agreed priorities from your calls</h2>'+reviews.map(r=>'<article class="cw-call"><div><b>'+esc(r.title.replace('Fathom review · ',''))+'</b><p class="cw-lines">'+esc(cleanCoachingText(r.body))+'</p></div></article>').join('')+'</section>':'');};
 const polishGuidanceMarkup=coachingGuidanceMarkup;
 coachingGuidanceMarkup=function(){const rows=state.data.coachingGuidance;state.data.coachingGuidance=(rows||[]).filter(r=>!/^Fathom review ·/.test(r.title));try{return polishGuidanceMarkup();}finally{state.data.coachingGuidance=rows;}};
 

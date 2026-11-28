@@ -1,0 +1,22 @@
+/* Stable surfaces and phone navigation. Route content still reports real loading/failure. */
+html{background:var(--paper,#f6f4ef)}
+body{min-height:100vh;min-height:100dvh}
+#clientApp,#coachApp{min-height:100vh;min-height:100dvh}
+#clientMain,#coachMain{min-width:0;min-height:calc(100vh - 170px);min-height:calc(100svh - 170px)}
+@media(max-width:600px){
+ #clientNav{display:grid;grid-template-columns:repeat(6,minmax(0,1fr))!important;gap:2px;padding-left:6px;padding-right:6px;overflow-x:visible}
+ #clientNav button{min-width:0;max-width:100%;padding-left:2px;padding-right:2px;white-space:normal;overflow-wrap:normal}
+}
+@media(max-width:420px){#clientNav button{font-size:11px!important}}
+
+/* Keep intrinsic content and the iOS keyboard from widening the phone page. */
+@media(max-width:600px){
+ #clientMain,#coachMain{box-sizing:border-box;width:100%;max-width:100%}
+ #clientMain .panel,#coachMain .panel,.client-head .side-brand,.head-actions{min-width:0}
+ #clientMain img,#coachMain img,#clientMain video,#coachMain video{max-width:100%;height:auto}
+ #clientMain iframe,#coachMain iframe{max-width:100%}
+ input,textarea,select{font-size:16px!important}
+ #clientMain .editor-grid,#coachMain .editor-grid{grid-template-columns:minmax(0,1fr)}
+ #clientNav{padding-bottom:max(8px,env(safe-area-inset-bottom))}
+ #clientMain{padding-bottom:calc(100px + env(safe-area-inset-bottom))}
+}

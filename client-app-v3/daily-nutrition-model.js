@@ -1,0 +1,107 @@
+/* Pure daily-food model. Unknown nutritional values remain unknown. */
+(function(root){
+ 'use strict';
+ const fields=['calories','protein_g','carbs_g','fat_g'];
+ function number(v){return v!==null&&v!==undefined&&v!==''&&Number.isFinite(Number(v))&&Number(v)>=0?Number(v):null;}
+ function category(meal,index=0){
+  const type=String(meal.meal_type||meal.timing||'');
+  if(/main meal/i.test(type))return 'Lunch';
+  if(/breakfast|meal\s*1/i.test(type))return 'Breakfast';
+  if(/lunch|meal\s*2/i.test(type))return 'Lunch';
+  if(/dinner|supper|meal\s*3/i.test(type))return 'Dinner';
+  if(/snack|meal\s*[4-9]/i.test(type))return 'Snacks';
+  return ['Breakfast','Lunch','Dinner','Snacks'][Math.min(index,3)];
+ }
+ function snapshot(meal){return {name:String(meal.name||'Meal').slice(0,200),meal_type:meal.meal_type||meal.timing||'Meal',...Object.fromEntries(fields.map(k=>[k,number(meal[k])])),ingredients:meal.ingredients||(meal.items||[]),cooking_instructions:meal.cooking_instructions||null,preparation:meal.preparation||null,swaps:meal.swaps||[],source_system:meal.source_system||null,source_url:meal.source_url||null,quality:meal.quality||null,portion:meal.portion||null,retrieved_at:meal.retrieved_at||null,allergen_note:meal.allergen_note||null};}
+ function placeholderMeal(meal){
+  return /^(?:new meal|untitled meal|meal)$/i.test(String(meal.name||'').trim())&&
+   !meal.ingredients?.length&&!meal.items?.length&&!meal.cooking_instructions?.trim()&&!meal.preparation?.trim()&&
+   fields.every(k=>number(meal[k])===null);
+ }
+ function slots(meals,entries=[]){
+  const counts={};const rows=meals.map((meal,i)=>{let group=category(meal,i);if(/main meal/i.test(meal.meal_type||''))group=!counts.Lunch?'Lunch':!counts.Dinner?'Dinner':'Snacks';counts[group]=(counts[group]||0)+1;const key=group.toLowerCase()+'-'+counts[group];return {key,group,meal,entry:entries.find(e=>e.slot_key===key)};});
+  entries.filter(e=>!rows.some(r=>r.key===e.slot_key)).forEach(entry=>rows.push({key:entry.slot_key,group:category(entry.meal_snapshot,3),meal:entry.meal_snapshot,entry}));
+  return rows.map(row=>({...row,meal:row.entry?.meal_snapshot||row.meal,servings:number(row.entry?.servings)??1,eaten:row.entry?.eaten===true})).filter(row=>row.entry||!placeholderMeal(row.meal));
+ }
+ function totals(rows,eatenOnly=false){
+  const selected=rows.filter(r=>!eatenOnly||r.eaten);
+  return Object.fromEntries(fields.map(k=>{const values=selected.map(r=>number(r.meal[k]));return [k,values.some(v=>v===null)?null:values.reduce((n,v,i)=>n+v*selected[i].servings,0)];}));
+ }
+ function targetRange(client,date){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(date||''))return null;
+  const weekday=new Date(date+'T12:00:00Z').getUTCDay();
+  return (client?.nutrition_target_ranges||[]).find(r=>r.start_date<=date&&r.end_date>=date&&Array.isArray(r.weekdays)&&r.weekdays.includes(weekday)&&number(r.calorie_min)>0&&number(r.calorie_max)>=number(r.calorie_min))||null;
+ }
+ function targets(client,plan,day,date=day?.nutrition_date){
+  const keys=['calorie_target','protein_target_g','carbs_target_g','fat_target_g'],clientKeys=['calorie_goal','protein_goal_g','carbs_goal_g','fat_goal_g'];
+  const result=Object.fromEntries(fields.map((k,i)=>[k,number(day?.[keys[i]])??number(plan?.[k])??number(client?.[clientKeys[i]])]));
+  const range=targetRange(client,date);if(range){result.calories=Number(range.calorie_max);if(range.macro_review_required){result.carbs_g=null;result.fat_g=null;}}
+  return result;
+ }
+ function comparable(original,candidate){
+  const a=number(original?.calories),b=number(candidate?.calories),p=number(original?.protein_g),q=number(candidate?.protein_g);
+  return a!==null&&a>0&&b!==null&&p!==null&&q!==null&&Math.abs(a-b)<=Math.max(50,a*.2)&&Math.abs(p-q)<=Math.max(5,p*.25);
+ }
+ function matchesGroup(recipe,group){return recipe.group===group||recipe.groups?.includes(group)===true;}
+ const foodWords={
+  yoghurt:'yogurt', oats:'oat', porridge:'oat', courgette:'zucchini', courgettes:'zucchini', zucchinis:'zucchini',
+  aubergine:'eggplant', aubergines:'eggplant', eggplants:'eggplant', capsicum:'pepper', peppers:'pepper',
+  prawns:'shrimp', prawn:'shrimp', shrimps:'shrimp', mince:'ground', minced:'ground',
+  scallions:'scallion', chickpeas:'chickpea', potatoes:'potato', tomatoes:'tomato',
+  strawberries:'strawberry', raspberries:'raspberry', blueberries:'blueberry',
+  bananas:'banana', apples:'apple', tortillas:'tortilla', eggs:'egg', wraps:'wrap'
+ };
+ function searchTerms(value){
+  const words=String(value||'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase()
+   .replace(/\bchick[\s-]+peas?\b/g,'chickpea').match(/[a-z0-9]+/g)||[];
+  return words.filter(word=>!['and','with','the'].includes(word)).map(word=>Object.hasOwn(foodWords,word)?foodWords[word]:word);
+ }
+ function matchesRecipeSearch(meal,query,presentation={}){
+  const {name,description,ingredients}=presentation;
+  const items=[ingredients,meal.ingredients,meal.items].filter(Array.isArray).flat();
+  const haystack=searchTerms([meal.name,name,description,...items.map(i=>typeof i==='string'?i:i?.name||i?.food)].join(' '));
+  return searchTerms(query).every(term=>haystack.some(word=>word===term||term.length>=3&&word.startsWith(term)));
+ }
+ function sameRecipe(a,b){
+  return Boolean(a.id&&a.id===b.id)||String(a.name||'').trim().toLowerCase()===String(b.name||'').trim().toLowerCase()&&
+   fields.every(key=>number(a[key])===number(b[key]));
+ }
+ function recipeFamily(meal){
+  const name=String(meal.name||'Meal').trim();
+  const explicit=(meal.tags||[]).find(t=>String(t).startsWith('recipe-family:'));
+  return (explicit?explicit.slice(14):name.replace(/^(Greek Yogurt (?:Protein Oat )?Bowl|Greek Yogurt Fruit Cup)\s*·.*$/i,'$1')).toLowerCase();
+ }
+ function mealIdeas(recipes,rows,goals,group='All'){
+  const eaten=totals(rows,true),remaining=Object.fromEntries(fields.map(k=>[k,number(goals[k])===null||eaten[k]===null?null:goals[k]-eaten[k]]));
+  const portions=Math.max(1,rows.filter(r=>!r.eaten).length),families=new Map();
+  for(const recipe of recipes){
+   if(group!=='All'&&!matchesGroup(recipe,group))continue;
+   const meal=recipe.meal,cal=number(meal.calories),protein=number(meal.protein_g);
+   const known=fields.filter(k=>remaining[k]!==null&&number(meal[k])!==null);
+   const score=known.length?known.reduce((n,k)=>{const available=Math.max(0,remaining[k]),amount=number(meal[k]),scale=Math.max(k==='calories'?100:10,available);return n+Math.abs(amount-available/portions)/scale+(amount>available?(amount-available)/scale*3:0);},0)/known.length:Infinity;
+   const fits=remaining.calories!==null&&cal!==null&&cal<=Math.max(0,remaining.calories);
+   const after=Object.fromEntries(fields.map(k=>[k,remaining[k]===null||number(meal[k])===null?null:remaining[k]-number(meal[k])]));
+   const item={...recipe,group:group==='All'?recipe.group:group,score,fits,after,remaining,comparable:remaining.calories!==null&&cal!==null&&remaining.protein_g!==null&&protein!==null};
+   const key=recipe.group+':'+recipeFamily(meal),old=families.get(key);
+   if(!old||score<old.score)families.set(key,item);
+  }
+  return [...families.values()].sort((a,b)=>a.score-b.score||String(a.meal.name).localeCompare(String(b.meal.name)));
+ }
+ // Logging coverage only; it is not an estimate of actual intake or adherence.
+ function trackingSummary({days,entries,today,clientId,startDate}){
+  const scoped=entries.filter(e=>e.client_id===clientId&&e.eaten===true);
+  const rows=days.filter(day=>day.date<=today&&(!startDate||day.date>=startDate)).map(day=>{
+   const planned=new Set(day.keys||[]),recorded=new Map();
+   for(const entry of scoped.filter(e=>e.entry_date===day.date))recorded.set(entry.slot_key,entry);
+   const items=[...recorded.values()],matched=[...recorded.keys()].filter(key=>planned.has(key)).length;
+   const totalsRecorded=items.length?totals(items.map(entry=>({meal:entry.meal_snapshot||{},servings:number(entry.servings)??1,eaten:true})),true):Object.fromEntries(fields.map(k=>[k,null]));
+   return {date:day.date,today:day.date===today,assigned:planned.size,matched,items:items.length,extra:items.length-matched,totals:totalsRecorded,targets:day.targets||{}};
+  });
+  const elapsed=rows.filter(r=>!r.today),assignedDays=elapsed.filter(r=>r.assigned>0);
+  const planned=elapsed.reduce((n,r)=>n+r.assigned,0),matched=elapsed.reduce((n,r)=>n+r.matched,0),logged=elapsed.filter(r=>r.items>0).length,complete=assignedDays.filter(r=>r.matched===r.assigned).length;
+  const pct=(n,d)=>d?Math.round(100*n/d):null;
+  return {rows,elapsed:elapsed.length,logged,planned,matched,assignedDays:assignedDays.length,complete,daysPercentage:pct(logged,elapsed.length),mealsPercentage:pct(matched,planned),completePercentage:pct(complete,assignedDays.length)};
+ }
+ const model={trackingSummary,placeholderMeal,matchesRecipeSearch,sameRecipe,fields,number,category,snapshot,slots,totals,targets,targetRange,comparable,matchesGroup,recipeFamily,mealIdeas};
+ root.DailyNutrition=model;if(typeof module!=='undefined')module.exports=model;
+})(typeof window==='undefined'?globalThis:window);
