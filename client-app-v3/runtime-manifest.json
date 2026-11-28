@@ -93,7 +93,8 @@
     "coach-change-log.js",
     "checkin-quick-view.js",
     "gym-plan.js",
-    "coach-food-tracking.js"
+    "coach-food-tracking.js",
+    "coach-client-overview.js"
   ],
   "styles": [
     "app.css",
@@ -152,6 +153,7 @@
     "coach-roadmaps.css",
     "roadmap-call-review.css",
     "coach-plan-simple.css",
-    "coaching-progression.css"
+    "coaching-progression.css",
+    "coach-client-overview.css"
   ]
 }
