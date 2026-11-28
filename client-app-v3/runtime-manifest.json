@@ -94,7 +94,8 @@
     "checkin-quick-view.js",
     "gym-plan.js",
     "coach-food-tracking.js",
-    "coach-client-overview.js"
+    "coach-client-overview.js",
+    "weekly-email-health.js"
   ],
   "styles": [
     "app.css",
